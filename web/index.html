@@ -1,10 +1,4 @@
-#pragma once
-
-#include <Arduino.h>
-
-// The control page served at "/". One self-contained file: no external assets,
-// so it works without an internet connection. It is a client of the REST API.
-static const char WEB_PAGE[] PROGMEM = R"HTML(<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -323,4 +317,3 @@ poll();
 </script>
 </body>
 </html>
-)HTML";

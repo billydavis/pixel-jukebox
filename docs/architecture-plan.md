@@ -65,7 +65,7 @@ keep.
 | 1 | **Measure.** Report heap, PSRAM and task stack headroom from the board; run a full rotation and sound mode; decide whether the image limit needs to change | Done: no change needed, see below |
 | 2 | **CI build.** GitHub Actions workflow building the regular firmware and the diagnostic builds, without `secrets.h` | Deferred, see below |
 | 3 | **Tests.** Unit tests for the pure functions listed above; a smoke-test script that exercises the API on a real board; the route-consistency check | Done, see below |
-| 4 | **Web assets.** Control and setup pages as `.html` files embedded at build time; a duplicate-ID check in the tests | Not started |
+| 4 | **Web assets.** Control and setup pages as `.html` files embedded at build time; a duplicate-ID check in the tests | Done, see below |
 | 5 | **Tidy `main.cpp`.** Move the diagnostics and the Wi-Fi lifecycle into their own modules | Not started |
 | 6 | **Regroup `src/`.** One mechanical commit | Not started |
 | 7 | **Metadata.** Give the PC tool its own identity; stop hard-coding the firmware version in the API example; commit the Postman generator | Not started |
@@ -156,4 +156,43 @@ GCC, which is not installed.
 Not covered by any of the three: the display, audio capture, GIF decoding on
 real artwork, Makapix registration and the Wi-Fi setup hotspot. Those remain
 manual, using the diagnostic builds and a phone.
+
+## Step 4 results
+
+The pages now live in `web/` as ordinary files and are compiled into the
+firmware by PlatformIO's `board_build.embed_txtfiles`, which needs no extra
+build script or dependency. `src/web_page.h` and `src/setup_page.h` are gone.
+
+| File | Purpose | Size |
+|---|---|---|
+| `web/index.html` | Control page, self-contained | 14.7 KB |
+| `web/setup.html` | Wi-Fi setup form | 1.6 KB |
+| `web/setup_check.html` | "Checking the password" | 0.6 KB |
+| `web/setup_done.html` | "Connected" | 0.5 KB |
+| `web/setup.css` | Styles shared by the three setup pages | 2.3 KB |
+
+Verified:
+
+- The board serves `/` byte for byte identical to `web/index.html`.
+- The API smoke test passes unchanged (49 of 49).
+- All four build environments compile, and the regular one without `secrets.h`.
+- `tools/check_web.py` passes, and was shown to catch the earlier bug:
+  reintroducing the duplicate `id="art"` made it report both the duplicate and
+  the script reference it broke.
+
+Two things changed beyond a straight move:
+
+- **The setup pages share one stylesheet.** Their styles were a C macro pasted
+  into three pages; they are now `web/setup.css`, which the hotspot serves at
+  `/setup.css`. This is still self-contained: it comes from the board.
+- **The control page stays a single file.** Splitting its CSS and JavaScript
+  out would mean three requests to a small single-threaded server for no gain
+  in maintainability at its current size.
+
+The colour tokens exist twice, in `index.html` and `setup.css`. Removing that
+would mean the control page loading a second file, so `check_web.py` compares
+the two and fails if they differ.
+
+The setup hotspot, which now makes a second request for its stylesheet, was
+checked by hand from a phone and renders correctly.
 

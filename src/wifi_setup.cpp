@@ -8,7 +8,7 @@
 
 #include "display.h"
 #include "html_escape.h"
-#include "setup_page.h"
+#include "web_assets.h"
 
 #if __has_include("secrets.h")
 #include "secrets.h"
@@ -133,7 +133,7 @@ static String networkList() {
 }
 
 static String setupPage(const String &alert, const String &ssid) {
-  String page = FPSTR(SETUP_PAGE);
+  String page = WEB_SETUP_HTML;
   page.replace("{{ALERT}}",
                alert.isEmpty() ? "" : "<p class=\"alert\" role=\"alert\">" + alert + "</p>");
   page.replace("{{NETWORKS}}", networkList());
@@ -177,7 +177,7 @@ static void redirect(WebServer &server, const char *path) {
 }
 
 static String filledPage(const char *page, const String &ssid) {
-  String html = FPSTR(page);
+  String html = page;
   html.replace("{{SSID}}", escapeHtml(ssid));
   return html;
 }
@@ -243,21 +243,26 @@ void wifiSetupRun(bool joinFailed) {
     stateSince = millis();
     Serial.printf("Trying Wi-Fi network %s\n", ssid.c_str());
     showMessage("WiFi", "checking\npassword", display->color565(255, 200, 0));
-    server.send(200, "text/html", filledPage(SETUP_CHECK_PAGE, ssid));
+    server.send(200, "text/html", filledPage(WEB_SETUP_CHECK_HTML, ssid));
     WiFi.begin(ssid.c_str(), password.c_str());
   });
 
   server.on("/result", HTTP_GET, []() {
     switch (setupState) {
       case SetupState::Testing:
-        server.send(200, "text/html", filledPage(SETUP_CHECK_PAGE, pendingSsid));
+        server.send(200, "text/html", filledPage(WEB_SETUP_CHECK_HTML, pendingSsid));
         break;
       case SetupState::Joined:
-        server.send(200, "text/html", filledPage(SETUP_DONE_PAGE, pendingSsid));
+        server.send(200, "text/html", filledPage(WEB_SETUP_DONE_HTML, pendingSsid));
         break;
       default:
         redirect(server, "/");
     }
+  });
+
+  server.on("/setup.css", HTTP_GET, []() {
+    server.sendHeader("Cache-Control", "max-age=600");
+    server.send_P(200, "text/css", WEB_SETUP_CSS);
   });
 
   // Phones probe assorted addresses to detect a sign-in page; send them all here.

@@ -12,7 +12,7 @@
 #include "rotation.h"
 #include "status.h"
 #include "telemetry.h"
-#include "web_page.h"
+#include "web_assets.h"
 
 #define API_BASE "/api/v1"
 
@@ -61,7 +61,7 @@ static bool readBody(JsonDocument &doc) {
   return true;
 }
 
-static void handlePage() { server.send_P(200, "text/html", WEB_PAGE); }
+static void handlePage() { server.send_P(200, "text/html", WEB_INDEX_HTML); }
 
 static void handleApiRoot() {
   JsonDocument doc;

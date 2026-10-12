@@ -65,7 +65,7 @@ Pin mapping is in [`include/pins.h`](include/pins.h).
 | Display | ESP32-HUB75-MatrixPanel-DMA, Adafruit GFX |
 | Artwork | AnimatedGIF, decoded from RAM (PSRAM) |
 | Network | Makapix player API over HTTPS, ArduinoJson; images over plain HTTP from the vault |
-| Remote control | Built-in WebServer and mDNS, JSON over HTTP |
+| Remote control | Built-in WebServer and mDNS, JSON over HTTP; pages embedded from `web/` at build time |
 | Storage | NVS (Preferences) for Wi-Fi details, the player key and token, brightness and the rotation |
 | Audio | ES7210 microphone ADC and ES8311 speaker codec over I2C and I2S; a built-in FFT for the visualizers |
 
@@ -111,7 +111,7 @@ Brightness (0-255) is set through the API and remembered across restarts; the st
 
 ## Control page
 
-Open `http://pixel-jukebox.local` (or the board's IP address) in a browser on the same network. The page shows what is on the panel and who made it, with Hold, Next and a brightness slider, a Jukebox / Sound switch for choosing a visualizer, and a Rotation section for choosing which slots play and for how long. On a keyboard, `N` skips and `H` holds. It is a single file built into the firmware, with no external assets.
+Open `http://pixel-jukebox.local` (or the board's IP address) in a browser on the same network. The page shows what is on the panel and who made it, with Hold, Next and a brightness slider, a Jukebox / Sound switch for choosing a visualizer, and a Rotation section for choosing which slots play and for how long. On a keyboard, `N` skips and `H` holds. It is a single file, [`web/index.html`](web/index.html), compiled into the firmware, with no external assets.
 
 ## REST API
 
@@ -171,9 +171,9 @@ The first run registers a second player on your account. Its key and token are k
 | `src/slot_clock.cpp` | Clock slot (network time) |
 | `src/commands.cpp` | Command queue and the BOOT button |
 | `src/wifi_setup.cpp` | Wi-Fi credentials and the setup hotspot |
-| `src/setup_page.h` | The hotspot's setup pages |
 | `src/api.cpp` | HTTP server and mDNS |
-| `src/web_page.h` | The control page (HTML, CSS and JavaScript in one string) |
+| `web/` | The control page and the Wi-Fi setup pages, as ordinary HTML and CSS files |
+| `src/web_assets.h` | Names for the `web/` files once they are embedded in the firmware |
 | `src/telemetry.cpp` | Memory and task headroom for `GET /diagnostics` |
 | `src/status.cpp` | Shared "now showing" state read by the API |
 | `src/makapix.cpp` | Makapix player API and stored credentials |
@@ -188,6 +188,7 @@ The first run registers a second player on your account. Its key and token are k
 | `tools/run_unit_tests.ps1` | Builds and runs the unit tests on a Windows PC |
 | `tools/api_smoke_test.py` | End-to-end check of the API against a board |
 | `tools/check_api_docs.py` | Checks the API document and Postman collection against the firmware |
+| `tools/check_web.py` | Checks the pages in `web/` for mistakes a browser would not report |
 | `include/pins.h` | HUB75, I2C and audio GPIO mapping, panel size |
 | `include/ca_certs.h` | Root certificates trusted for makapix.club |
 | `include/secrets.example.h` | Optional compiled-in Wi-Fi credentials |
@@ -200,13 +201,19 @@ pio device monitor      # serial log at 115200 baud
 
 ## Testing
 
-Three checks, from fastest to most thorough.
+Four checks, from fastest to most thorough.
 
 ```sh
 python tools/check_api_docs.py
 ```
 
 Compares the routes in `src/api.cpp` with the API document and the Postman collection. Needs no board.
+
+```sh
+python tools/check_web.py
+```
+
+Checks the pages in `web/` for duplicate element IDs, script references to IDs that do not exist, anything loaded from outside the board, placeholders the firmware never fills in, and colour tokens that differ between the control page and the setup pages. Needs no board.
 
 ```sh
 powershell -File tools/run_unit_tests.ps1

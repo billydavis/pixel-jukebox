@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pixel Jukebox setup</title>
+<link rel="stylesheet" href="setup.css">
+</head>
+<body>
+<main>
+<h1>Pixel Jukebox</h1>
+<h2>Connect the panel to Wi-Fi</h2>
+<p>Pick your home network and enter its password. The panel checks it works before saving.</p>
+{{ALERT}}
+<form method="post" action="/save">
+  <p class="cap">Networks nearby</p>
+  <div class="nets">{{NETWORKS}}</div>
+  <p class="note"><a href="/?scan=1">Scan again</a>. Only 2.4 GHz networks appear; the panel can't use 5 GHz.</p>
+  <label for="ssid">Network name</label>
+  <input id="ssid" name="ssid" type="text" value="{{SSID}}" maxlength="32" required autocapitalize="none" autocorrect="off" spellcheck="false">
+  <label for="pw">Password</label>
+  <input id="pw" name="password" type="password" maxlength="63" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+  <label class="show"><input type="checkbox" id="show"> Show password</label>
+  <button class="go">Connect</button>
+  <p class="note">Leave the password empty for an open network.</p>
+</form>
+</main>
+<script>
+var ssid=document.getElementById('ssid'),pw=document.getElementById('pw'),nets=document.querySelectorAll('.net');
+nets.forEach(function(b){b.onclick=function(){
+  nets.forEach(function(n){n.classList.remove('on')});
+  b.classList.add('on');ssid.value=b.dataset.ssid;pw.focus();
+}});
+document.getElementById('show').onchange=function(){pw.type=this.checked?'text':'password'};
+</script>
+</body>
+</html>
