@@ -32,7 +32,7 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 
 | Area | What's included |
 |---|---|
-| **Slots** | Rotates through screens: three artworks, then a clock for 10 seconds |
+| **Slots** | Rotates through screens: by default three artworks, then a clock for 10 seconds. The rotation is editable from the control page and saved on the board |
 | **Button** | BOOT button: short press skips to the next slot, long press holds the current one |
 | **Control page** | Open `http://pixel-jukebox.local` on a phone or PC: see the artwork and artist, skip, hold, set brightness |
 | **REST API** | Status, skip, hold and brightness over HTTP, found on the network as `pixel-jukebox.local` |
@@ -86,9 +86,9 @@ The board has two USB-C ports: **Power** feeds the board and the panel, **USB** 
 
 If an upload fails with "No serial data received", unplug both cables, hold **BOOT**, plug the **USB** cable back in, release **BOOT**, then upload again.
 
-### Rotation and time zone
+### Time zone
 
-The rotation is the `ROTATION` table in [`src/main.cpp`](src/main.cpp). The clock's time zone is `TIMEZONE` in [`include/config.h`](include/config.h) (US Central by default).
+The clock's time zone is `TIMEZONE` in [`include/config.h`](include/config.h) (US Central by default).
 
 ### Brightness
 
@@ -96,7 +96,7 @@ Brightness (0-255) is set through the API and remembered across restarts; the st
 
 ## Control page
 
-Open `http://pixel-jukebox.local` (or the board's IP address) in a browser on the same network. The page shows what is on the panel and who made it, with Hold, Next and a brightness slider. On a keyboard, `N` skips and `H` holds. It is a single file built into the firmware, with no external assets.
+Open `http://pixel-jukebox.local` (or the board's IP address) in a browser on the same network. The page shows what is on the panel and who made it, with Hold, Next and a brightness slider, and a Rotation section for choosing which slots play and for how long. On a keyboard, `N` skips and `H` holds. It is a single file built into the firmware, with no external assets.
 
 ## REST API
 
@@ -143,7 +143,8 @@ The first run registers a second player on your account. Its key and token are k
 
 | Path | Purpose |
 |---|---|
-| `src/main.cpp` | Wi-Fi, the slot rotation and command handling |
+| `src/main.cpp` | Wi-Fi, running each slot and command handling |
+| `src/rotation.cpp` | The slot types and the saved rotation |
 | `src/slot.h` | Interface every slot implements |
 | `src/slot_makapix.cpp` | Artwork slot: registration, background loader, playback |
 | `src/slot_clock.cpp` | Clock slot (network time) |
@@ -175,12 +176,12 @@ Ideas for later:
 - Report views, and MQTT for "send to device" commands from the Makapix site
 - Brightness control and a Wi-Fi setup portal
 - Use the speaker, microphones and onboard sensors
-- More of the API: slot list and editing, show a specific post, sensors
+- More of the API: show a specific post, sensors, per-slot settings
 - A companion app (Flutter)
 
 Ideas borrowed from [Pixelix](https://github.com/BlueAndi/Pixelix), using parts already on the board:
 
-- More slot types, with the rotation editable without re-uploading
+- More slot types
 - Keep time across restarts with the onboard clock chip
 - Room temperature and humidity (onboard sensor), and a weather screen
 - Sound-reactive spectrum display (onboard microphones)

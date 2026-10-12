@@ -62,6 +62,19 @@ input[type=range]::-moz-range-progress{height:12px;background:var(--accent)}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:32px;margin-top:-10px;background:var(--ink);box-shadow:3px 3px 0 var(--edge)}
 input[type=range]::-moz-range-thumb{width:22px;height:32px;border:0;border-radius:0;background:var(--ink);box-shadow:3px 3px 0 var(--edge)}
 input[type=range]:disabled{opacity:.45}
+.rot summary{font:13px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+  cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px}
+.rot ol{list-style:none;margin:6px 0 14px;padding:0;display:grid;gap:10px}
+.rot li{display:flex;align-items:center;gap:6px}
+.rot .nm{flex:1;min-width:0;font-size:15px;font-weight:700;line-height:1.2}
+.rot .nm small{display:block;margin-top:3px;font:400 12px/1.3 var(--mono);color:var(--dim)}
+button.sm{min-height:44px;min-width:44px;padding:0 10px;font-size:17px;letter-spacing:0;box-shadow:3px 3px 0 var(--edge)}
+button.sm:active{transform:translate(3px,3px)}
+button.sm:disabled{box-shadow:3px 3px 0 var(--edge)}
+.add{display:flex;gap:10px}
+select{flex:1;min-width:0;min-height:44px;padding:0 10px;border:0;border-radius:0;
+  font:15px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--panel)}
+.note{margin:10px 0 0;min-height:1.4em;font:12px/1.4 var(--mono);color:var(--dim)}
 footer{font:12px/1.6 var(--mono);color:var(--dim);text-align:center;overflow-wrap:anywhere}
 kbd{font:inherit;color:var(--ink)}
 .hint{display:none}
@@ -102,6 +115,15 @@ kbd{font:inherit;color:var(--ink)}
       <label for="bri"><span>Brightness</span><output id="briv">--</output></label>
       <input id="bri" type="range" min="0" max="255" step="1" value="32" disabled>
     </div>
+    <details class="rot" id="rot">
+      <summary>Rotation</summary>
+      <ol id="rows"></ol>
+      <div class="add">
+        <select id="kind" aria-label="Slot to add"></select>
+        <button id="add" class="sm">Add</button>
+      </div>
+      <p class="note" id="rotnote" role="status"></p>
+    </details>
   </div>
   <footer><span id="info">&nbsp;</span><span class="hint"> &middot; keys: <kbd>N</kbd> next, <kbd>H</kbd> hold</span></footer>
 </main>
@@ -184,8 +206,54 @@ $('bri').onchange=e=>{
   dragging=false;clearTimeout(sendTimer);
   act('PUT','/brightness',{value:+e.target.value});
 };
+let rot=null;
+const copy=()=>rot.rotation.map(r=>({...r}));
+
+async function loadRot(){
+  try{rot=await call('GET','/slots');drawRot();}catch(e){$('rotnote').textContent='Could not load the rotation.';}
+}
+
+function drawRot(){
+  const rows=$('rows'),focus=document.activeElement&&document.activeElement.dataset.k;
+  rows.textContent='';
+  rot.rotation.forEach((r,i)=>{
+    const a=rot.available.find(x=>x.name==r.slot)||{label:r.slot,turn:'turn'};
+    const li=document.createElement('li'),nm=document.createElement('span'),sm=document.createElement('small');
+    nm.className='nm';nm.textContent=a.label;
+    sm.textContent=r.turns+' × '+a.turn;nm.appendChild(sm);li.appendChild(nm);
+    const btn=(j,text,label,off,fn)=>{
+      const b=document.createElement('button');
+      b.className='sm';b.textContent=text;b.dataset.k=i+':'+j;b.disabled=off;b.onclick=fn;
+      b.setAttribute('aria-label',label+' '+a.label);li.appendChild(b);
+    };
+    btn(0,'−','Fewer turns for',r.turns<=1,()=>{const l=copy();l[i].turns--;saveRot(l);});
+    btn(1,'+','More turns for',r.turns>=rot.maxTurns,()=>{const l=copy();l[i].turns++;saveRot(l);});
+    btn(2,'↑','Move up',i==0,()=>{const l=copy();[l[i-1],l[i]]=[l[i],l[i-1]];saveRot(l);});
+    btn(3,'×','Remove',rot.rotation.length<=1,()=>{const l=copy();l.splice(i,1);saveRot(l);});
+    rows.appendChild(li);
+  });
+  const kind=$('kind');
+  if(!kind.options.length)rot.available.forEach(a=>kind.add(new Option(a.label,a.name)));
+  $('add').disabled=rot.rotation.length>=rot.maxEntries;
+  const again=focus&&rows.querySelector('[data-k="'+focus+'"]');
+  if(again&&!again.disabled)again.focus();
+}
+
+async function saveRot(list){
+  try{
+    rot=await call('PUT','/slots',{rotation:list});
+    $('rotnote').textContent='Saved. Starts after the current piece.';
+    drawRot();
+  }catch(e){
+    $('rotnote').textContent='Could not save. Try again.';
+    loadRot();
+  }
+}
+
+$('add').onclick=()=>{const l=copy();l.push({slot:$('kind').value,turns:1});saveRot(l);};
+$('rot').ontoggle=()=>{if($('rot').open)loadRot();};
 addEventListener('keydown',e=>{
-  if(e.target.tagName=='INPUT'||e.ctrlKey||e.metaKey||e.altKey)return;
+  if(e.target.tagName=='INPUT'||e.target.tagName=='SELECT'||e.ctrlKey||e.metaKey||e.altKey)return;
   const k=e.key.toLowerCase();
   if(k=='n')$('next').click();
   if(k=='h')$('hold').click();

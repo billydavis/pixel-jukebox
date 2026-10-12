@@ -8,6 +8,7 @@
 #include "commands.h"
 #include "config.h"
 #include "display.h"
+#include "rotation.h"
 #include "status.h"
 #include "web_page.h"
 
@@ -143,6 +144,62 @@ static void handlePutBrightness() {
   sendQueued(commandSend(CommandType::SetBrightness, (uint8_t)value), "brightness");
 }
 
+static void sendSlots() {
+  JsonDocument doc;
+  JsonArray available = doc["available"].to<JsonArray>();
+  for (const SlotInfo &info : rotationAvailable()) {
+    JsonObject item = available.add<JsonObject>();
+    item["name"] = info.name;
+    item["label"] = info.label;
+    item["turn"] = info.turnMeaning;
+  }
+  JsonArray rotation = doc["rotation"].to<JsonArray>();
+  for (const RotationEntry &entry : rotationGet()) {
+    JsonObject item = rotation.add<JsonObject>();
+    item["slot"] = entry.slot;
+    item["turns"] = entry.turns;
+  }
+  doc["maxEntries"] = ROTATION_MAX_ENTRIES;
+  doc["maxTurns"] = ROTATION_MAX_TURNS;
+  sendJson(200, doc);
+}
+
+static void handleGetSlots() { sendSlots(); }
+
+// Replaces the whole rotation. Applied directly rather than queued: it takes
+// effect when the slot on screen finishes.
+static void handlePutSlots() {
+  JsonDocument body;
+  if (!readBody(body)) {
+    return;
+  }
+  if (!body["rotation"].is<JsonArray>()) {
+    sendError(400, "rotation must be an array");
+    return;
+  }
+
+  std::vector<RotationEntry> entries;
+  for (JsonVariant item : body["rotation"].as<JsonArray>()) {
+    if (!item["slot"].is<const char *>() || !item["turns"].is<int>()) {
+      sendError(400, "each entry needs a slot name and a whole number of turns");
+      return;
+    }
+    int turns = item["turns"];
+    if (turns < 1 || turns > ROTATION_MAX_TURNS) {
+      sendError(400, "turns is out of range");
+      return;
+    }
+    entries.push_back({item["slot"].as<String>(), (uint8_t)turns});
+  }
+
+  String error;
+  if (!rotationSet(entries, error)) {
+    sendError(400, error.c_str());
+    return;
+  }
+  sendSlots();
+}
+
 static void handleNotFound() { sendError(404, "No such endpoint"); }
 
 static void serverTask(void *) {
@@ -165,6 +222,8 @@ void apiBegin() {
   server.on(API_BASE "/hold", HTTP_POST, handleHold);
   server.on(API_BASE "/brightness", HTTP_GET, handleGetBrightness);
   server.on(API_BASE "/brightness", HTTP_PUT, handlePutBrightness);
+  server.on(API_BASE "/slots", HTTP_GET, handleGetSlots);
+  server.on(API_BASE "/slots", HTTP_PUT, handlePutSlots);
   server.onNotFound(handleNotFound);
   server.begin();
 

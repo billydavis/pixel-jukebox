@@ -1,4 +1,5 @@
 // Pixel Jukebox - rotates through slots (Makapix artwork, clock) on a 64x64 LED matrix.
+// The rotation itself lives in rotation.cpp.
 
 #include <Arduino.h>
 #include <WiFi.h>
@@ -9,8 +10,7 @@
 #include "config.h"
 #include "display.h"
 #include "pins.h"
-#include "slot_clock.h"
-#include "slot_makapix.h"
+#include "rotation.h"
 #include "status.h"
 
 #if __has_include("secrets.h")
@@ -25,22 +25,6 @@ static const uint32_t MESSAGE_MS = 1500;
 static const uint32_t SKIPPED_SLOT_MS = 200;
 static const uint32_t COMMAND_POLL_MS = 5;
 
-static MakapixSlot makapixSlot;
-static ClockSlot clockSlot;
-
-// Each slot is shown `turns` times in a row before moving on.
-struct RotationEntry {
-  Slot *slot;
-  uint8_t turns;
-};
-static const RotationEntry ROTATION[] = {
-    {&makapixSlot, 3},
-    {&clockSlot, 1},
-};
-static const size_t ROTATION_LENGTH = sizeof(ROTATION) / sizeof(ROTATION[0]);
-
-static size_t rotationIndex = 0;
-static uint8_t turnsTaken = 0;
 static size_t skippedInARow = 0;
 static uint32_t lastWifiAttempt = 0;
 
@@ -146,21 +130,6 @@ static void runSlot(Slot *slot) {
   }
 }
 
-static size_t rotationTurns() {
-  size_t turns = 0;
-  for (const RotationEntry &entry : ROTATION) {
-    turns += entry.turns;
-  }
-  return turns;
-}
-
-static void advanceRotation() {
-  if (++turnsTaken >= ROTATION[rotationIndex].turns) {
-    turnsTaken = 0;
-    rotationIndex = (rotationIndex + 1) % ROTATION_LENGTH;
-  }
-}
-
 #ifdef SPEAKER_TEST
 // Lists the I2C devices, then plays a rising chime and a steady tone three times.
 static void runSpeakerTest() {
@@ -207,7 +176,7 @@ void setup() {
 
   statusBegin();
   commandsBegin();
-  makapixSlot.begin();
+  rotationBegin();
 }
 
 void loop() {
@@ -218,7 +187,7 @@ void loop() {
 
   maintainWifi();
 
-  Slot *slot = ROTATION[rotationIndex].slot;
+  Slot *slot = rotationCurrent();
   if (slot->start()) {
     skippedInARow = 0;
     statusSetSlot(slot->name());
@@ -243,5 +212,5 @@ void loop() {
       }
     }
   }
-  advanceRotation();
+  rotationAdvance();
 }

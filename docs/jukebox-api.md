@@ -64,6 +64,8 @@ the reply is `503` and nothing is queued.
 | `POST` | `/hold` | Hold or release the current slot |
 | `GET` | `/brightness` | Read the brightness |
 | `PUT` | `/brightness` | Set the brightness |
+| `GET` | `/slots` | The rotation and the slot types that can go in it |
+| `PUT` | `/slots` | Replace the rotation |
 
 ### `GET /status`
 
@@ -72,7 +74,7 @@ the reply is `503` and nothing is queued.
   "device": {
     "name": "pixel-jukebox",
     "model": "pixel-jukebox-64x64",
-    "firmware": "0.4.0",
+    "firmware": "0.5.0",
     "ip": "192.168.4.105",
     "rssi": -64,
     "uptimeSeconds": 14
@@ -139,6 +141,52 @@ Brightness is limited by the 5V supply, not by the API. When the supply cannot
 keep up, white turns yellow and then red. On the board's USB-C power port this
 starts above about 32.
 
+### `GET /slots`
+
+```json
+{
+  "available": [
+    { "name": "makapix", "label": "Makapix artwork", "turn": "one artwork" },
+    { "name": "clock", "label": "Clock", "turn": "10 seconds" }
+  ],
+  "rotation": [
+    { "slot": "makapix", "turns": 3 },
+    { "slot": "clock", "turns": 1 }
+  ],
+  "maxEntries": 8,
+  "maxTurns": 20
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `available` | Slot types this firmware has. `turn` says what one turn of that slot is, for showing to people |
+| `rotation` | The order slots are shown in. Each entry is shown `turns` times in a row, then the next entry, looping |
+| `maxEntries`, `maxTurns` | Limits that `PUT /slots` enforces |
+
+The example plays three artworks, then the clock for 10 seconds, and repeats.
+The same slot type may appear more than once.
+
+### `PUT /slots`
+
+```json
+{
+  "rotation": [
+    { "slot": "makapix", "turns": 5 },
+    { "slot": "clock", "turns": 2 }
+  ]
+}
+```
+
+Replaces the whole rotation. Unlike the commands above it is applied directly,
+not queued: the reply is `200` with the same body as `GET /slots`. The slot on
+screen finishes its turn, then the new rotation starts from its first entry.
+The rotation is saved on the board and restored after a restart.
+
+It is a `400`, and nothing changes, if `rotation` is not an array of 1 to
+`maxEntries` entries, a `slot` is not one of the `available` names, or `turns`
+is not a whole number from 1 to `maxTurns`.
+
 ## Error responses
 
 | Status | When |
@@ -154,4 +202,5 @@ curl http://pixel-jukebox.local/api/v1/status
 curl -X POST http://pixel-jukebox.local/api/v1/next
 curl -X POST -H "Content-Type: application/json" -d '{"held":true}' http://pixel-jukebox.local/api/v1/hold
 curl -X PUT -H "Content-Type: application/json" -d '{"value":32}' http://pixel-jukebox.local/api/v1/brightness
+curl http://pixel-jukebox.local/api/v1/slots
 ```
