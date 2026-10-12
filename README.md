@@ -83,3 +83,7 @@ few to `tools/downloads/`.
 - Brightness control and a Wi-Fi setup portal
 - Use the speaker, microphones and onboard sensors
 - Find out why a few posts return a tiny file that is not a GIF (they are skipped)
+
+## License
+
+MIT. See [LICENSE](LICENSE).
