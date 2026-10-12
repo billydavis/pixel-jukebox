@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "display.h"
+#include "html_escape.h"
 #include "setup_page.h"
 
 #if __has_include("secrets.h")
@@ -85,32 +86,7 @@ bool wifiSetupRequested() {
 }
 
 // Network names come from whoever is nearby, so they are never trusted as HTML.
-static String escapeHtml(const String &text) {
-  String out;
-  out.reserve(text.length());
-  for (char c : text) {
-    switch (c) {
-      case '&':
-        out += "&amp;";
-        break;
-      case '<':
-        out += "&lt;";
-        break;
-      case '>':
-        out += "&gt;";
-        break;
-      case '"':
-        out += "&quot;";
-        break;
-      case '\'':
-        out += "&#39;";
-        break;
-      default:
-        out += c;
-    }
-  }
-  return out;
-}
+static String escapeHtml(const String &text) { return htmlEscape(text.c_str()).c_str(); }
 
 // Strongest first, one entry per name. The radio only sees 2.4 GHz networks.
 static void scanNetworks() {

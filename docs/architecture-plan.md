@@ -63,15 +63,28 @@ keep.
 | Step | Work | Status |
 |---|---|---|
 | 1 | **Measure.** Report heap, PSRAM and task stack headroom from the board; run a full rotation and sound mode; decide whether the image limit needs to change | Done: no change needed, see below |
-| 2 | **CI build.** GitHub Actions workflow building the regular firmware and the diagnostic builds, without `secrets.h` | Not started |
-| 3 | **Tests.** PC-side unit tests for the pure functions listed above; a smoke-test script that exercises the API on a real board; the route-consistency check | Not started |
+| 2 | **CI build.** GitHub Actions workflow building the regular firmware and the diagnostic builds, without `secrets.h` | Deferred, see below |
+| 3 | **Tests.** Unit tests for the pure functions listed above; a smoke-test script that exercises the API on a real board; the route-consistency check | Done, see below |
 | 4 | **Web assets.** Control and setup pages as `.html` files embedded at build time; a duplicate-ID check in the tests | Not started |
 | 5 | **Tidy `main.cpp`.** Move the diagnostics and the Wi-Fi lifecycle into their own modules | Not started |
 | 6 | **Regroup `src/`.** One mechanical commit | Not started |
 | 7 | **Metadata.** Give the PC tool its own identity; stop hard-coding the firmware version in the API example; commit the Postman generator | Not started |
 
-Steps 1 and 2 are small and independent. Steps 5 and 6 are the only ones that
-touch many files, which is why they follow the safety net.
+Steps 5 and 6 are the only ones that touch many files, which is why they
+follow the tests.
+
+**Step 2 is deferred.** This is a one-person project built locally on every
+change, so an automated build is not needed yet. Until it exists, its job is
+done by hand: before any commit that moves or restructures code, build all
+four environments, and the regular one once more with `include/secrets.h`
+moved aside.
+
+```sh
+pio run -e waveshare-s3-rgb-matrix -e colour-check -e speaker-test -e mic-test
+```
+
+Reasons to revisit: a second contributor, a library update that breaks a
+fresh install, or a diagnostic build found broken when it was needed.
 
 ## Step 1 results
 
@@ -113,3 +126,34 @@ Decisions:
 This was a nine-minute test, not a soak. A leak slower than about a kilobyte a
 minute would not have shown. Reading `/diagnostics` after a day of normal use
 would settle that.
+
+## Step 3 results
+
+Three checks now exist, described in the README's Testing section.
+
+| Check | Covers | Result |
+|---|---|---|
+| `tools/run_unit_tests.ps1`, or `pio test` on the board | 22 unit tests for `lib/jukebox_core`: small-GIF padding, HTML escaping, rotation rules, FFT band mapping and scaling | All pass |
+| `tools/api_smoke_test.py` | 49 checks across every endpoint except Wi-Fi setup, including each rejection, against a running board | All pass |
+| `tools/check_api_docs.py` | The 12 routes in `src/api.cpp` against the API document and the Postman collection | In agreement |
+
+What changed in the code to make this possible:
+
+- The four pure functions moved out of `src/` into `lib/jukebox_core`, which
+  includes nothing from Arduino or the hardware. The firmware calls them from
+  where the code used to be; behaviour is unchanged.
+- The unit tests were shown to bite: deliberately corrupting the GIF padding
+  made one test fail, and restoring it made all pass again.
+
+The unit tests run in two places from one source file. On the PC,
+`tools/run_unit_tests.ps1` compiles them with the Visual Studio C++ compiler in
+a few seconds, with no board involved; this is the everyday way to run them.
+On the board, `pio test` builds them with the ESP32 compiler, which confirms
+the same results on the real target but replaces the firmware until it is
+uploaded again. PlatformIO's own PC test mode was not used because it requires
+GCC, which is not installed.
+
+Not covered by any of the three: the display, audio capture, GIF decoding on
+real artwork, Makapix registration and the Wi-Fi setup hotspot. Those remain
+manual, using the diagnostic builds and a phone.
+

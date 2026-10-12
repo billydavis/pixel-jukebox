@@ -183,6 +183,11 @@ The first run registers a second player on your account. Its key and token are k
 | `src/slot_visualizers.cpp` | Spectrum bars, VU meter, oscilloscope and fire |
 | `src/audio_analysis.cpp` | Frequency analysis and automatic level scaling for the visualizers |
 | `src/audio.cpp` | Speaker output (ES8311) and microphone input (ES7210) |
+| `lib/jukebox_core/` | Hardware-free logic, covered by the unit tests |
+| `test/test_core/` | Unit tests |
+| `tools/run_unit_tests.ps1` | Builds and runs the unit tests on a Windows PC |
+| `tools/api_smoke_test.py` | End-to-end check of the API against a board |
+| `tools/check_api_docs.py` | Checks the API document and Postman collection against the firmware |
 | `include/pins.h` | HUB75, I2C and audio GPIO mapping, panel size |
 | `include/ca_certs.h` | Root certificates trusted for makapix.club |
 | `include/secrets.example.h` | Optional compiled-in Wi-Fi credentials |
@@ -192,6 +197,32 @@ pio run                 # build
 pio run -t upload       # build and flash
 pio device monitor      # serial log at 115200 baud
 ```
+
+## Testing
+
+Three checks, from fastest to most thorough.
+
+```sh
+python tools/check_api_docs.py
+```
+
+Compares the routes in `src/api.cpp` with the API document and the Postman collection. Needs no board.
+
+```sh
+powershell -File tools/run_unit_tests.ps1
+```
+
+Runs the unit tests in `test/` for the hardware-free code in `lib/jukebox_core` (small-GIF padding, HTML escaping, rotation rules, the visualizers' frequency maths). It compiles them on the PC with the Visual Studio C++ compiler, so it takes a few seconds and needs no board.
+
+The same tests also run on the board itself, built by the ESP32 compiler, with `pio test -e waveshare-s3-rgb-matrix`. That replaces the firmware, so upload the regular firmware again afterwards.
+
+```sh
+python tools/api_smoke_test.py 192.168.4.105
+```
+
+Exercises every API endpoint against a running board except Wi-Fi setup, including the rejections, and puts brightness, mode and rotation back as they were. Takes about a minute.
+
+Behaviour that depends on the hardware is covered by the diagnostic builds above.
 
 ## Roadmap
 

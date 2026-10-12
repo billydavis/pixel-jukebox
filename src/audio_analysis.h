@@ -2,12 +2,14 @@
 
 #include <Arduino.h>
 
+#include "spectrum_math.h"
+
 // Turns microphone input into the numbers the visualizer slots draw from.
 // Levels are scaled automatically to the loudness of the room, so quiet music
 // and loud music both fill the panel.
 
 static const int ANALYSIS_SAMPLES = 512; // per frame: 32 ms at 16 kHz
-static const int ANALYSIS_BANDS = 32;    // 60 Hz to 7 kHz, evenly spaced by pitch
+static const int ANALYSIS_BANDS = spectrum::BANDS; // 60 Hz to 7 kHz, evenly spaced by pitch
 
 struct AudioFrame {
   int16_t left[ANALYSIS_SAMPLES]; // the newest block of audio

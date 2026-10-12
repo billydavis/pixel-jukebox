@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include <Preferences.h>
 
+#include "rotation_rules.h"
 #include "slot_clock.h"
 #include "slot_makapix.h"
 
@@ -43,21 +44,20 @@ static Slot *findSlot(const String &name) {
 }
 
 static bool validate(const std::vector<RotationEntry> &entries, String &error) {
-  if (entries.empty() || entries.size() > ROTATION_MAX_ENTRIES) {
-    error = "rotation must have 1 to " + String(ROTATION_MAX_ENTRIES) + " entries";
-    return false;
-  }
+  std::vector<RotationItem> items;
   for (const RotationEntry &entry : entries) {
-    if (!findSlot(entry.slot)) {
-      error = "unknown slot: " + entry.slot;
-      return false;
-    }
-    if (entry.turns < 1 || entry.turns > ROTATION_MAX_TURNS) {
-      error = "turns must be 1 to " + String(ROTATION_MAX_TURNS);
-      return false;
-    }
+    items.push_back({entry.slot.c_str(), entry.turns});
   }
-  return true;
+  std::vector<std::string> known;
+  for (const SlotType &type : SLOT_TYPES) {
+    known.push_back(type.info.name);
+  }
+  std::string problem;
+  if (rotationValid(items, known, ROTATION_MAX_ENTRIES, ROTATION_MAX_TURNS, problem)) {
+    return true;
+  }
+  error = problem.c_str();
+  return false;
 }
 
 static std::vector<RotationEntry> defaultRotation() { return {{"makapix", 3}, {"clock", 1}}; }
