@@ -12,14 +12,10 @@
 #include "pins.h"
 #include "rotation.h"
 #include "status.h"
-
-#if __has_include("secrets.h")
-#include "secrets.h"
-#else
-#error "Copy include/secrets.example.h to include/secrets.h and fill in your Wi-Fi details"
-#endif
+#include "wifi_setup.h"
 
 static const uint32_t WIFI_TIMEOUT_MS = 20000;
+static const int WIFI_BOOT_ATTEMPTS = 2;
 static const uint32_t WIFI_RETRY_MS = 60000;
 static const uint32_t MESSAGE_MS = 1500;
 static const uint32_t SKIPPED_SLOT_MS = 200;
@@ -32,38 +28,55 @@ static uint16_t amber() { return display->color565(255, 200, 0); }
 static uint16_t red() { return display->color565(255, 0, 0); }
 static uint16_t green() { return display->color565(0, 255, 0); }
 
-static bool connectWifi() {
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-  uint32_t start = millis();
-  while (WiFi.status() != WL_CONNECTED) {
-    if (millis() - start > WIFI_TIMEOUT_MS) {
-      return false;
-    }
-    delay(250);
+// Joins Wi-Fi at boot. With no network to join, or one that cannot be joined,
+// this hands over to the setup hotspot, which ends in a restart.
+static void startWifi() {
+  wifiBegin();
+  if (wifiSetupRequested() || !wifiHasCredentials()) {
+    wifiSetupRun(false);
   }
-  return true;
-}
-
-// Reconnects when the connection is down, at most once per WIFI_RETRY_MS so
-// slots that work offline keep their turns.
-static void maintainWifi() {
-  if (WiFi.status() == WL_CONNECTED) {
-    return;
-  }
-  if (lastWifiAttempt != 0 && millis() - lastWifiAttempt < WIFI_RETRY_MS) {
-    return;
-  }
-  lastWifiAttempt = millis();
 
   showMessage("WiFi", "joining...", amber());
-  if (!connectWifi()) {
-    Serial.println("Wi-Fi connection timed out");
-    showMessage("WiFi", "failed", red());
-    delay(MESSAGE_MS);
+  for (int attempt = 0; attempt < WIFI_BOOT_ATTEMPTS; attempt++) {
+    if (wifiConnect(WIFI_TIMEOUT_MS)) {
+      return; // maintainWifi() announces the connection
+    }
+  }
+  Serial.println("Could not join the saved network");
+  wifiSetupRun(true);
+}
+
+// Restarts into the setup hotspot when asked by the button or the API.
+static void enterWifiSetup() {
+  Serial.println("Command: Wi-Fi setup");
+  showMessage("WiFi", "setup...", amber());
+  delay(MESSAGE_MS);
+  wifiRequestSetup();
+}
+
+// Announces a new connection and reconnects when it drops, at most once per
+// WIFI_RETRY_MS so slots that work offline keep their turns.
+static void maintainWifi() {
+  static bool announced = false;
+  if (WiFi.status() != WL_CONNECTED) {
+    announced = false;
+    if (lastWifiAttempt != 0 && millis() - lastWifiAttempt < WIFI_RETRY_MS) {
+      return;
+    }
+    lastWifiAttempt = millis();
+
+    showMessage("WiFi", "joining...", amber());
+    if (!wifiConnect(WIFI_TIMEOUT_MS)) {
+      Serial.println("Wi-Fi connection timed out");
+      showMessage("WiFi", "failed", red());
+      delay(MESSAGE_MS);
+      return;
+    }
+  }
+  if (announced) {
     return;
   }
+  announced = true;
   Serial.printf("Connected, IP %s\n", WiFi.localIP().toString().c_str());
   configTzTime(TIMEZONE, NTP_SERVER);
   apiBegin();
@@ -103,6 +116,9 @@ static void runSlot(Slot *slot) {
             break;
           case CommandType::SetHold:
             wantHeld = command.value != 0;
+            break;
+          case CommandType::WifiSetup:
+            enterWifiSetup();
             break;
           case CommandType::SetBrightness:
             Serial.printf("Command: brightness %u\n", command.value);
@@ -174,6 +190,8 @@ void setup() {
   runSpeakerTest();
 #endif
 
+  startWifi();
+
   statusBegin();
   commandsBegin();
   rotationBegin();
@@ -204,11 +222,13 @@ void loop() {
     }
     delay(SKIPPED_SLOT_MS);
 
-    // With nothing showing, only brightness changes have something to act on.
+    // With nothing showing, hold and next have nothing to act on.
     Command command;
     while (commandReceive(command)) {
       if (command.type == CommandType::SetBrightness) {
         displaySetBrightness(command.value);
+      } else if (command.type == CommandType::WifiSetup) {
+        enterWifiSetup();
       }
     }
   }

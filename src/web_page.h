@@ -74,6 +74,7 @@ button.sm:disabled{box-shadow:3px 3px 0 var(--edge)}
 .add{display:flex;gap:10px}
 select{flex:1;min-width:0;min-height:44px;padding:0 10px;border:0;border-radius:0;
   font:15px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--panel)}
+.note.wifi{margin:0 0 14px}
 .note{margin:10px 0 0;min-height:1.4em;font:12px/1.4 var(--mono);color:var(--dim)}
 footer{font:12px/1.6 var(--mono);color:var(--dim);text-align:center;overflow-wrap:anywhere}
 kbd{font:inherit;color:var(--ink)}
@@ -124,6 +125,11 @@ kbd{font:inherit;color:var(--ink)}
       </div>
       <p class="note" id="rotnote" role="status"></p>
     </details>
+    <details class="rot">
+      <summary>Wi-Fi</summary>
+      <p class="note wifi" id="wifinote" role="status">&nbsp;</p>
+      <button id="wifi" class="sm">Change Wi-Fi</button>
+    </details>
   </div>
   <footer><span id="info">&nbsp;</span><span class="hint"> &middot; keys: <kbd>N</kbd> next, <kbd>H</kbd> hold</span></footer>
 </main>
@@ -172,6 +178,7 @@ function render(online){
 
   if(!dragging)showBrightness(st.brightness);
   const d=st.device;
+  if(!wifiArmed)$('wifinote').textContent='Connected to '+d.ssid+'.';
   $('info').textContent=d.name+'.local · v'+d.firmware+' · '+d.ip+' · '+d.rssi+' dBm · up '+uptime(d.uptimeSeconds);
 }
 
@@ -206,6 +213,20 @@ $('bri').onchange=e=>{
   dragging=false;clearTimeout(sendTimer);
   act('PUT','/brightness',{value:+e.target.value});
 };
+let wifiArmed=0;
+$('wifi').onclick=()=>{
+  if(!wifiArmed){
+    wifiArmed=setTimeout(()=>{wifiArmed=0;$('wifi').textContent='Change Wi-Fi';},6000);
+    $('wifi').textContent='Tap again to confirm';
+    $('wifinote').textContent='The panel will restart and offer its own network, Pixel-Jukebox, for setup.';
+    return;
+  }
+  clearTimeout(wifiArmed);
+  $('wifi').disabled=true;$('wifi').textContent='Restarting';
+  $('wifinote').textContent='Join the Pixel-Jukebox network on your phone to choose a new network.';
+  call('POST','/wifi/setup').catch(()=>{});
+};
+
 let rot=null;
 const copy=()=>rot.rotation.map(r=>({...r}));
 

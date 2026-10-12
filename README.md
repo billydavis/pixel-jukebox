@@ -33,9 +33,10 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 | Area | What's included |
 |---|---|
 | **Slots** | Rotates through screens: by default three artworks, then a clock for 10 seconds. The rotation is editable from the control page and saved on the board |
-| **Button** | BOOT button: short press skips to the next slot, long press holds the current one |
+| **Button** | BOOT button: short press skips to the next slot, long press holds the current one, a 5-second hold starts Wi-Fi setup |
 | **Control page** | Open `http://pixel-jukebox.local` on a phone or PC: see the artwork and artist, skip, hold, set brightness |
 | **REST API** | Status, skip, hold and brightness over HTTP, found on the network as `pixel-jukebox.local` |
+| **Wi-Fi setup** | With no network configured, the board starts its own hotspot and a page for choosing one. No code editing needed |
 | **Registration** | Shows a 6-character code on the panel; enter it on makapix.club and the board stores its token |
 | **Artwork feed** | Shuffles every post that is 64 pixels or smaller and has a GIF rendition, 25 at a time |
 | **Playback** | Animated and still GIFs, each shown for its dwell time, finishing the loop in progress |
@@ -64,7 +65,7 @@ Pin mapping is in [`include/pins.h`](include/pins.h).
 | Artwork | AnimatedGIF, decoded from RAM (PSRAM) |
 | Network | Makapix player API over HTTPS, ArduinoJson; images over plain HTTP from the vault |
 | Remote control | Built-in WebServer and mDNS, JSON over HTTP |
-| Storage | NVS (Preferences) for the player key, token and brightness |
+| Storage | NVS (Preferences) for Wi-Fi details, the player key and token, brightness and the rotation |
 | Audio | ES8311 codec over I2C and I2S (test build only so far) |
 
 ## Getting started
@@ -74,11 +75,24 @@ Pin mapping is in [`include/pins.h`](include/pins.h).
 ```sh
 git clone https://github.com/billydavis/pixel-jukebox.git
 cd pixel-jukebox
-cp include/secrets.example.h include/secrets.h   # then fill in your 2.4 GHz Wi-Fi
 pio run -t upload
 ```
 
-On first boot the panel shows a 6-character code. Enter it at makapix.club under **Settings > Players > Add Device**. The board shows "linked!" and starts playing.
+### Wi-Fi setup
+
+On first boot the panel shows "WiFi setup" and starts an open network named `Pixel-Jukebox`.
+
+1. Join `Pixel-Jukebox` on a phone. A setup page opens by itself; if it doesn't, browse to `http://10.10.10.1`.
+2. Pick your home network from the list (2.4 GHz only) and enter its password.
+3. The panel tries the network. If it joins, the details are saved and it restarts; if not, the page says so within 15 seconds and nothing is saved.
+
+To skip this step, copy `include/secrets.example.h` to `include/secrets.h` and fill in your network before uploading. Details saved through the setup page take priority over that file.
+
+To change networks later, hold the BOOT button for 5 seconds, or use **Change Wi-Fi** on the control page. If the saved network can't be joined at startup, the panel offers setup again by itself, and goes back to retrying the saved network after three minutes with nobody connected.
+
+### Makapix registration
+
+Once online, the panel shows a 6-character code. Enter it at makapix.club under **Settings > Players > Add Device**. The board shows "linked!" and starts playing.
 
 ### Uploading
 
@@ -149,6 +163,8 @@ The first run registers a second player on your account. Its key and token are k
 | `src/slot_makapix.cpp` | Artwork slot: registration, background loader, playback |
 | `src/slot_clock.cpp` | Clock slot (network time) |
 | `src/commands.cpp` | Command queue and the BOOT button |
+| `src/wifi_setup.cpp` | Wi-Fi credentials and the setup hotspot |
+| `src/setup_page.h` | The hotspot's setup pages |
 | `src/api.cpp` | HTTP server and mDNS |
 | `src/web_page.h` | The control page (HTML, CSS and JavaScript in one string) |
 | `src/status.cpp` | Shared "now showing" state read by the API |
@@ -158,7 +174,7 @@ The first run registers a second player on your account. Its key and token are k
 | `src/audio.cpp` | Speaker output through the ES8311 codec |
 | `include/pins.h` | HUB75, I2C and audio GPIO mapping, panel size |
 | `include/ca_certs.h` | Root certificates trusted for makapix.club |
-| `include/secrets.example.h` | Wi-Fi credentials template |
+| `include/secrets.example.h` | Optional compiled-in Wi-Fi credentials |
 
 ```sh
 pio run                 # build
@@ -174,7 +190,7 @@ Ideas for later:
 
 - Power the panel from the dedicated 5V input for full brightness
 - Report views, and MQTT for "send to device" commands from the Makapix site
-- Brightness control and a Wi-Fi setup portal
+- A brightness schedule for day and night
 - Use the speaker, microphones and onboard sensors
 - More of the API: show a specific post, sensors, per-slot settings
 - A companion app (Flutter)

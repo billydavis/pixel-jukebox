@@ -9,6 +9,7 @@ enum class CommandType : uint8_t {
   ToggleHold,    // stay on the current slot, or release it
   SetHold,       // value: 1 = hold, 0 = release
   SetBrightness, // value: 0-255
+  WifiSetup,     // restart into the Wi-Fi setup hotspot
 };
 
 struct Command {
@@ -17,7 +18,7 @@ struct Command {
 };
 
 // Creates the queue and starts watching the BOOT button:
-// short press = Next, long press = ToggleHold.
+// short press = Next, long press = ToggleHold, held for 5 seconds = WifiSetup.
 void commandsBegin();
 
 bool commandSend(CommandType type, uint8_t value = 0);

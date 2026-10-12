@@ -6,6 +6,7 @@ static const int QUEUE_LENGTH = 8;
 static const uint32_t BUTTON_POLL_MS = 10;
 static const uint32_t DEBOUNCE_MS = 30;
 static const uint32_t LONG_PRESS_MS = 600;
+static const uint32_t SETUP_PRESS_MS = 5000;
 
 static QueueHandle_t queue;
 
@@ -21,6 +22,7 @@ static void buttonTask(void *) {
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   bool pressed = false;
   bool longSent = false;
+  bool setupSent = false;
   uint32_t pressedAt = 0;
 
   for (;;) {
@@ -29,10 +31,14 @@ static void buttonTask(void *) {
     if (down && !pressed) {
       pressed = true;
       longSent = false;
+      setupSent = false;
       pressedAt = now;
     } else if (down && !longSent && now - pressedAt >= LONG_PRESS_MS) {
       longSent = true;
       commandSend(CommandType::ToggleHold);
+    } else if (down && !setupSent && now - pressedAt >= SETUP_PRESS_MS) {
+      setupSent = true;
+      commandSend(CommandType::WifiSetup);
     } else if (!down && pressed) {
       pressed = false;
       if (!longSent && now - pressedAt >= DEBOUNCE_MS) {

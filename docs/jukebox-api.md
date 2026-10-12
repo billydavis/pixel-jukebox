@@ -66,6 +66,7 @@ the reply is `503` and nothing is queued.
 | `PUT` | `/brightness` | Set the brightness |
 | `GET` | `/slots` | The rotation and the slot types that can go in it |
 | `PUT` | `/slots` | Replace the rotation |
+| `POST` | `/wifi/setup` | Restart into the Wi-Fi setup hotspot |
 
 ### `GET /status`
 
@@ -74,8 +75,9 @@ the reply is `503` and nothing is queued.
   "device": {
     "name": "pixel-jukebox",
     "model": "pixel-jukebox-64x64",
-    "firmware": "0.5.0",
+    "firmware": "0.6.0",
     "ip": "192.168.4.105",
+    "ssid": "Home Network",
     "rssi": -64,
     "uptimeSeconds": 14
   },
@@ -91,6 +93,7 @@ the reply is `503` and nothing is queued.
 
 | Field | Meaning |
 |---|---|
+| `device.ssid` | The Wi-Fi network the board is on |
 | `device.rssi` | Wi-Fi signal strength in dBm |
 | `slot.name` | `makapix` or `clock`; `null` between slots or when nothing can be shown |
 | `slot.held` | `true` while the current slot is held |
@@ -186,6 +189,17 @@ The rotation is saved on the board and restored after a restart.
 It is a `400`, and nothing changes, if `rotation` is not an array of 1 to
 `maxEntries` entries, a `slot` is not one of the `available` names, or `turns`
 is not a whole number from 1 to `maxTurns`.
+
+### `POST /wifi/setup`
+
+Restarts the board into its setup hotspot so a different Wi-Fi network can be
+chosen. No body. Reply: `202 {"queued":"wifiSetup"}`.
+
+The board leaves the network, so the API stops answering. It starts an open
+network named `Pixel-Jukebox` and serves a setup page there (see the README).
+The saved network is kept: if nobody connects to the hotspot for three minutes,
+the board restarts and rejoins it. Holding the BOOT button for five seconds does
+the same thing.
 
 ## Error responses
 

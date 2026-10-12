@@ -77,6 +77,7 @@ static void handleStatus() {
   device["model"] = DEVICE_MODEL;
   device["firmware"] = FIRMWARE_VERSION;
   device["ip"] = WiFi.localIP().toString();
+  device["ssid"] = WiFi.SSID();
   device["rssi"] = WiFi.RSSI();
   device["uptimeSeconds"] = millis() / 1000;
 
@@ -143,6 +144,8 @@ static void handlePutBrightness() {
   }
   sendQueued(commandSend(CommandType::SetBrightness, (uint8_t)value), "brightness");
 }
+
+static void handleWifiSetup() { sendQueued(commandSend(CommandType::WifiSetup), "wifiSetup"); }
 
 static void sendSlots() {
   JsonDocument doc;
@@ -222,6 +225,7 @@ void apiBegin() {
   server.on(API_BASE "/hold", HTTP_POST, handleHold);
   server.on(API_BASE "/brightness", HTTP_GET, handleGetBrightness);
   server.on(API_BASE "/brightness", HTTP_PUT, handlePutBrightness);
+  server.on(API_BASE "/wifi/setup", HTTP_POST, handleWifiSetup);
   server.on(API_BASE "/slots", HTTP_GET, handleGetSlots);
   server.on(API_BASE "/slots", HTTP_PUT, handlePutSlots);
   server.onNotFound(handleNotFound);

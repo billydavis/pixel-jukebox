@@ -477,6 +477,46 @@
       ]
     },
     {
+      "name": "Wi-Fi",
+      "item": [
+        {
+          "name": "Start Wi-Fi Setup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 202', function () {",
+                  "  pm.response.to.have.status(202);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/wifi/setup",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "wifi",
+                "setup"
+              ]
+            },
+            "description": "Restarts the board into its setup hotspot (network name Pixel-Jukebox). The board goes offline; it rejoins the saved network after three minutes if nobody connects."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Error cases",
       "item": [
         {
