@@ -5,3 +5,8 @@
 #define USER_AGENT "pixel-jukebox/" FIRMWARE_VERSION
 
 #define MAKAPIX_API_URL "https://makapix.club/api"
+
+// POSIX time zone for the clock (US Central here). Other zones:
+// https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
+#define TIMEZONE "CST6CDT,M3.2.0,M11.1.0"
+#define NTP_SERVER "pool.ntp.org"

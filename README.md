@@ -32,6 +32,8 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 
 | Area | What's included |
 |---|---|
+| **Slots** | Rotates through screens: three artworks, then a clock for 10 seconds |
+| **Button** | BOOT button: short press skips to the next slot, long press holds the current one |
 | **Registration** | Shows a 6-character code on the panel; enter it on makapix.club and the board stores its token |
 | **Artwork feed** | Shuffles every post that is 64 pixels or smaller and has a GIF rendition, 25 at a time |
 | **Playback** | Animated and still GIFs, each shown for its dwell time, finishing the loop in progress |
@@ -81,6 +83,10 @@ The board has two USB-C ports: **Power** feeds the board and the panel, **USB** 
 
 If an upload fails with "No serial data received", unplug both cables, hold **BOOT**, plug the **USB** cable back in, release **BOOT**, then upload again.
 
+### Rotation and time zone
+
+The rotation is the `ROTATION` table in [`src/main.cpp`](src/main.cpp). The clock's time zone is `TIMEZONE` in [`include/config.h`](include/config.h) (US Central by default).
+
 ### Brightness
 
 Brightness is the `BRIGHTNESS` constant (0-255) at the top of [`src/display.cpp`](src/display.cpp). Raise it only as far as white stays white; see the colour check below.
@@ -117,9 +123,13 @@ The first run registers a second player on your account. Its key and token are k
 
 | Path | Purpose |
 |---|---|
-| `src/main.cpp` | Main loop: Wi-Fi, registration, background loader, playback |
+| `src/main.cpp` | Wi-Fi, the slot rotation and command handling |
+| `src/slot.h` | Interface every slot implements |
+| `src/slot_makapix.cpp` | Artwork slot: registration, background loader, playback |
+| `src/slot_clock.cpp` | Clock slot (network time) |
+| `src/commands.cpp` | Command queue and the BOOT button |
 | `src/makapix.cpp` | Makapix player API and stored credentials |
-| `src/gif_player.cpp` | GIF download and playback, with whole-number scaling |
+| `src/gif_player.cpp` | GIF download and frame-by-frame playback, with whole-number scaling |
 | `src/display.cpp` | Panel setup, text screens, colour check |
 | `src/audio.cpp` | Speaker output through the ES8311 codec |
 | `include/pins.h` | HUB75, I2C and audio GPIO mapping, panel size |
@@ -134,7 +144,7 @@ pio device monitor      # serial log at 115200 baud
 
 ## Roadmap
 
-Working today: registration, shuffled playback with preloading, certificate checking, and the diagnostic builds.
+Working today: registration, shuffled playback with preloading, a slot rotation with a clock, button control, certificate checking, and the diagnostic builds.
 
 Ideas for later:
 
@@ -142,12 +152,12 @@ Ideas for later:
 - Report views, and MQTT for "send to device" commands from the Makapix site
 - Brightness control and a Wi-Fi setup portal
 - Use the speaker, microphones and onboard sensors
-- Find out why a few posts return a tiny file that is not a GIF (they are skipped)
+- A REST API on the board, then a settings web page and a companion app
 
 Ideas borrowed from [Pixelix](https://github.com/BlueAndi/Pixelix), using parts already on the board:
 
-- Slots that rotate between artwork and information screens
-- Clock and date (onboard clock chip, set over the network)
+- More slot types, with the rotation editable without re-uploading
+- Keep time across restarts with the onboard clock chip
 - Room temperature and humidity (onboard sensor), and a weather screen
 - Sound-reactive spectrum display (onboard microphones)
 - Built-in effects such as fire, falling code, rainbow and Game of Life

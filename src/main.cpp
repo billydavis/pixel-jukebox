@@ -1,13 +1,15 @@
-// Pixel Jukebox - shuffles pixel art from Makapix Club on a 64x64 LED matrix.
+// Pixel Jukebox - rotates through slots (Makapix artwork, clock) on a 64x64 LED matrix.
 
 #include <Arduino.h>
 #include <WiFi.h>
-#include <vector>
 
 #include "audio.h"
+#include "commands.h"
+#include "config.h"
 #include "display.h"
-#include "gif_player.h"
-#include "makapix.h"
+#include "pins.h"
+#include "slot_clock.h"
+#include "slot_makapix.h"
 
 #if __has_include("secrets.h")
 #include "secrets.h"
@@ -16,30 +18,29 @@
 #endif
 
 static const uint32_t WIFI_TIMEOUT_MS = 20000;
-static const uint32_t RETRY_DELAY_MS = 10000;
-static const uint32_t CODE_VALID_MS = 15 * 60 * 1000;
-static const uint32_t POLL_INTERVAL_MS = 5000;
-static const uint32_t RATE_LIMIT_WAIT_MS = 60000;
-static const int MAX_LOAD_ATTEMPTS = 3;
-static const uint32_t LOADER_STACK_BYTES = 16384; // TLS handshake plus JSON parsing
-static const BaseType_t LOADER_CORE = 0;          // away from the playback loop on core 1
+static const uint32_t WIFI_RETRY_MS = 60000;
+static const uint32_t MESSAGE_MS = 1500;
+static const uint32_t SKIPPED_SLOT_MS = 200;
+static const uint32_t COMMAND_POLL_MS = 5;
 
-enum class LoadStatus { Ready, Unauthorized, Failed };
+static MakapixSlot makapixSlot;
+static ClockSlot clockSlot;
 
-struct LoadedArtwork {
-  makapix::Artwork artwork;
-  uint8_t *data;
-  size_t size;
+// Each slot is shown `turns` times in a row before moving on.
+struct RotationEntry {
+  Slot *slot;
+  uint8_t turns;
 };
+static const RotationEntry ROTATION[] = {
+    {&makapixSlot, 3},
+    {&clockSlot, 1},
+};
+static const size_t ROTATION_LENGTH = sizeof(ROTATION) / sizeof(ROTATION[0]);
 
-// Owned by the loader while it runs, by loop() otherwise.
-static std::vector<makapix::Artwork> queue;
-static size_t queueIndex = 0;
-static LoadedArtwork pending;
-static LoadStatus pendingStatus;
-
-static SemaphoreHandle_t loaderDone;
-static bool loading = false;
+static size_t rotationIndex = 0;
+static uint8_t turnsTaken = 0;
+static size_t skippedInARow = 0;
+static uint32_t lastWifiAttempt = 0;
 
 static uint16_t amber() { return display->color565(255, 200, 0); }
 static uint16_t red() { return display->color565(255, 0, 0); }
@@ -59,95 +60,89 @@ static bool connectWifi() {
   return true;
 }
 
-static bool ensureWifi() {
+// Reconnects when the connection is down, at most once per WIFI_RETRY_MS so
+// slots that work offline keep their turns.
+static void maintainWifi() {
   if (WiFi.status() == WL_CONNECTED) {
-    return true;
+    return;
   }
+  if (lastWifiAttempt != 0 && millis() - lastWifiAttempt < WIFI_RETRY_MS) {
+    return;
+  }
+  lastWifiAttempt = millis();
+
   showMessage("WiFi", "joining...", amber());
   if (!connectWifi()) {
     Serial.println("Wi-Fi connection timed out");
     showMessage("WiFi", "failed", red());
-    delay(RETRY_DELAY_MS);
-    return false;
-  }
-  Serial.printf("Connected, IP %s\n", WiFi.localIP().toString().c_str());
-  showMessage("WiFi OK", WiFi.localIP().toString(), green());
-  delay(1500);
-  return true;
-}
-
-// Shows a registration code and waits for the user to enter it on makapix.club.
-static void registerDevice() {
-  String code;
-  if (!makapix::provision(code)) {
-    showMessage("Makapix", "unreachable", red());
-    delay(RETRY_DELAY_MS);
+    delay(MESSAGE_MS);
     return;
   }
-  Serial.printf("Registration code: %s\n", code.c_str());
-  showRegistrationCode(code);
+  Serial.printf("Connected, IP %s\n", WiFi.localIP().toString().c_str());
+  configTzTime(TIMEZONE, NTP_SERVER);
+  showMessage("WiFi OK", WiFi.localIP().toString(), green());
+  delay(MESSAGE_MS);
+}
 
-  uint32_t start = millis();
-  while (millis() - start < CODE_VALID_MS) {
-    delay(POLL_INTERVAL_MS);
-    makapix::LinkStatus status = makapix::pollCredentials();
-    if (status == makapix::LinkStatus::Linked) {
-      Serial.println("Device linked");
-      showMessage("Makapix", "linked!", green());
-      delay(1500);
+// Two small bars in the top-right corner while the current slot is held.
+static void drawHoldMarker() {
+  uint16_t white = display->color565(255, 255, 255);
+  display->fillRect(PANEL_RES_X - 6, 1, 2, 5, white);
+  display->fillRect(PANEL_RES_X - 3, 1, 2, 5, white);
+}
+
+// Runs a started slot until it finishes or a command ends it.
+static void runSlot(Slot *slot) {
+  bool held = false;
+  for (;;) {
+    uint32_t updatedAt = millis();
+    uint32_t waitMs = slot->update();
+    if (held) {
+      drawHoldMarker();
+    }
+
+    do {
+      Command command;
+      while (commandReceive(command)) {
+        if (command == Command::Next) {
+          Serial.println("Command: next");
+          slot->stop();
+          return;
+        }
+        held = !held;
+        Serial.printf("Command: %s\n", held ? "hold" : "release");
+        if (held) {
+          drawHoldMarker();
+        } else {
+          slot->redraw(); // clears the marker
+        }
+      }
+      delay(COMMAND_POLL_MS);
+    } while (millis() - updatedAt < waitMs);
+
+    if (!held && slot->finished()) {
+      slot->stop();
       return;
     }
-    if (status == makapix::LinkStatus::RateLimited) {
-      delay(RATE_LIMIT_WAIT_MS);
-    }
-  }
-  // Code expired; the next loop() pass provisions a fresh one.
-}
-
-// Takes the next artwork from the queue (fetching a new page when it runs out)
-// and downloads it, skipping ones that fail to download.
-static LoadStatus loadNext(LoadedArtwork &loaded) {
-  for (int attempt = 0; attempt < MAX_LOAD_ATTEMPTS; attempt++) {
-    if (queueIndex >= queue.size()) {
-      queueIndex = 0;
-      makapix::QueryStatus status = makapix::nextPage(queue);
-      if (status == makapix::QueryStatus::Unauthorized) {
-        return LoadStatus::Unauthorized;
-      }
-      if (status == makapix::QueryStatus::Failed || queue.empty()) {
-        return LoadStatus::Failed;
-      }
-      Serial.printf("Queued %u artworks\n", (unsigned)queue.size());
-    }
-
-    const makapix::Artwork &artwork = queue[queueIndex++];
-    size_t size = 0;
-    uint8_t *data = downloadGif(artwork.gifUrl, size);
-    if (data) {
-      loaded = {artwork, data, size};
-      return LoadStatus::Ready;
-    }
-  }
-  return LoadStatus::Failed;
-}
-
-static void loaderTask(void *) {
-  pendingStatus = loadNext(pending);
-  xSemaphoreGive(loaderDone);
-  vTaskDelete(nullptr);
-}
-
-// Loads the next artwork in the background so it is ready when the current
-// one finishes. The result is collected by taking loaderDone.
-static void startLoading() {
-  loading = true;
-  if (xTaskCreatePinnedToCore(loaderTask, "loader", LOADER_STACK_BYTES, nullptr, 1, nullptr,
-                              LOADER_CORE) != pdPASS) {
-    pendingStatus = loadNext(pending);
-    xSemaphoreGive(loaderDone);
   }
 }
 
+static size_t rotationTurns() {
+  size_t turns = 0;
+  for (const RotationEntry &entry : ROTATION) {
+    turns += entry.turns;
+  }
+  return turns;
+}
+
+static void advanceRotation() {
+  if (++turnsTaken >= ROTATION[rotationIndex].turns) {
+    turnsTaken = 0;
+    rotationIndex = (rotationIndex + 1) % ROTATION_LENGTH;
+  }
+}
+
+#ifdef SPEAKER_TEST
 // Lists the I2C devices, then plays a rising chime and a steady tone three times.
 static void runSpeakerTest() {
   String devices = audioScanI2c();
@@ -173,6 +168,7 @@ static void runSpeakerTest() {
     delay(700);
   }
 }
+#endif
 
 void setup() {
   Serial.begin(115200);
@@ -190,8 +186,8 @@ void setup() {
   runSpeakerTest();
 #endif
 
-  loaderDone = xSemaphoreCreateBinary();
-  makapix::begin();
+  commandsBegin();
+  makapixSlot.begin();
 }
 
 void loop() {
@@ -200,41 +196,27 @@ void loop() {
     return;
   }
 
-  if (!loading) {
-    if (!ensureWifi()) {
-      return;
-    }
-    if (!makapix::isRegistered()) {
-      registerDevice();
-      return;
-    }
-    startLoading();
-  }
+  maintainWifi();
 
-  xSemaphoreTake(loaderDone, portMAX_DELAY);
-  loading = false;
-
-  if (pendingStatus == LoadStatus::Unauthorized) {
-    // Token revoked or device removed on the site: register again.
-    Serial.println("Token rejected, registering again");
-    makapix::forget();
-    queue.clear();
-    queueIndex = 0;
-    return;
-  }
-  if (pendingStatus == LoadStatus::Failed) {
-    // A dropped Wi-Fi connection is reported by ensureWifi() on the next pass.
-    if (WiFi.status() == WL_CONNECTED) {
-      showMessage("Makapix", "no artwork", red());
-      delay(RETRY_DELAY_MS);
+  Slot *slot = ROTATION[rotationIndex].slot;
+  if (slot->start()) {
+    skippedInARow = 0;
+    Serial.printf("Slot: %s\n", slot->name());
+    runSlot(slot);
+  } else {
+    // Nothing to show yet (offline, still downloading, clock not set). Say so
+    // once every slot has been skipped.
+    if (++skippedInARow >= rotationTurns()) {
+      skippedInARow = 0;
+      showMessage("Pixel", "Jukebox\nwaiting...", amber());
+      delay(MESSAGE_MS);
     }
-    return;
-  }
+    delay(SKIPPED_SLOT_MS);
 
-  LoadedArtwork current = pending;
-  startLoading(); // preload the next one while this one plays
-  Serial.printf("Playing post %u (%u bytes)\n", (unsigned)current.artwork.postId,
-                (unsigned)current.size);
-  playGif(current.data, current.size, current.artwork.dwellMs);
-  free(current.data);
+    // Commands sent while nothing is showing have nothing to act on.
+    Command discarded;
+    while (commandReceive(discarded)) {
+    }
+  }
+  advanceRotation();
 }

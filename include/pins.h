@@ -31,3 +31,5 @@
 #define I2S_WS_PIN 38
 #define I2S_DOUT_PIN 21
 #define SPEAKER_AMP_PIN 11 // high = amplifier on
+
+#define BUTTON_PIN 0 // BOOT button, low when pressed
