@@ -7,5 +7,6 @@ extern MatrixPanel_I2S_DMA *display;
 
 bool setupDisplay();
 void drawTestPattern();
+void runColourCheck();
 void showMessage(const char *title, const String &body, uint16_t colour);
 void showRegistrationCode(const String &code);

@@ -2,7 +2,7 @@
 
 #include "pins.h"
 
-static const uint8_t BRIGHTNESS = 128; // 0-255; full brightness needs a 5V supply rated 3A or more
+static const uint8_t BRIGHTNESS = 32; // 0-255; white tints yellow at 64 and red at 128 on the current supply
 
 MatrixPanel_I2S_DMA *display = nullptr;
 
@@ -64,4 +64,32 @@ void showRegistrationCode(const String &code) {
   display->print(code.substring(0, 3));
   display->setCursor(14, 34);
   display->print(code.substring(3));
+}
+
+// White at rising brightness, then colour bars. If white turns pink as the
+// brightness rises, the 5V supply is sagging (red LEDs need the least voltage).
+void runColourCheck() {
+  const uint8_t levels[] = {32, 64, 128};
+  for (uint8_t level : levels) {
+    display->setBrightness8(level);
+    display->fillScreen(display->color565(255, 255, 255));
+    display->setTextSize(1);
+    display->setTextColor(0);
+    display->setCursor(2, 2);
+    display->print(level);
+    delay(8000);
+  }
+
+  const uint8_t bars[][3] = {{255, 255, 255}, {128, 128, 128}, {64, 64, 64},
+                             {255, 0, 0},     {0, 255, 0},     {0, 0, 255}};
+  const int barHeight = PANEL_RES_Y / 6;
+  display->clearScreen();
+  for (int i = 0; i < 6; i++) {
+    display->fillRect(0, i * barHeight, PANEL_RES_X, barHeight,
+                      display->color565(bars[i][0], bars[i][1], bars[i][2]));
+  }
+  delay(12000);
+
+  display->setBrightness8(BRIGHTNESS);
+  display->clearScreen();
 }
