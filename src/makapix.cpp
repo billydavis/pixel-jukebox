@@ -167,7 +167,9 @@ QueryStatus nextPage(std::vector<Artwork> &artworks) {
   hasGif["field"] = "file_format";
   hasGif["op"] = "eq";
   hasGif["value"] = "gif";
-  body["include_fields"].to<JsonArray>().add("dwell_time_ms");
+  JsonArray fields = body["include_fields"].to<JsonArray>();
+  fields.add("dwell_time_ms");
+  fields.add("owner_handle");
 
   String payload;
   serializeJson(body, payload);
@@ -186,6 +188,7 @@ QueryStatus nextPage(std::vector<Artwork> &artworks) {
   for (JsonObject post : doc["posts"].as<JsonArray>()) {
     Artwork artwork;
     artwork.postId = post["post_id"] | 0;
+    artwork.ownerHandle = post["owner_handle"] | "";
     artwork.gifUrl = gifUrlFor(post["art_url"].as<String>());
     artwork.dwellMs = post["dwell_time_ms"] | 30000;
     artworks.push_back(artwork);

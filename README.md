@@ -34,6 +34,7 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 |---|---|
 | **Slots** | Rotates through screens: three artworks, then a clock for 10 seconds |
 | **Button** | BOOT button: short press skips to the next slot, long press holds the current one |
+| **REST API** | Status, skip, hold and brightness over HTTP, found on the network as `pixel-jukebox.local` |
 | **Registration** | Shows a 6-character code on the panel; enter it on makapix.club and the board stores its token |
 | **Artwork feed** | Shuffles every post that is 64 pixels or smaller and has a GIF rendition, 25 at a time |
 | **Playback** | Animated and still GIFs, each shown for its dwell time, finishing the loop in progress |
@@ -61,7 +62,8 @@ Pin mapping is in [`include/pins.h`](include/pins.h).
 | Display | ESP32-HUB75-MatrixPanel-DMA, Adafruit GFX |
 | Artwork | AnimatedGIF, decoded from RAM (PSRAM) |
 | Network | Makapix player API over HTTPS, ArduinoJson; images over plain HTTP from the vault |
-| Storage | NVS (Preferences) for the player key and token |
+| Remote control | Built-in WebServer and mDNS, JSON over HTTP |
+| Storage | NVS (Preferences) for the player key, token and brightness |
 | Audio | ES8311 codec over I2C and I2S (test build only so far) |
 
 ## Getting started
@@ -89,7 +91,20 @@ The rotation is the `ROTATION` table in [`src/main.cpp`](src/main.cpp). The cloc
 
 ### Brightness
 
-Brightness is the `BRIGHTNESS` constant (0-255) at the top of [`src/display.cpp`](src/display.cpp). Raise it only as far as white stays white; see the colour check below.
+Brightness (0-255) is set through the API and remembered across restarts; the starting value is `DEFAULT_BRIGHTNESS` in [`src/display.cpp`](src/display.cpp). Raise it only as far as white stays white; see the colour check below.
+
+## REST API
+
+The board serves a small JSON API for remote control, at `http://pixel-jukebox.local/api/v1`. The full contract is in [`docs/jukebox-api.md`](docs/jukebox-api.md).
+
+```sh
+curl http://pixel-jukebox.local/api/v1/status
+curl -X POST http://pixel-jukebox.local/api/v1/next
+```
+
+A Postman collection is in [`postman/`](postman/Pixel-Jukebox-API.postman_collection.json); set its `device_ip` variable to the board's address.
+
+There is no authentication: anyone on the same network can call it.
 
 ## Diagnostic builds
 
@@ -99,7 +114,7 @@ Two extra PlatformIO environments run a check at boot and then carry on as norma
 pio run -e colour-check -t upload
 ```
 
-Shows white at brightness 32, 64 and 128, then colour bars. If white turns yellow or red as the brightness rises, the 5V supply is sagging: lower `BRIGHTNESS` or use a stronger supply.
+Shows white at brightness 32, 64 and 128, then colour bars. If white turns yellow or red as the brightness rises, the 5V supply is sagging: lower the brightness or use a stronger supply.
 
 ```sh
 pio run -e speaker-test -t upload
@@ -128,6 +143,8 @@ The first run registers a second player on your account. Its key and token are k
 | `src/slot_makapix.cpp` | Artwork slot: registration, background loader, playback |
 | `src/slot_clock.cpp` | Clock slot (network time) |
 | `src/commands.cpp` | Command queue and the BOOT button |
+| `src/api.cpp` | HTTP server and mDNS |
+| `src/status.cpp` | Shared "now showing" state read by the API |
 | `src/makapix.cpp` | Makapix player API and stored credentials |
 | `src/gif_player.cpp` | GIF download and frame-by-frame playback, with whole-number scaling |
 | `src/display.cpp` | Panel setup, text screens, colour check |
@@ -144,7 +161,7 @@ pio device monitor      # serial log at 115200 baud
 
 ## Roadmap
 
-Working today: registration, shuffled playback with preloading, a slot rotation with a clock, button control, certificate checking, and the diagnostic builds.
+Working today: registration, shuffled playback with preloading, a slot rotation with a clock, button and REST control, certificate checking, and the diagnostic builds.
 
 Ideas for later:
 
@@ -152,7 +169,8 @@ Ideas for later:
 - Report views, and MQTT for "send to device" commands from the Makapix site
 - Brightness control and a Wi-Fi setup portal
 - Use the speaker, microphones and onboard sensors
-- A REST API on the board, then a settings web page and a companion app
+- More of the API: slot list and editing, show a specific post, sensors
+- A settings web page on the board and a companion app (Flutter)
 
 Ideas borrowed from [Pixelix](https://github.com/BlueAndi/Pixelix), using parts already on the board:
 

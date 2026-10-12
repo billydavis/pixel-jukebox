@@ -1,8 +1,14 @@
 #include "display.h"
 
+#include <Preferences.h>
+
 #include "pins.h"
 
-static const uint8_t BRIGHTNESS = 32; // 0-255; white tints yellow at 64 and red at 128 on the current supply
+// 0-255. Over the USB-C power port, white tints yellow at 64 and red at 128.
+static const uint8_t DEFAULT_BRIGHTNESS = 32;
+
+static Preferences prefs;
+static uint8_t brightness = DEFAULT_BRIGHTNESS;
 
 MatrixPanel_I2S_DMA *display = nullptr;
 
@@ -16,9 +22,22 @@ bool setupDisplay() {
   if (!display->begin()) {
     return false;
   }
-  display->setBrightness8(BRIGHTNESS);
+  prefs.begin("jukebox", false);
+  brightness = prefs.getUChar("brightness", DEFAULT_BRIGHTNESS);
+  display->setBrightness8(brightness);
   display->clearScreen();
   return true;
+}
+
+uint8_t displayBrightness() { return brightness; }
+
+void displaySetBrightness(uint8_t value) {
+  if (value == brightness) {
+    return;
+  }
+  brightness = value;
+  display->setBrightness8(brightness);
+  prefs.putUChar("brightness", brightness);
 }
 
 // Colour gradient with a marker in each corner, to check wiring and orientation:
@@ -90,6 +109,6 @@ void runColourCheck() {
   }
   delay(12000);
 
-  display->setBrightness8(BRIGHTNESS);
+  display->setBrightness8(brightness);
   display->clearScreen();
 }

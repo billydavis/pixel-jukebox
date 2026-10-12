@@ -8,6 +8,7 @@ namespace makapix {
 
 struct Artwork {
   uint32_t postId;
+  String ownerHandle;
   String gifUrl; // plain-HTTP vault URL of the GIF rendition
   uint32_t dwellMs;
 };

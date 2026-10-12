@@ -5,6 +5,7 @@
 
 #include "display.h"
 #include "gif_player.h"
+#include "status.h"
 
 static const uint32_t CODE_VALID_MS = 15 * 60 * 1000;
 static const uint32_t CODE_SHOW_MS = 45000; // per turn, so other slots still get shown
@@ -149,6 +150,7 @@ bool MakapixSlot::startPlaying() {
     return false;
   }
 
+  statusSetArtwork(current.artwork.postId, current.artwork.ownerHandle);
   mode = Mode::Playing;
   startedAt = millis();
   data = current.data;
@@ -248,6 +250,7 @@ void MakapixSlot::stop() {
     gifClose();
     free(data);
     data = nullptr;
+    statusClearArtwork();
   }
   mode = Mode::Idle;
 }

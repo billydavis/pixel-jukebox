@@ -9,7 +9,10 @@ static const uint32_t LONG_PRESS_MS = 600;
 
 static QueueHandle_t queue;
 
-bool commandSend(Command command) { return xQueueSend(queue, &command, 0) == pdTRUE; }
+bool commandSend(CommandType type, uint8_t value) {
+  Command command = {type, value};
+  return xQueueSend(queue, &command, 0) == pdTRUE;
+}
 
 bool commandReceive(Command &command) { return xQueueReceive(queue, &command, 0) == pdTRUE; }
 
@@ -29,11 +32,11 @@ static void buttonTask(void *) {
       pressedAt = now;
     } else if (down && !longSent && now - pressedAt >= LONG_PRESS_MS) {
       longSent = true;
-      commandSend(Command::ToggleHold);
+      commandSend(CommandType::ToggleHold);
     } else if (!down && pressed) {
       pressed = false;
       if (!longSent && now - pressedAt >= DEBOUNCE_MS) {
-        commandSend(Command::Next);
+        commandSend(CommandType::Next);
       }
     }
     vTaskDelay(pdMS_TO_TICKS(BUTTON_POLL_MS));

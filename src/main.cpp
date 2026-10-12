@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 
+#include "api.h"
 #include "audio.h"
 #include "commands.h"
 #include "config.h"
@@ -10,6 +11,7 @@
 #include "pins.h"
 #include "slot_clock.h"
 #include "slot_makapix.h"
+#include "status.h"
 
 #if __has_include("secrets.h")
 #include "secrets.h"
@@ -80,6 +82,7 @@ static void maintainWifi() {
   }
   Serial.printf("Connected, IP %s\n", WiFi.localIP().toString().c_str());
   configTzTime(TIMEZONE, NTP_SERVER);
+  apiBegin();
   showMessage("WiFi OK", WiFi.localIP().toString(), green());
   delay(MESSAGE_MS);
 }
@@ -104,17 +107,33 @@ static void runSlot(Slot *slot) {
     do {
       Command command;
       while (commandReceive(command)) {
-        if (command == Command::Next) {
-          Serial.println("Command: next");
-          slot->stop();
-          return;
+        bool wantHeld = held;
+        switch (command.type) {
+          case CommandType::Next:
+            Serial.println("Command: next");
+            statusSetHeld(false);
+            slot->stop();
+            return;
+          case CommandType::ToggleHold:
+            wantHeld = !held;
+            break;
+          case CommandType::SetHold:
+            wantHeld = command.value != 0;
+            break;
+          case CommandType::SetBrightness:
+            Serial.printf("Command: brightness %u\n", command.value);
+            displaySetBrightness(command.value);
+            break;
         }
-        held = !held;
-        Serial.printf("Command: %s\n", held ? "hold" : "release");
-        if (held) {
-          drawHoldMarker();
-        } else {
-          slot->redraw(); // clears the marker
+        if (wantHeld != held) {
+          held = wantHeld;
+          statusSetHeld(held);
+          Serial.printf("Command: %s\n", held ? "hold" : "release");
+          if (held) {
+            drawHoldMarker();
+          } else {
+            slot->redraw(); // clears the marker
+          }
         }
       }
       delay(COMMAND_POLL_MS);
@@ -186,6 +205,7 @@ void setup() {
   runSpeakerTest();
 #endif
 
+  statusBegin();
   commandsBegin();
   makapixSlot.begin();
 }
@@ -201,8 +221,10 @@ void loop() {
   Slot *slot = ROTATION[rotationIndex].slot;
   if (slot->start()) {
     skippedInARow = 0;
+    statusSetSlot(slot->name());
     Serial.printf("Slot: %s\n", slot->name());
     runSlot(slot);
+    statusSetSlot("");
   } else {
     // Nothing to show yet (offline, still downloading, clock not set). Say so
     // once every slot has been skipped.
@@ -213,9 +235,12 @@ void loop() {
     }
     delay(SKIPPED_SLOT_MS);
 
-    // Commands sent while nothing is showing have nothing to act on.
-    Command discarded;
-    while (commandReceive(discarded)) {
+    // With nothing showing, only brightness changes have something to act on.
+    Command command;
+    while (commandReceive(command)) {
+      if (command.type == CommandType::SetBrightness) {
+        displaySetBrightness(command.value);
+      }
     }
   }
   advanceRotation();
