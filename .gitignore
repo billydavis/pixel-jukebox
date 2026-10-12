@@ -1,0 +1,6 @@
+.pio/
+.vscode/
+include/secrets.h
+tools/.player_state.json
+tools/downloads/
+__pycache__/
