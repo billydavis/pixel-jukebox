@@ -18,7 +18,9 @@ Pin mapping is in [include/pins.h](include/pins.h).
 | `src/makapix.cpp` | Makapix player API and stored credentials (NVS) |
 | `src/gif_player.cpp` | GIF download and playback, with whole-number scaling |
 | `src/display.cpp` | Panel setup and text screens |
-| `include/pins.h` | HUB75 GPIO mapping and panel size |
+| `src/audio.cpp` | Speaker output through the ES8311 codec (used by `speaker-test` only so far) |
+| `include/pins.h` | HUB75, I2C and audio GPIO mapping, panel size |
+| `include/ca_certs.h` | Root certificates trusted for makapix.club |
 | `include/secrets.example.h` | Wi-Fi credentials template; copy to `secrets.h` |
 | `tools/makapix_player.py` | PC script that walks the Makapix player API |
 
@@ -44,6 +46,25 @@ for its dwell time (30 seconds by default).
 If an upload fails with "No serial data received", unplug both USB cables, hold BOOT,
 plug the "USB" cable back in, release BOOT, then upload again.
 
+### Diagnostic builds
+
+Two extra PlatformIO environments run a check at boot and then carry on as normal.
+Upload the regular firmware again afterwards.
+
+```bash
+pio run -e colour-check -t upload
+```
+
+Shows white at brightness 32, 64 and 128, then colour bars. If white turns yellow or
+red as the brightness rises, the 5V supply is sagging; lower `BRIGHTNESS` in
+`src/display.cpp` or use a stronger supply.
+
+```bash
+pio run -e speaker-test -t upload
+```
+
+Lists the devices on the I2C bus, then plays a chime and a steady tone three times.
+
 ## Makapix API script
 
 ```bash
@@ -57,7 +78,8 @@ few to `tools/downloads/`.
 
 ## To do
 
-- Verify the makapix.club TLS certificate (currently `setInsecure()`)
-- Preload the next artwork to remove the pause between swaps
+- Power the panel from the dedicated 5V input; over USB-C, white tints above brightness 32
 - Report views, and MQTT for "send to device" commands from the web app
-- Brightness control, Wi-Fi setup portal, audio
+- Brightness control and a Wi-Fi setup portal
+- Use the speaker, microphones and onboard sensors
+- Find out why a few posts return a tiny file that is not a GIF (they are skipped)
