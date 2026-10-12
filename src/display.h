@@ -5,6 +5,13 @@
 
 extern MatrixPanel_I2S_DMA *display;
 
+// The colours used for status text: in progress, wrong, and fine.
+namespace colour {
+uint16_t amber();
+uint16_t red();
+uint16_t green();
+} // namespace colour
+
 bool setupDisplay();
 
 // Brightness is 0-255 and is remembered across restarts. Call

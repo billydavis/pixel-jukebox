@@ -164,7 +164,9 @@ The first run registers a second player on your account. Its key and token are k
 
 | Path | Purpose |
 |---|---|
-| `src/main.cpp` | Wi-Fi, running each slot and command handling |
+| `src/main.cpp` | Board start-up, running each slot and command handling |
+| `src/connection.cpp` | Joining Wi-Fi at boot and rejoining after a drop |
+| `src/diagnostics.cpp` | The speaker and microphone checks for the diagnostic builds |
 | `src/rotation.cpp` | The slot types and the saved rotation |
 | `src/slot.h` | Interface every slot implements |
 | `src/slot_makapix.cpp` | Artwork slot: registration, background loader, playback |

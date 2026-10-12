@@ -12,6 +12,10 @@ static uint8_t brightness = DEFAULT_BRIGHTNESS;
 
 MatrixPanel_I2S_DMA *display = nullptr;
 
+uint16_t colour::amber() { return display->color565(255, 200, 0); }
+uint16_t colour::red() { return display->color565(255, 0, 0); }
+uint16_t colour::green() { return display->color565(0, 255, 0); }
+
 bool setupDisplay() {
   HUB75_I2S_CFG::i2s_pins pins = {R1_PIN, G1_PIN, B1_PIN, R2_PIN, G2_PIN, B2_PIN, A_PIN,
                                   B_PIN,  C_PIN,  D_PIN,  E_PIN,  LAT_PIN, OE_PIN, CLK_PIN};

@@ -66,7 +66,7 @@ keep.
 | 2 | **CI build.** GitHub Actions workflow building the regular firmware and the diagnostic builds, without `secrets.h` | Deferred, see below |
 | 3 | **Tests.** Unit tests for the pure functions listed above; a smoke-test script that exercises the API on a real board; the route-consistency check | Done, see below |
 | 4 | **Web assets.** Control and setup pages as `.html` files embedded at build time; a duplicate-ID check in the tests | Done, see below |
-| 5 | **Tidy `main.cpp`.** Move the diagnostics and the Wi-Fi lifecycle into their own modules | Not started |
+| 5 | **Tidy `main.cpp`.** Move the diagnostics and the Wi-Fi lifecycle into their own modules | Done, see below |
 | 6 | **Regroup `src/`.** One mechanical commit | Not started |
 | 7 | **Metadata.** Give the PC tool its own identity; stop hard-coding the firmware version in the API example; commit the Postman generator | Not started |
 
@@ -195,4 +195,24 @@ the two and fails if they differ.
 
 The setup hotspot, which now makes a second request for its stylesheet, was
 checked by hand from a phone and renders correctly.
+
+## Step 5 results
+
+`src/main.cpp` went from 314 lines to 167. It now holds board start-up, the
+loop that picks and runs a slot, and command handling, and nothing else.
+
+| Moved to | What | Lines |
+|---|---|---|
+| `src/connection.cpp` | Joining Wi-Fi at boot, announcing the connection, rejoining after a drop, entering setup | 67 |
+| `src/diagnostics.cpp` | The speaker and microphone checks, behind one `runDiagnostics()` call | 99 |
+| `src/display.cpp` | The three status colours, which each file had been defining for itself | 3 |
+
+The code was moved, not rewritten; the only edits are names. Verified after
+the move: all four environments build, as does the regular one without
+`secrets.h`; the unit tests, web check and route check pass; the API smoke
+test passes 49 of 49 against the board; and the `mic-test` build was flashed
+and its self-check passed, confirming the diagnostics still run from their new
+home.
+
+The slot runner stayed in `main.cpp`, as planned. It is the file's main job.
 
