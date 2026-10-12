@@ -2,7 +2,7 @@
 
 #include "pins.h"
 
-static const uint8_t BRIGHTNESS = 64; // 0-255; kept low while powered from the bench
+static const uint8_t BRIGHTNESS = 128; // 0-255; full brightness needs a 5V supply rated 3A or more
 
 MatrixPanel_I2S_DMA *display = nullptr;
 
