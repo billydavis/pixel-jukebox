@@ -5,6 +5,7 @@
 #include <Preferences.h>
 #include <WiFiClientSecure.h>
 
+#include "ca_certs.h"
 #include "config.h"
 #include "pins.h"
 
@@ -23,8 +24,7 @@ static uint32_t shuffleSeed = 0;
 
 static int request(const char *method, const String &path, const String &body, String &response) {
   WiFiClientSecure client;
-  // TODO: pin the server's CA instead; the certificate is not verified yet.
-  client.setInsecure();
+  client.setCACert(MAKAPIX_ROOT_CAS);
 
   HTTPClient http;
   http.setUserAgent(USER_AGENT);
