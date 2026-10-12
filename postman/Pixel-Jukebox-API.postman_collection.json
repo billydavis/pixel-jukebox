@@ -69,12 +69,15 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "http://{{device_ip}}/",
+              "raw": "http://{{device_ip}}/api/v1",
               "protocol": "http",
               "host": [
                 "{{device_ip}}"
               ],
-              "path": []
+              "path": [
+                "api",
+                "v1"
+              ]
             },
             "description": "Returns the device name and the API base path."
           },

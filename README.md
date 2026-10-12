@@ -34,6 +34,7 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 |---|---|
 | **Slots** | Rotates through screens: three artworks, then a clock for 10 seconds |
 | **Button** | BOOT button: short press skips to the next slot, long press holds the current one |
+| **Control page** | Open `http://pixel-jukebox.local` on a phone or PC: see the artwork and artist, skip, hold, set brightness |
 | **REST API** | Status, skip, hold and brightness over HTTP, found on the network as `pixel-jukebox.local` |
 | **Registration** | Shows a 6-character code on the panel; enter it on makapix.club and the board stores its token |
 | **Artwork feed** | Shuffles every post that is 64 pixels or smaller and has a GIF rendition, 25 at a time |
@@ -93,6 +94,10 @@ The rotation is the `ROTATION` table in [`src/main.cpp`](src/main.cpp). The cloc
 
 Brightness (0-255) is set through the API and remembered across restarts; the starting value is `DEFAULT_BRIGHTNESS` in [`src/display.cpp`](src/display.cpp). Raise it only as far as white stays white; see the colour check below.
 
+## Control page
+
+Open `http://pixel-jukebox.local` (or the board's IP address) in a browser on the same network. The page shows what is on the panel and who made it, with Hold, Next and a brightness slider. On a keyboard, `N` skips and `H` holds. It is a single file built into the firmware, with no external assets.
+
 ## REST API
 
 The board serves a small JSON API for remote control, at `http://pixel-jukebox.local/api/v1`. The full contract is in [`docs/jukebox-api.md`](docs/jukebox-api.md).
@@ -144,6 +149,7 @@ The first run registers a second player on your account. Its key and token are k
 | `src/slot_clock.cpp` | Clock slot (network time) |
 | `src/commands.cpp` | Command queue and the BOOT button |
 | `src/api.cpp` | HTTP server and mDNS |
+| `src/web_page.h` | The control page (HTML, CSS and JavaScript in one string) |
 | `src/status.cpp` | Shared "now showing" state read by the API |
 | `src/makapix.cpp` | Makapix player API and stored credentials |
 | `src/gif_player.cpp` | GIF download and frame-by-frame playback, with whole-number scaling |
@@ -161,7 +167,7 @@ pio device monitor      # serial log at 115200 baud
 
 ## Roadmap
 
-Working today: registration, shuffled playback with preloading, a slot rotation with a clock, button and REST control, certificate checking, and the diagnostic builds.
+Working today: registration, shuffled playback with preloading, a slot rotation with a clock, button, web and REST control, certificate checking, and the diagnostic builds.
 
 Ideas for later:
 
@@ -170,7 +176,7 @@ Ideas for later:
 - Brightness control and a Wi-Fi setup portal
 - Use the speaker, microphones and onboard sensors
 - More of the API: slot list and editing, show a specific post, sensors
-- A settings web page on the board and a companion app (Flutter)
+- A companion app (Flutter)
 
 Ideas borrowed from [Pixelix](https://github.com/BlueAndi/Pixelix), using parts already on the board:
 

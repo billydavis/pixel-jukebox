@@ -150,7 +150,12 @@ bool MakapixSlot::startPlaying() {
     return false;
   }
 
-  statusSetArtwork(current.artwork.postId, current.artwork.ownerHandle);
+  // The panel fetches over plain HTTP; other clients get the HTTPS address.
+  String shareUrl = current.artwork.gifUrl;
+  if (shareUrl.startsWith("http://")) {
+    shareUrl = "https://" + shareUrl.substring(7);
+  }
+  statusSetArtwork(current.artwork.postId, current.artwork.ownerHandle, shareUrl);
   mode = Mode::Playing;
   startedAt = millis();
   data = current.data;

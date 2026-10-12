@@ -10,11 +10,12 @@ struct PlayerStatus {
   bool hasArtwork = false;
   uint32_t postId = 0;
   String owner;
+  String gifUrl; // HTTPS, for clients that want to show the artwork
 };
 
 void statusBegin();
 void statusSetSlot(const char *name);
 void statusSetHeld(bool held);
-void statusSetArtwork(uint32_t postId, const String &owner);
+void statusSetArtwork(uint32_t postId, const String &owner, const String &gifUrl);
 void statusClearArtwork();
 PlayerStatus statusGet();

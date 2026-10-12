@@ -9,6 +9,7 @@
 #include "config.h"
 #include "display.h"
 #include "status.h"
+#include "web_page.h"
 
 #define API_BASE "/api/v1"
 
@@ -57,7 +58,9 @@ static bool readBody(JsonDocument &doc) {
   return true;
 }
 
-static void handleRoot() {
+static void handlePage() { server.send_P(200, "text/html", WEB_PAGE); }
+
+static void handleApiRoot() {
   JsonDocument doc;
   doc["name"] = "Pixel Jukebox";
   doc["api"] = API_BASE;
@@ -88,6 +91,7 @@ static void handleStatus() {
     JsonObject artwork = doc["artwork"].to<JsonObject>();
     artwork["postId"] = status.postId;
     artwork["owner"] = status.owner;
+    artwork["gifUrl"] = status.gifUrl;
   } else {
     doc["artwork"] = nullptr;
   }
@@ -154,7 +158,8 @@ void apiBegin() {
   }
   started = true;
 
-  server.on("/", HTTP_GET, handleRoot);
+  server.on("/", HTTP_GET, handlePage);
+  server.on(API_BASE, HTTP_GET, handleApiRoot);
   server.on(API_BASE "/status", HTTP_GET, handleStatus);
   server.on(API_BASE "/next", HTTP_POST, handleNext);
   server.on(API_BASE "/hold", HTTP_POST, handleHold);

@@ -24,7 +24,11 @@ The board announces itself over mDNS:
 
 A client scanning for `_http._tcp` can use the `jukebox` TXT key to tell a
 jukebox from any other web server, and its value as the API base path.
-`GET /` returns the same pointer: `{"name":"Pixel Jukebox","api":"/api/v1"}`.
+`GET /api/v1` returns `{"name":"Pixel Jukebox","api":"/api/v1"}`, so a client can
+confirm what it has found.
+
+`GET /` serves the built-in control page (`src/web_page.h`), which is itself a
+client of this API.
 
 ## Conventions
 
@@ -46,13 +50,15 @@ the BOOT button uses. The reply is `202 Accepted` and names what was queued:
 
 The change normally takes effect within a few milliseconds; read `GET /status`
 to see the result. For the first few seconds after power-on, while the first
-artwork loads, queued commands wait until playback starts. If the queue is full
+artwork loads, a queued command is delayed until playback starts, and `next`
+or `hold` may be dropped because there is no slot yet for it to act on. If the queue is full
 the reply is `503` and nothing is queued.
 
 ## Endpoints
 
 | Method | Path | Purpose |
 |---|---|---|
+| `GET` | (the base path, `/api/v1`) | Device name and API base path |
 | `GET` | `/status` | What the panel is showing, plus device information |
 | `POST` | `/next` | Skip to the next slot |
 | `POST` | `/hold` | Hold or release the current slot |
@@ -66,13 +72,17 @@ the reply is `503` and nothing is queued.
   "device": {
     "name": "pixel-jukebox",
     "model": "pixel-jukebox-64x64",
-    "firmware": "0.3.0",
+    "firmware": "0.4.0",
     "ip": "192.168.4.105",
     "rssi": -64,
     "uptimeSeconds": 14
   },
   "slot": { "name": "makapix", "held": false },
-  "artwork": { "postId": 647, "owner": "Odio" },
+  "artwork": {
+    "postId": 647,
+    "owner": "Odio",
+    "gifUrl": "https://vault.makapix.club/21/32/abc123.gif"
+  },
   "brightness": 32
 }
 ```
@@ -84,6 +94,7 @@ the reply is `503` and nothing is queued.
 | `slot.held` | `true` while the current slot is held |
 | `artwork` | The Makapix post on screen; `null` when the slot is not showing artwork (clock, registration code) |
 | `artwork.owner` | The artist's Makapix handle |
+| `artwork.gifUrl` | HTTPS address of the GIF being played, for clients that want to show it |
 | `brightness` | 0-255 |
 
 ### `POST /next`
