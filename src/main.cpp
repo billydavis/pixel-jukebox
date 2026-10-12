@@ -4,6 +4,7 @@
 #include <WiFi.h>
 #include <vector>
 
+#include "audio.h"
 #include "display.h"
 #include "gif_player.h"
 #include "makapix.h"
@@ -147,6 +148,32 @@ static void startLoading() {
   }
 }
 
+// Lists the I2C devices, then plays a rising chime and a steady tone three times.
+static void runSpeakerTest() {
+  String devices = audioScanI2c();
+  Serial.printf("I2C devices: %s\n", devices.c_str());
+  showMessage("I2C", devices, amber());
+  delay(4000);
+
+  if (!audioBegin()) {
+    Serial.println("Audio init failed");
+    showMessage("Speaker", "init failed", red());
+    delay(5000);
+    return;
+  }
+  Serial.println("Audio init OK, playing tones");
+  showMessage("Speaker", "playing", green());
+  const float chime[] = {523.25f, 659.25f, 783.99f, 1046.5f}; // C5 E5 G5 C6
+  for (int repeat = 0; repeat < 3; repeat++) {
+    for (float note : chime) {
+      audioTone(note, 250);
+    }
+    delay(300);
+    audioTone(1000, 1000);
+    delay(700);
+  }
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -158,6 +185,9 @@ void setup() {
   delay(1500);
 #ifdef COLOUR_CHECK
   runColourCheck();
+#endif
+#ifdef SPEAKER_TEST
+  runSpeakerTest();
 #endif
 
   loaderDone = xSemaphoreCreateBinary();

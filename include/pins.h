@@ -21,3 +21,13 @@
 #define LAT_PIN 40
 #define OE_PIN 2
 #define CLK_PIN 41
+
+// Audio (ES8311 codec) and the shared I2C bus. Source: community pin map checked
+// against Waveshare's BSP, https://github.com/NickoScope/waveshare-rgb-matrix-p2-64x64
+#define I2C_SDA_PIN 47
+#define I2C_SCL_PIN 48
+#define I2S_MCLK_PIN 12
+#define I2S_BCLK_PIN 43
+#define I2S_WS_PIN 38
+#define I2S_DOUT_PIN 21
+#define SPEAKER_AMP_PIN 11 // high = amplifier on
