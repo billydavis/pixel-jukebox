@@ -7,7 +7,9 @@
 
 static const i2s_port_t I2S_PORT = I2S_NUM_0;
 static const int SAMPLE_RATE = 16000;
-static const uint8_t ES8311_ADDRESS = 0x18;
+static const uint8_t ES8311_ADDRESS = 0x18; // speaker codec
+static const uint8_t ES7210_ADDRESS = 0x40; // microphone ADC
+static const uint8_t MIC_GAIN = 0x0A;       // 30 dB, in 3 dB steps from 0
 static const int16_t TONE_AMPLITUDE = 12000; // of 32767
 static const int FADE_SAMPLES = SAMPLE_RATE / 100; // 10 ms, avoids clicks
 static const int CHUNK_FRAMES = 256;
@@ -59,9 +61,52 @@ static bool setupCodec() {
   return writeRegister(0x37, 0x08); // DAC equaliser bypass
 }
 
+static bool writeMicRegister(uint8_t reg, uint8_t value) {
+  Wire.beginTransmission(ES7210_ADDRESS);
+  Wire.write(reg);
+  Wire.write(value);
+  return Wire.endTransmission() == 0;
+}
+
+// Register sequence from Espressif's es7210 driver (esp-bsp), fixed to 16 kHz,
+// 16-bit standard I2S (microphones 1 and 2 as left and right) with MCLK at
+// 256 x the sample rate.
+static bool setupMics() {
+  if (!writeMicRegister(0x00, 0xFF)) { // reset
+    return false;
+  }
+  writeMicRegister(0x00, 0x32);
+  writeMicRegister(0x09, 0x30); // power-up timing
+  writeMicRegister(0x0A, 0x30);
+  writeMicRegister(0x23, 0x2A); // high-pass filters, ADC 1-2
+  writeMicRegister(0x22, 0x0A);
+  writeMicRegister(0x21, 0x2A); // high-pass filters, ADC 3-4
+  writeMicRegister(0x20, 0x0A);
+  writeMicRegister(0x11, 0x60); // I2S format, 16-bit
+  writeMicRegister(0x12, 0x00); // no TDM
+  writeMicRegister(0x40, 0xC3); // analog power and VMID
+  writeMicRegister(0x41, 0x70); // microphone bias 2.87 V
+  writeMicRegister(0x42, 0x70);
+  for (uint8_t reg = 0x43; reg <= 0x46; reg++) {
+    writeMicRegister(reg, MIC_GAIN | 0x10);
+  }
+  for (uint8_t reg = 0x47; reg <= 0x4A; reg++) {
+    writeMicRegister(reg, 0x08); // microphone power on
+  }
+  writeMicRegister(0x07, 0x20); // oversampling
+  writeMicRegister(0x02, 0xC1); // clock divider, doubler and DLL for 4.096 MHz
+  writeMicRegister(0x04, 0x01); // LRCK divider
+  writeMicRegister(0x05, 0x00);
+  writeMicRegister(0x06, 0x04); // DLL power down
+  writeMicRegister(0x4B, 0x0F); // bias, ADC and PGA power, microphones 1-2
+  writeMicRegister(0x4C, 0x0F); // and 3-4
+  writeMicRegister(0x00, 0x71); // enable
+  return writeMicRegister(0x00, 0x41);
+}
+
 static bool setupI2s() {
   i2s_config_t config = {};
-  config.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX);
+  config.mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_RX);
   config.sample_rate = SAMPLE_RATE;
   config.bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT;
   config.channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT;
@@ -79,15 +124,15 @@ static bool setupI2s() {
   pins.bck_io_num = I2S_BCLK_PIN;
   pins.ws_io_num = I2S_WS_PIN;
   pins.data_out_num = I2S_DOUT_PIN;
-  pins.data_in_num = I2S_PIN_NO_CHANGE;
+  pins.data_in_num = I2S_DIN_PIN;
   return i2s_set_pin(I2S_PORT, &pins) == ESP_OK;
 }
 
 bool audioBegin() {
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN, 400000);
 
-  // The codec needs MCLK running before it is configured.
-  if (!setupI2s() || !setupCodec()) {
+  // The codecs need MCLK running before they are configured.
+  if (!setupI2s() || !setupCodec() || !setupMics()) {
     return false;
   }
   audioSetVolume(60);
@@ -124,6 +169,42 @@ void audioTone(float frequencyHz, uint32_t durationMs) {
     size_t written = 0;
     i2s_write(I2S_PORT, frames, count * 2 * sizeof(int16_t), &written, portMAX_DELAY);
   }
+}
+
+MicLevels audioMeasure(uint32_t durationMs) {
+  static int16_t frames[CHUNK_FRAMES * 2];
+  const int total = SAMPLE_RATE * durationMs / 1000;
+  double sumLeft = 0, sumRight = 0;
+  int peakLeft = 0, peakRight = 0;
+  int measured = 0;
+
+  while (measured < total) {
+    size_t bytes = 0;
+    if (i2s_read(I2S_PORT, frames, sizeof(frames), &bytes, pdMS_TO_TICKS(200)) != ESP_OK ||
+        bytes == 0) {
+      break;
+    }
+    int count = bytes / (2 * sizeof(int16_t));
+    for (int i = 0; i < count; i++) {
+      int left = frames[i * 2];
+      int right = frames[i * 2 + 1];
+      sumLeft += (double)left * left;
+      sumRight += (double)right * right;
+      peakLeft = max(peakLeft, abs(left));
+      peakRight = max(peakRight, abs(right));
+    }
+    measured += count;
+  }
+
+  MicLevels levels = {};
+  if (measured > 0) {
+    levels.rmsLeft = (int)sqrt(sumLeft / measured);
+    levels.rmsRight = (int)sqrt(sumRight / measured);
+    levels.peakLeft = peakLeft;
+    levels.peakRight = peakRight;
+    levels.frames = measured;
+  }
+  return levels;
 }
 
 String audioScanI2c() {

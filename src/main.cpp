@@ -174,6 +174,57 @@ static void runSpeakerTest() {
 }
 #endif
 
+#ifdef MIC_TEST
+// Shows the level of each microphone as a bar for a minute, and logs it.
+static void runMicTest() {
+  if (!audioBegin()) {
+    Serial.println("Audio init failed");
+    showMessage("Mic", "init failed", red());
+    delay(5000);
+    return;
+  }
+  Serial.println("Audio init OK, measuring microphones");
+
+  // Self-check: the microphones should hear the board's own speaker. The
+  // reading after the tone comes from audio buffered while it was playing.
+  audioMeasure(500); // discard the power-on transient
+  MicLevels quiet = audioMeasure(300);
+  audioTone(1000, 400);
+  MicLevels tone = audioMeasure(100);
+  bool heard = tone.rmsLeft > quiet.rmsLeft * 4 && tone.rmsRight > quiet.rmsRight * 4;
+  Serial.printf("Self-check: quiet L %d R %d, 1 kHz tone L %d R %d: %s\n", quiet.rmsLeft,
+                quiet.rmsRight, tone.rmsLeft, tone.rmsRight, heard ? "PASS" : "FAIL");
+  showMessage("Mic", heard ? "self-check\npassed" : "self-check\nfailed", heard ? green() : red());
+  delay(2000);
+
+  const uint32_t testMs = 60000;
+  const int barMax = PANEL_RES_X - 4;
+  uint32_t start = millis();
+  while (millis() - start < testMs) {
+    MicLevels levels = audioMeasure(100);
+    Serial.printf("mic rms L %5d R %5d  peak L %5d R %5d  frames %d\n", levels.rmsLeft,
+                  levels.rmsRight, levels.peakLeft, levels.peakRight, levels.frames);
+
+    // A square-root scale keeps quiet sounds visible.
+    int left = min(barMax, (int)(sqrtf(levels.rmsLeft / 8000.0f) * barMax));
+    int right = min(barMax, (int)(sqrtf(levels.rmsRight / 8000.0f) * barMax));
+    display->clearScreen();
+    display->setTextSize(1);
+    display->setTextWrap(false);
+    display->setTextColor(amber());
+    display->setCursor(2, 2);
+    display->print("Mic test");
+    display->setTextColor(display->color565(150, 150, 150));
+    display->setCursor(2, 16);
+    display->print("L");
+    display->setCursor(2, 38);
+    display->print("R");
+    display->fillRect(2, 26, left, 8, green());
+    display->fillRect(2, 48, right, 8, green());
+  }
+}
+#endif
+
 void setup() {
   Serial.begin(115200);
 
@@ -188,6 +239,9 @@ void setup() {
 #endif
 #ifdef SPEAKER_TEST
   runSpeakerTest();
+#endif
+#ifdef MIC_TEST
+  runMicTest();
 #endif
 
   startWifi();

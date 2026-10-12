@@ -29,7 +29,8 @@
 #define I2S_MCLK_PIN 12
 #define I2S_BCLK_PIN 43
 #define I2S_WS_PIN 38
-#define I2S_DOUT_PIN 21
+#define I2S_DOUT_PIN 21 // to the speaker codec
+#define I2S_DIN_PIN 39  // from the microphone ADC
 #define SPEAKER_AMP_PIN 11 // high = amplifier on
 
 #define BUTTON_PIN 0 // BOOT button, low when pressed

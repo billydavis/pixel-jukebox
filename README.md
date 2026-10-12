@@ -66,7 +66,7 @@ Pin mapping is in [`include/pins.h`](include/pins.h).
 | Network | Makapix player API over HTTPS, ArduinoJson; images over plain HTTP from the vault |
 | Remote control | Built-in WebServer and mDNS, JSON over HTTP |
 | Storage | NVS (Preferences) for Wi-Fi details, the player key and token, brightness and the rotation |
-| Audio | ES8311 codec over I2C and I2S (test build only so far) |
+| Audio | ES8311 speaker codec and ES7210 microphone ADC over I2C and I2S (test builds only so far) |
 
 ## Getting started
 
@@ -127,7 +127,7 @@ There is no authentication: anyone on the same network can call it.
 
 ## Diagnostic builds
 
-Two extra PlatformIO environments run a check at boot and then carry on as normal. Upload the regular firmware again afterwards.
+Three extra PlatformIO environments run a check at boot and then carry on as normal. Upload the regular firmware again afterwards.
 
 ```sh
 pio run -e colour-check -t upload
@@ -140,6 +140,12 @@ pio run -e speaker-test -t upload
 ```
 
 Lists the devices on the I2C bus, then plays a chime and a steady tone three times.
+
+```sh
+pio run -e mic-test -t upload
+```
+
+Plays a short tone and checks both microphones hear it, then shows each microphone's level as a bar for a minute.
 
 ## Makapix API script
 
@@ -171,7 +177,7 @@ The first run registers a second player on your account. Its key and token are k
 | `src/makapix.cpp` | Makapix player API and stored credentials |
 | `src/gif_player.cpp` | GIF download and frame-by-frame playback, with whole-number scaling |
 | `src/display.cpp` | Panel setup, text screens, colour check |
-| `src/audio.cpp` | Speaker output through the ES8311 codec |
+| `src/audio.cpp` | Speaker output (ES8311) and microphone input (ES7210) |
 | `include/pins.h` | HUB75, I2C and audio GPIO mapping, panel size |
 | `include/ca_certs.h` | Root certificates trusted for makapix.club |
 | `include/secrets.example.h` | Optional compiled-in Wi-Fi credentials |
