@@ -144,6 +144,21 @@ Ideas for later:
 - Use the speaker, microphones and onboard sensors
 - Find out why a few posts return a tiny file that is not a GIF (they are skipped)
 
+Ideas borrowed from [Pixelix](https://github.com/BlueAndi/Pixelix), using parts already on the board:
+
+- Slots that rotate between artwork and information screens
+- Clock and date (onboard clock chip, set over the network)
+- Room temperature and humidity (onboard sensor), and a weather screen
+- Sound-reactive spectrum display (onboard microphones)
+- Built-in effects such as fire, falling code, rainbow and Game of Life
+- A web page for settings, and firmware updates over Wi-Fi
+
+## Acknowledgements
+
+Pixel Jukebox is inspired by [Pixelix](https://github.com/BlueAndi/Pixelix) by BlueAndi, a far more complete LED matrix firmware with a plugin system, web interface and its own Makapix player. Seeing Makapix art on a Pixelix display is what started this project. Pixel Jukebox is written from scratch as a learning project and shares no code with Pixelix.
+
+Thanks also to [Makapix Club](https://makapix.club) for the open player API and its documentation, and to the authors of the libraries listed under Stack.
+
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
