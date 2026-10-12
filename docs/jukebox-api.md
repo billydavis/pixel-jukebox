@@ -60,6 +60,7 @@ the reply is `503` and nothing is queued.
 |---|---|---|
 | `GET` | (the base path, `/api/v1`) | Device name and API base path |
 | `GET` | `/status` | What the panel is showing, plus device information |
+| `GET` | `/diagnostics` | Memory and task headroom |
 | `POST` | `/next` | Skip to the next slot |
 | `POST` | `/hold` | Hold or release the current slot |
 | `GET` | `/brightness` | Read the brightness |
@@ -107,6 +108,32 @@ the reply is `503` and nothing is queued.
 | `mode` | `rotation` or `sound` |
 | `visualizer` | The visualizer sound mode uses, whether or not it is showing now |
 | `brightness` | 0-255 |
+
+### `GET /diagnostics`
+
+Memory and task-stack headroom, for checking limits against measurements. All
+sizes are in bytes.
+
+```json
+{
+  "uptimeSeconds": 318,
+  "lastReset": "power on",
+  "heap": { "free": 135868, "lowestFree": 70660, "largestBlock": 81908 },
+  "psram": { "present": true, "size": 16774227, "free": 16583611, "lowestFree": 16552927, "largestBlock": 16515060 },
+  "tasks": [
+    { "name": "display", "stack": 8192, "lowestFree": 5864 },
+    { "name": "api", "stack": 8192, "lowestFree": 5816 }
+  ],
+  "artwork": { "downloaded": 42, "largestBytes": 187850 }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `lastReset` | Why the board last started: `power on`, `software restart`, `crash`, `watchdog`, `brownout` or `other` |
+| `heap`, `psram` | Internal and external memory. `lowestFree` is the least that has been free since startup; `largestBlock` is the biggest single allocation possible now |
+| `tasks` | `lowestFree` is the least stack each task has had spare. `loader` is short-lived and appears once it has run |
+| `artwork` | Artworks downloaded since startup and the size of the largest |
 
 ### `POST /next`
 

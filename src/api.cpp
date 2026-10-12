@@ -11,6 +11,7 @@
 #include "mode.h"
 #include "rotation.h"
 #include "status.h"
+#include "telemetry.h"
 #include "web_page.h"
 
 #define API_BASE "/api/v1"
@@ -102,6 +103,12 @@ static void handleStatus() {
   doc["mode"] = modeIsSound() ? "sound" : "rotation";
   doc["visualizer"] = modeVisualizer();
   doc["brightness"] = displayBrightness();
+  sendJson(200, doc);
+}
+
+static void handleDiagnostics() {
+  JsonDocument doc;
+  telemetryReport(doc.to<JsonObject>());
   sendJson(200, doc);
 }
 
@@ -263,6 +270,7 @@ void apiBegin() {
   server.on("/", HTTP_GET, handlePage);
   server.on(API_BASE, HTTP_GET, handleApiRoot);
   server.on(API_BASE "/status", HTTP_GET, handleStatus);
+  server.on(API_BASE "/diagnostics", HTTP_GET, handleDiagnostics);
   server.on(API_BASE "/next", HTTP_POST, handleNext);
   server.on(API_BASE "/hold", HTTP_POST, handleHold);
   server.on(API_BASE "/brightness", HTTP_GET, handleGetBrightness);
@@ -283,6 +291,8 @@ void apiBegin() {
     Serial.println("mDNS failed to start");
   }
 
-  xTaskCreatePinnedToCore(serverTask, "api", SERVER_STACK_BYTES, nullptr, 1, nullptr, SERVER_CORE);
+  TaskHandle_t task = nullptr;
+  xTaskCreatePinnedToCore(serverTask, "api", SERVER_STACK_BYTES, nullptr, 1, &task, SERVER_CORE);
+  telemetryRegisterTask("api", task, SERVER_STACK_BYTES);
   Serial.printf("API at http://%s.local%s\n", MDNS_HOSTNAME, API_BASE);
 }

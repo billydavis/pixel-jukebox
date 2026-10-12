@@ -51,6 +51,40 @@
           "response": []
         },
         {
+          "name": "Get Diagnostics",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/diagnostics",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "diagnostics"
+              ]
+            },
+            "description": "Memory and task-stack headroom since startup, and why the board last restarted."
+          },
+          "response": []
+        },
+        {
           "name": "Get API Pointer",
           "event": [
             {

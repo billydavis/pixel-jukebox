@@ -6,6 +6,7 @@
 #include "display.h"
 #include "gif_player.h"
 #include "status.h"
+#include "telemetry.h"
 
 static const uint32_t CODE_VALID_MS = 15 * 60 * 1000;
 static const uint32_t CODE_SHOW_MS = 45000; // per turn, so other slots still get shown
@@ -63,6 +64,7 @@ static LoadStatus loadNext(LoadedArtwork &loaded) {
       free(data);
       continue;
     }
+    telemetryNoteImage(size);
     loaded = {artwork, data, size};
     return LoadStatus::Ready;
   }
@@ -71,6 +73,7 @@ static LoadStatus loadNext(LoadedArtwork &loaded) {
 
 static void loaderTask(void *) {
   pendingStatus = loadNext(pending);
+  telemetryNoteTaskExit("loader", LOADER_STACK_BYTES);
   xSemaphoreGive(loaderDone);
   vTaskDelete(nullptr);
 }

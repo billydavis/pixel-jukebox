@@ -1,12 +1,14 @@
 #include "commands.h"
 
 #include "pins.h"
+#include "telemetry.h"
 
 static const int QUEUE_LENGTH = 8;
 static const uint32_t BUTTON_POLL_MS = 10;
 static const uint32_t DEBOUNCE_MS = 30;
 static const uint32_t LONG_PRESS_MS = 600;
 static const uint32_t SETUP_PRESS_MS = 5000;
+static const uint32_t BUTTON_STACK_BYTES = 2048;
 
 static QueueHandle_t queue;
 
@@ -51,5 +53,7 @@ static void buttonTask(void *) {
 
 void commandsBegin() {
   queue = xQueueCreate(QUEUE_LENGTH, sizeof(Command));
-  xTaskCreate(buttonTask, "button", 2048, nullptr, 2, nullptr);
+  TaskHandle_t task = nullptr;
+  xTaskCreate(buttonTask, "button", BUTTON_STACK_BYTES, nullptr, 2, &task);
+  telemetryRegisterTask("button", task, BUTTON_STACK_BYTES);
 }

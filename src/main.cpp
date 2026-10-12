@@ -13,6 +13,7 @@
 #include "pins.h"
 #include "rotation.h"
 #include "status.h"
+#include "telemetry.h"
 #include "wifi_setup.h"
 
 static const uint32_t WIFI_TIMEOUT_MS = 20000;
@@ -253,6 +254,7 @@ void setup() {
   runMicTest();
 #endif
 
+  telemetryRegisterTask("display", xTaskGetCurrentTaskHandle(), getArduinoLoopTaskStackSize());
   startWifi();
 
   statusBegin();

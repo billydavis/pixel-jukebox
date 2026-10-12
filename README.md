@@ -174,6 +174,7 @@ The first run registers a second player on your account. Its key and token are k
 | `src/setup_page.h` | The hotspot's setup pages |
 | `src/api.cpp` | HTTP server and mDNS |
 | `src/web_page.h` | The control page (HTML, CSS and JavaScript in one string) |
+| `src/telemetry.cpp` | Memory and task headroom for `GET /diagnostics` |
 | `src/status.cpp` | Shared "now showing" state read by the API |
 | `src/makapix.cpp` | Makapix player API and stored credentials |
 | `src/gif_player.cpp` | GIF download and frame-by-frame playback, with whole-number scaling |
