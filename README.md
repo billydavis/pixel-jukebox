@@ -1,65 +1,101 @@
-# Pixel Jukebox
+<div align="center">
+  <img src="logo.png" alt="Pixel Jukebox" width="120" />
 
-A 64x64 LED matrix that shuffles through pixel art from [Makapix Club](https://makapix.club).
+  <h1>Pixel Jukebox</h1>
+
+  <p>A 64x64 LED matrix that shuffles through pixel art from <a href="https://makapix.club">Makapix Club</a>:<br><strong>plug it in, enter a code, and it plays.</strong></p>
+
+  <p>
+    <img src="https://img.shields.io/badge/ESP32-S3-E7352C?logo=espressif&logoColor=white" />
+    <img src="https://img.shields.io/badge/PlatformIO-Arduino-F5822A?logo=platformio&logoColor=white" />
+    <img src="https://img.shields.io/badge/HUB75-64x64-8A2BE2" />
+    <img src="https://img.shields.io/badge/Makapix-Club-FF4081" />
+    <img src="https://img.shields.io/badge/License-MIT-3DA639" />
+  </p>
+</div>
+
+<!-- Photo of the panel playing artwork goes here:
+<p align="center">
+  <img src="pixel-jukebox-promo.webp" alt="Pixel Jukebox playing artwork" width="800" />
+</p>
+-->
+
+---
+
+## What it is
+
+Pixel Jukebox is firmware for a Waveshare ESP32-S3 driver board and a 64x64 HUB75 LED panel. It registers itself as a player on Makapix Club, a pixel art community, then pulls artwork from the public feed and shows each piece for about 30 seconds, like a jukebox working through a stack of records.
+
+There is no app and no server of your own to run. The board talks to Makapix directly over Wi-Fi and remembers its registration across restarts.
+
+## Features
+
+| Area | What's included |
+|---|---|
+| **Registration** | Shows a 6-character code on the panel; enter it on makapix.club and the board stores its token |
+| **Artwork feed** | Shuffles every post that is 64 pixels or smaller and has a GIF rendition, 25 at a time |
+| **Playback** | Animated and still GIFs, each shown for its dwell time, finishing the loop in progress |
+| **Scaling** | 16x16 and 32x32 art is scaled by a whole number and centred, so pixels stay sharp |
+| **Preloading** | The next artwork downloads in the background while the current one plays |
+| **Recovery** | Re-registers if the device is removed on the site; reconnects after a Wi-Fi drop; skips bad files |
+| **Security** | Verifies the makapix.club TLS certificate before sending the device token |
+| **Diagnostics** | Separate builds for a colour and power check and a speaker test |
 
 ## Hardware
 
-- Waveshare ESP32-S3-RGB-Matrix driver board
-- Waveshare RGB-Matrix-P2-64x64 panel (HUB75, 1/32 scan)
-- 5V supply for the panel, connected to the panel's own power lead
+| Part | Notes |
+|---|---|
+| Waveshare ESP32-S3-RGB-Matrix | Driver board; ESP32-S3 with 32 MB octal flash and 16 MB octal PSRAM |
+| Waveshare RGB-Matrix-P2-64x64 | HUB75 panel, 2 mm pitch, 1/32 scan |
+| 5V supply | Waveshare advises 4 A per panel; over the board's USB-C power port, white tints above brightness 32 |
 
-Pin mapping is in [include/pins.h](include/pins.h).
+Pin mapping is in [`include/pins.h`](include/pins.h).
 
-## Layout
+## Stack
 
-| Path | Purpose |
-|------|---------|
-| `src/main.cpp` | Main loop: Wi-Fi, registration, artwork queue |
-| `src/makapix.cpp` | Makapix player API and stored credentials (NVS) |
-| `src/gif_player.cpp` | GIF download and playback, with whole-number scaling |
-| `src/display.cpp` | Panel setup and text screens |
-| `src/audio.cpp` | Speaker output through the ES8311 codec (used by `speaker-test` only so far) |
-| `include/pins.h` | HUB75, I2C and audio GPIO mapping, panel size |
-| `include/ca_certs.h` | Root certificates trusted for makapix.club |
-| `include/secrets.example.h` | Wi-Fi credentials template; copy to `secrets.h` |
-| `tools/makapix_player.py` | PC script that walks the Makapix player API |
+| Layer | Technology |
+|---|---|
+| Build | PlatformIO, Arduino framework (arduino-esp32 2.x) |
+| Display | ESP32-HUB75-MatrixPanel-DMA, Adafruit GFX |
+| Artwork | AnimatedGIF, decoded from RAM (PSRAM) |
+| Network | Makapix player API over HTTPS, ArduinoJson; images over plain HTTP from the vault |
+| Storage | NVS (Preferences) for the player key and token |
+| Audio | ES8311 codec over I2C and I2S (test build only so far) |
 
-## Firmware
+## Getting started
 
-1. Install the PlatformIO extension for VS Code.
-2. Copy `include/secrets.example.h` to `include/secrets.h` and fill in your 2.4 GHz network.
-3. Build and upload, then open the serial monitor:
+**Prerequisites:** VS Code with the PlatformIO extension, and a [Makapix Club](https://makapix.club) account
 
-```bash
+```sh
+git clone https://github.com/billydavis/pixel-jukebox.git
+cd pixel-jukebox
+cp include/secrets.example.h include/secrets.h   # then fill in your 2.4 GHz Wi-Fi
 pio run -t upload
 ```
 
-```bash
-pio device monitor
-```
+On first boot the panel shows a 6-character code. Enter it at makapix.club under **Settings > Players > Add Device**. The board shows "linked!" and starts playing.
 
-On first boot the panel shows a 6-character code. Enter it at makapix.club under
-Settings > Players > Add Device; the board stores its token and starts playing. It
-shuffles every post that is 64 pixels or smaller and has a GIF rendition, showing each
-for its dwell time (30 seconds by default).
+### Uploading
 
-If an upload fails with "No serial data received", unplug both USB cables, hold BOOT,
-plug the "USB" cable back in, release BOOT, then upload again.
+The board has two USB-C ports: **Power** feeds the board and the panel, **USB** carries data to the PC.
 
-### Diagnostic builds
+If an upload fails with "No serial data received", unplug both cables, hold **BOOT**, plug the **USB** cable back in, release **BOOT**, then upload again.
 
-Two extra PlatformIO environments run a check at boot and then carry on as normal.
-Upload the regular firmware again afterwards.
+### Brightness
 
-```bash
+Brightness is the `BRIGHTNESS` constant (0-255) at the top of [`src/display.cpp`](src/display.cpp). Raise it only as far as white stays white; see the colour check below.
+
+## Diagnostic builds
+
+Two extra PlatformIO environments run a check at boot and then carry on as normal. Upload the regular firmware again afterwards.
+
+```sh
 pio run -e colour-check -t upload
 ```
 
-Shows white at brightness 32, 64 and 128, then colour bars. If white turns yellow or
-red as the brightness rises, the 5V supply is sagging; lower `BRIGHTNESS` in
-`src/display.cpp` or use a stronger supply.
+Shows white at brightness 32, 64 and 128, then colour bars. If white turns yellow or red as the brightness rises, the 5V supply is sagging: lower `BRIGHTNESS` or use a stronger supply.
 
-```bash
+```sh
 pio run -e speaker-test -t upload
 ```
 
@@ -67,23 +103,47 @@ Lists the devices on the I2C bus, then plays a chime and a steady tone three tim
 
 ## Makapix API script
 
-```bash
-python tools/makapix_player.py
+[`tools/makapix_player.py`](tools/makapix_player.py) walks the same player API from a PC, using only the Python standard library. It is useful for trying queries before changing the firmware.
+
+```sh
+python tools/makapix_player.py                 # register (first run), query, download
+python tools/makapix_player.py --channel hashtag --hashtag landscape --download 5
+python tools/makapix_player.py --reset         # forget the stored player
 ```
 
-The first run registers a new player: it prints a 6-character code to enter at
-makapix.club under Settings > Players > Add Device, then stores the player key and
-bearer token in `tools/.player_state.json`. It then queries 64x64 GIFs and saves a
-few to `tools/downloads/`.
+The first run registers a second player on your account. Its key and token are kept in `tools/.player_state.json`, and downloads go to `tools/downloads/`; both are git-ignored.
 
-## To do
+## Development
 
-- Power the panel from the dedicated 5V input; over USB-C, white tints above brightness 32
-- Report views, and MQTT for "send to device" commands from the web app
+| Path | Purpose |
+|---|---|
+| `src/main.cpp` | Main loop: Wi-Fi, registration, background loader, playback |
+| `src/makapix.cpp` | Makapix player API and stored credentials |
+| `src/gif_player.cpp` | GIF download and playback, with whole-number scaling |
+| `src/display.cpp` | Panel setup, text screens, colour check |
+| `src/audio.cpp` | Speaker output through the ES8311 codec |
+| `include/pins.h` | HUB75, I2C and audio GPIO mapping, panel size |
+| `include/ca_certs.h` | Root certificates trusted for makapix.club |
+| `include/secrets.example.h` | Wi-Fi credentials template |
+
+```sh
+pio run                 # build
+pio run -t upload       # build and flash
+pio device monitor      # serial log at 115200 baud
+```
+
+## Roadmap
+
+Working today: registration, shuffled playback with preloading, certificate checking, and the diagnostic builds.
+
+Ideas for later:
+
+- Power the panel from the dedicated 5V input for full brightness
+- Report views, and MQTT for "send to device" commands from the Makapix site
 - Brightness control and a Wi-Fi setup portal
 - Use the speaker, microphones and onboard sensors
 - Find out why a few posts return a tiny file that is not a GIF (they are skipped)
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT License. See [LICENSE](LICENSE) for details.
