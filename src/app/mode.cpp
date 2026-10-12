@@ -1,9 +1,9 @@
-#include "mode.h"
+#include "app/mode.h"
 
 #include <Preferences.h>
 
-#include "commands.h"
-#include "slot_visualizers.h"
+#include "app/commands.h"
+#include "slots/slot_visualizers.h"
 
 static SpectrumSlot spectrumSlot;
 static VuSlot vuSlot;

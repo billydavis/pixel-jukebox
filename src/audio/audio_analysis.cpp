@@ -1,6 +1,6 @@
-#include "audio_analysis.h"
+#include "audio/audio_analysis.h"
 
-#include "audio.h"
+#include "audio/audio.h"
 #include "spectrum_math.h"
 
 static const float SAMPLE_RATE = 16000.0f;

@@ -1,8 +1,8 @@
-#include "slot_clock.h"
+#include "slots/slot_clock.h"
 
 #include <time.h>
 
-#include "display.h"
+#include "display/display.h"
 #include "pins.h"
 
 static const uint32_t SHOW_MS = 10000;

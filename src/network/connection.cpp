@@ -1,12 +1,12 @@
-#include "connection.h"
+#include "network/connection.h"
 
 #include <Arduino.h>
 #include <WiFi.h>
 
-#include "api.h"
+#include "network/api.h"
 #include "config.h"
-#include "display.h"
-#include "wifi_setup.h"
+#include "display/display.h"
+#include "network/wifi_setup.h"
 
 static const uint32_t JOIN_TIMEOUT_MS = 20000;
 static const int BOOT_ATTEMPTS = 2;

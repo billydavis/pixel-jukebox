@@ -1,11 +1,11 @@
-#include "rotation.h"
+#include "app/rotation.h"
 
 #include <ArduinoJson.h>
 #include <Preferences.h>
 
 #include "rotation_rules.h"
-#include "slot_clock.h"
-#include "slot_makapix.h"
+#include "slots/slot_clock.h"
+#include "slots/slot_makapix.h"
 
 static MakapixSlot makapixSlot;
 static ClockSlot clockSlot;

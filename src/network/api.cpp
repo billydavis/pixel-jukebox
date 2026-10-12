@@ -1,18 +1,18 @@
-#include "api.h"
+#include "network/api.h"
 
 #include <ArduinoJson.h>
 #include <ESPmDNS.h>
 #include <WebServer.h>
 #include <WiFi.h>
 
-#include "commands.h"
+#include "app/commands.h"
 #include "config.h"
-#include "display.h"
-#include "mode.h"
-#include "rotation.h"
-#include "status.h"
-#include "telemetry.h"
-#include "web_assets.h"
+#include "display/display.h"
+#include "app/mode.h"
+#include "app/rotation.h"
+#include "app/status.h"
+#include "app/telemetry.h"
+#include "network/web_assets.h"
 
 #define API_BASE "/api/v1"
 

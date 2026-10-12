@@ -67,7 +67,7 @@ keep.
 | 3 | **Tests.** Unit tests for the pure functions listed above; a smoke-test script that exercises the API on a real board; the route-consistency check | Done, see below |
 | 4 | **Web assets.** Control and setup pages as `.html` files embedded at build time; a duplicate-ID check in the tests | Done, see below |
 | 5 | **Tidy `main.cpp`.** Move the diagnostics and the Wi-Fi lifecycle into their own modules | Done, see below |
-| 6 | **Regroup `src/`.** One mechanical commit | Not started |
+| 6 | **Regroup `src/`.** One mechanical commit | Done, see below |
 | 7 | **Metadata.** Give the PC tool its own identity; stop hard-coding the firmware version in the API example; commit the Postman generator | Not started |
 
 Steps 5 and 6 are the only ones that touch many files, which is why they
@@ -88,7 +88,7 @@ fresh install, or a diagnostic build found broken when it was needed.
 
 ## Step 1 results
 
-Measured on the board with `GET /api/v1/diagnostics` (`src/telemetry.cpp`),
+Measured on the board with `GET /api/v1/diagnostics` (`src/app/telemetry.cpp`),
 firmware 0.8.0, over about nine minutes: 68 artworks downloaded by skipping
 every four seconds, each visualizer run in sound mode, and roughly 1,800 API
 calls alongside, with no failed calls and no restart.
@@ -135,7 +135,7 @@ Three checks now exist, described in the README's Testing section.
 |---|---|---|
 | `tools/run_unit_tests.ps1`, or `pio test` on the board | 22 unit tests for `lib/jukebox_core`: small-GIF padding, HTML escaping, rotation rules, FFT band mapping and scaling | All pass |
 | `tools/api_smoke_test.py` | 49 checks across every endpoint except Wi-Fi setup, including each rejection, against a running board | All pass |
-| `tools/check_api_docs.py` | The 12 routes in `src/api.cpp` against the API document and the Postman collection | In agreement |
+| `tools/check_api_docs.py` | The 12 routes in `src/network/api.cpp` against the API document and the Postman collection | In agreement |
 
 What changed in the code to make this possible:
 
@@ -203,9 +203,9 @@ loop that picks and runs a slot, and command handling, and nothing else.
 
 | Moved to | What | Lines |
 |---|---|---|
-| `src/connection.cpp` | Joining Wi-Fi at boot, announcing the connection, rejoining after a drop, entering setup | 67 |
-| `src/diagnostics.cpp` | The speaker and microphone checks, behind one `runDiagnostics()` call | 99 |
-| `src/display.cpp` | The three status colours, which each file had been defining for itself | 3 |
+| `src/network/connection.cpp` | Joining Wi-Fi at boot, announcing the connection, rejoining after a drop, entering setup | 67 |
+| `src/app/diagnostics.cpp` | The speaker and microphone checks, behind one `runDiagnostics()` call | 99 |
+| `src/display/display.cpp` | The three status colours, which each file had been defining for itself | 3 |
 
 The code was moved, not rewritten; the only edits are names. Verified after
 the move: all four environments build, as does the regular one without
@@ -215,4 +215,36 @@ and its self-check passed, confirming the diagnostics still run from their new
 home.
 
 The slot runner stayed in `main.cpp`, as planned. It is the file's main job.
+
+## Step 6 results
+
+The 36 files beside `main.cpp` moved into five folders, in one commit, with
+`git mv` so each file keeps its history.
+
+| Folder | Files | Holds |
+|---|---|---|
+| `src/app/` | commands, diagnostics, mode, rotation, status, telemetry | What the panel is doing and how it is told |
+| `src/slots/` | slot, slot_clock, slot_makapix, slot_visualizers | The things that can be on screen |
+| `src/display/` | display, gif_player | The panel |
+| `src/audio/` | audio, audio_analysis | Speaker and microphones |
+| `src/network/` | api, connection, makapix, wifi_setup, web_assets | Wi-Fi, the API and Makapix |
+
+These are the five areas the review proposed. This plan said fewer folders
+would probably do; laying the files out showed otherwise. Merging `display`
+and `audio` into one "hardware" folder was the only candidate, and it would
+have put the GIF player and the frequency analysis side by side with nothing
+in common, so the review's split stands.
+
+The plan's other point held: this was one mechanical change, not a gradual
+one. Only file locations and `#include` lines changed. Includes are written
+from `src/`, such as `#include "display/display.h"`, so a file's area is
+visible wherever it is used.
+
+Verified after the move: all four environments build, as does the regular one
+without `secrets.h`; the unit tests, web check and route check pass; and the
+API smoke test passes 49 of 49 against the board running the regrouped build.
+
+Paths in the README, the API document, the tools and the earlier sections of
+this plan were updated to match. `architecture-review.md` was left as written,
+so three of its links point at files that have since moved or been replaced.
 

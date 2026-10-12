@@ -1,12 +1,12 @@
-#include "slot_makapix.h"
+#include "slots/slot_makapix.h"
 
 #include <WiFi.h>
 #include <vector>
 
-#include "display.h"
-#include "gif_player.h"
-#include "status.h"
-#include "telemetry.h"
+#include "display/display.h"
+#include "display/gif_player.h"
+#include "app/status.h"
+#include "app/telemetry.h"
 
 static const uint32_t CODE_VALID_MS = 15 * 60 * 1000;
 static const uint32_t CODE_SHOW_MS = 45000; // per turn, so other slots still get shown

@@ -2,7 +2,7 @@
 
     python tools/check_api_docs.py
 
-Reads the routes registered in src/api.cpp and looks for each one in
+Reads the routes registered in src/network/api.cpp and looks for each one in
 docs/jukebox-api.md and postman/Pixel-Jukebox-API.postman_collection.json, and
 for anything those two describe that the firmware does not have. Needs no
 board. Exits non-zero if they disagree.
@@ -18,7 +18,7 @@ BASE = "/api/v1"
 
 
 def firmware_routes():
-    source = (ROOT / "src/api.cpp").read_text(encoding="utf-8")
+    source = (ROOT / "src/network/api.cpp").read_text(encoding="utf-8")
     routes = set()
     for path, method in re.findall(r'server\.on\(API_BASE(?:\s*"([^"]*)")?,\s*HTTP_(\w+)', source):
         routes.add((method, path))
@@ -64,7 +64,7 @@ for name, described in (("docs/jukebox-api.md", documented_routes()), ("the Post
     if extra:
         problems.append(f"In {name} but not in the firmware: {show(extra)}")
 
-print(f"{len(firmware)} routes in src/api.cpp")
+print(f"{len(firmware)} routes in src/network/api.cpp")
 if problems:
     print("\n".join(problems))
     sys.exit(1)

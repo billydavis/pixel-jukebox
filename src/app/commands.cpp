@@ -1,7 +1,7 @@
-#include "commands.h"
+#include "app/commands.h"
 
 #include "pins.h"
-#include "telemetry.h"
+#include "app/telemetry.h"
 
 static const int QUEUE_LENGTH = 8;
 static const uint32_t BUTTON_POLL_MS = 10;

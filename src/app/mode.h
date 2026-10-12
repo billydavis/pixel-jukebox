@@ -3,8 +3,8 @@
 #include <Arduino.h>
 #include <vector>
 
-#include "rotation.h"
-#include "slot.h"
+#include "app/rotation.h"
+#include "slots/slot.h"
 
 // What the panel is doing overall: working through the rotation, or showing one
 // sound visualizer until told otherwise. The panel always starts in the

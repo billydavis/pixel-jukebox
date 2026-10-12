@@ -1,6 +1,6 @@
-#include "slot_visualizers.h"
+#include "slots/slot_visualizers.h"
 
-#include "display.h"
+#include "display/display.h"
 
 static const int W = PANEL_RES_X;
 static const int H = PANEL_RES_Y;

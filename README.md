@@ -107,7 +107,7 @@ The clock's time zone is `TIMEZONE` in [`include/config.h`](include/config.h) (U
 
 ### Brightness
 
-Brightness (0-255) is set through the API and remembered across restarts; the starting value is `DEFAULT_BRIGHTNESS` in [`src/display.cpp`](src/display.cpp). Raise it only as far as white stays white; see the colour check below.
+Brightness (0-255) is set through the API and remembered across restarts; the starting value is `DEFAULT_BRIGHTNESS` in [`src/display/display.cpp`](src/display/display.cpp). Raise it only as far as white stays white; see the colour check below.
 
 ## Control page
 
@@ -162,38 +162,48 @@ The first run registers a second player on your account. Its key and token are k
 
 ## Development
 
+The firmware source is grouped by area. `#include` paths are written from `src/`, for example `#include "display/display.h"`.
+
 | Path | Purpose |
 |---|---|
 | `src/main.cpp` | Board start-up, running each slot and command handling |
-| `src/connection.cpp` | Joining Wi-Fi at boot and rejoining after a drop |
-| `src/diagnostics.cpp` | The speaker and microphone checks for the diagnostic builds |
-| `src/rotation.cpp` | The slot types and the saved rotation |
-| `src/slot.h` | Interface every slot implements |
-| `src/slot_makapix.cpp` | Artwork slot: registration, background loader, playback |
-| `src/slot_clock.cpp` | Clock slot (network time) |
-| `src/commands.cpp` | Command queue and the BOOT button |
-| `src/wifi_setup.cpp` | Wi-Fi credentials and the setup hotspot |
-| `src/api.cpp` | HTTP server and mDNS |
+| **`src/app/`** | **What the panel is doing and how it is told** |
+| `src/app/rotation.cpp` | The slot types and the saved rotation |
+| `src/app/mode.cpp` | Rotation or sound mode, and the chosen visualizer |
+| `src/app/commands.cpp` | Command queue and the BOOT button |
+| `src/app/status.cpp` | Shared "now showing" state read by the API |
+| `src/app/telemetry.cpp` | Memory and task headroom for `GET /diagnostics` |
+| `src/app/diagnostics.cpp` | The speaker and microphone checks for the diagnostic builds |
+| **`src/slots/`** | **The things that can be on screen** |
+| `src/slots/slot.h` | Interface every slot implements |
+| `src/slots/slot_makapix.cpp` | Artwork slot: registration, background loader, playback |
+| `src/slots/slot_clock.cpp` | Clock slot (network time) |
+| `src/slots/slot_visualizers.cpp` | Spectrum bars, VU meter, oscilloscope and fire |
+| **`src/display/`** | **The panel** |
+| `src/display/display.cpp` | Panel setup, text screens, colour check |
+| `src/display/gif_player.cpp` | GIF download and frame-by-frame playback, with whole-number scaling |
+| **`src/audio/`** | **Speaker and microphones** |
+| `src/audio/audio.cpp` | Speaker output (ES8311) and microphone input (ES7210) |
+| `src/audio/audio_analysis.cpp` | Frequency analysis and automatic level scaling for the visualizers |
+| **`src/network/`** | **Wi-Fi, the API and Makapix** |
+| `src/network/connection.cpp` | Joining Wi-Fi at boot and rejoining after a drop |
+| `src/network/wifi_setup.cpp` | Wi-Fi credentials and the setup hotspot |
+| `src/network/api.cpp` | HTTP server and mDNS |
+| `src/network/makapix.cpp` | Makapix player API and stored credentials |
+| `src/network/web_assets.h` | Names for the `web/` files once they are embedded in the firmware |
+| **Outside `src/`** | |
 | `web/` | The control page and the Wi-Fi setup pages, as ordinary HTML and CSS files |
-| `src/web_assets.h` | Names for the `web/` files once they are embedded in the firmware |
-| `src/telemetry.cpp` | Memory and task headroom for `GET /diagnostics` |
-| `src/status.cpp` | Shared "now showing" state read by the API |
-| `src/makapix.cpp` | Makapix player API and stored credentials |
-| `src/gif_player.cpp` | GIF download and frame-by-frame playback, with whole-number scaling |
-| `src/display.cpp` | Panel setup, text screens, colour check |
-| `src/mode.cpp` | Rotation or sound mode, and the chosen visualizer |
-| `src/slot_visualizers.cpp` | Spectrum bars, VU meter, oscilloscope and fire |
-| `src/audio_analysis.cpp` | Frequency analysis and automatic level scaling for the visualizers |
-| `src/audio.cpp` | Speaker output (ES8311) and microphone input (ES7210) |
 | `lib/jukebox_core/` | Hardware-free logic, covered by the unit tests |
 | `test/test_core/` | Unit tests |
+| `include/pins.h` | HUB75, I2C and audio GPIO mapping, panel size |
+| `include/config.h` | Version, time zone, host name |
+| `include/ca_certs.h` | Root certificates trusted for makapix.club |
+| `include/secrets.example.h` | Optional compiled-in Wi-Fi credentials |
 | `tools/run_unit_tests.ps1` | Builds and runs the unit tests on a Windows PC |
 | `tools/api_smoke_test.py` | End-to-end check of the API against a board |
 | `tools/check_api_docs.py` | Checks the API document and Postman collection against the firmware |
 | `tools/check_web.py` | Checks the pages in `web/` for mistakes a browser would not report |
-| `include/pins.h` | HUB75, I2C and audio GPIO mapping, panel size |
-| `include/ca_certs.h` | Root certificates trusted for makapix.club |
-| `include/secrets.example.h` | Optional compiled-in Wi-Fi credentials |
+| `tools/makapix_player.py` | PC script that walks the Makapix player API |
 
 ```sh
 pio run                 # build
@@ -209,7 +219,7 @@ Four checks, from fastest to most thorough.
 python tools/check_api_docs.py
 ```
 
-Compares the routes in `src/api.cpp` with the API document and the Postman collection. Needs no board.
+Compares the routes in `src/network/api.cpp` with the API document and the Postman collection. Needs no board.
 
 ```sh
 python tools/check_web.py

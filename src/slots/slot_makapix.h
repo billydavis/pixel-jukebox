@@ -1,7 +1,7 @@
 #pragma once
 
-#include "makapix.h"
-#include "slot.h"
+#include "network/makapix.h"
+#include "slots/slot.h"
 
 // Plays one Makapix artwork per turn, preloading the next in the background.
 // While the device is not registered it shows the registration code instead.

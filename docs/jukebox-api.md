@@ -3,7 +3,7 @@
 The REST control surface of the Pixel Jukebox firmware. Any client on the same
 network can use it: a web page, a companion app, a script.
 
-Status: **implemented and verified on real hardware.** Source: `src/api.cpp`.
+Status: **implemented and verified on real hardware.** Source: `src/network/api.cpp`.
 
 ## Base path
 
@@ -27,7 +27,7 @@ jukebox from any other web server, and its value as the API base path.
 `GET /api/v1` returns `{"name":"Pixel Jukebox","api":"/api/v1"}`, so a client can
 confirm what it has found.
 
-`GET /` serves the built-in control page (`src/web_page.h`), which is itself a
+`GET /` serves the built-in control page (`web/index.html`), which is itself a
 client of this API.
 
 ## Conventions

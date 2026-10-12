@@ -1,4 +1,4 @@
-#include "wifi_setup.h"
+#include "network/wifi_setup.h"
 
 #include <DNSServer.h>
 #include <Preferences.h>
@@ -6,9 +6,9 @@
 #include <WiFi.h>
 #include <vector>
 
-#include "display.h"
+#include "display/display.h"
 #include "html_escape.h"
-#include "web_assets.h"
+#include "network/web_assets.h"
 
 #if __has_include("secrets.h")
 #include "secrets.h"

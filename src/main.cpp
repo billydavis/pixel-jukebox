@@ -7,15 +7,15 @@
 
 #include <Arduino.h>
 
-#include "commands.h"
-#include "diagnostics.h"
-#include "display.h"
-#include "mode.h"
-#include "connection.h"
+#include "app/commands.h"
+#include "app/diagnostics.h"
+#include "display/display.h"
+#include "app/mode.h"
+#include "network/connection.h"
 #include "pins.h"
-#include "rotation.h"
-#include "status.h"
-#include "telemetry.h"
+#include "app/rotation.h"
+#include "app/status.h"
+#include "app/telemetry.h"
 
 static const uint32_t MESSAGE_MS = 1500;
 static const uint32_t SKIPPED_SLOT_MS = 200;

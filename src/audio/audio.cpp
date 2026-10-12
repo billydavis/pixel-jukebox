@@ -1,4 +1,4 @@
-#include "audio.h"
+#include "audio/audio.h"
 
 #include <Wire.h>
 #include <driver/i2s.h>

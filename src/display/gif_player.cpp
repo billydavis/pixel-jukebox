@@ -1,11 +1,11 @@
-#include "gif_player.h"
+#include "display/gif_player.h"
 
 #include <AnimatedGIF.h>
 #include <HTTPClient.h>
 #include <WiFi.h>
 
 #include "config.h"
-#include "display.h"
+#include "display/display.h"
 #include "gif_pad.h"
 #include "pins.h"
 

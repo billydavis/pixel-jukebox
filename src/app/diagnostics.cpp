@@ -1,9 +1,9 @@
-#include "diagnostics.h"
+#include "app/diagnostics.h"
 
 #include <Arduino.h>
 
-#include "audio.h"
-#include "display.h"
+#include "audio/audio.h"
+#include "display/display.h"
 #include "pins.h"
 
 #ifdef SPEAKER_TEST

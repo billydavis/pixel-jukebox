@@ -1,6 +1,6 @@
 #pragma once
 
-#include "slot.h"
+#include "slots/slot.h"
 
 // Date and time from the network clock. Skipped until the time is known.
 class ClockSlot : public Slot {

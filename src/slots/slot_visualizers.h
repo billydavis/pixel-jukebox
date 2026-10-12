@@ -1,8 +1,8 @@
 #pragma once
 
-#include "audio_analysis.h"
+#include "audio/audio_analysis.h"
 #include "pins.h"
-#include "slot.h"
+#include "slots/slot.h"
 
 // Slots that draw from the microphones, used by sound mode (mode.cpp). One
 // stays on screen until another is chosen, redrawing about 30 times a second,

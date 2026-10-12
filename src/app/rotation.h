@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include <vector>
 
-#include "slot.h"
+#include "slots/slot.h"
 
 // The order slots are shown in. Saved on the board and editable through the
 // API; every call is safe from any task.

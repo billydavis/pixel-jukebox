@@ -94,11 +94,11 @@ for name in PAGES:
             problems.append(f"{name}: the stylesheet loads from outside the board: {value}")
 
 # Every placeholder in a setup page must be one the firmware replaces.
-firmware = (ROOT / "src/wifi_setup.cpp").read_text(encoding="utf-8")
+firmware = (ROOT / "src/network/wifi_setup.cpp").read_text(encoding="utf-8")
 for name in PAGES:
     for placeholder in sorted(set(re.findall(r"\{\{\w+\}\}", texts[name]))):
         if f'"{placeholder}"' not in firmware:
-            problems.append(f"{name}: {placeholder} is never filled in by src/wifi_setup.cpp")
+            problems.append(f"{name}: {placeholder} is never filled in by src/network/wifi_setup.cpp")
 
 control, setup = tokens(texts["index.html"]), tokens(texts[STYLESHEET])
 for name in TOKENS:
