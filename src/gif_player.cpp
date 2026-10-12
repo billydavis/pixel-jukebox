@@ -49,7 +49,17 @@ uint8_t *downloadGif(const String &url, size_t &size) {
   int received = 0;
   uint32_t lastData = millis();
   while (received < length && millis() - lastData < DOWNLOAD_STALL_MS) {
-    int count = stream->readBytes(buffer + received, min(length - received, 4096));
+    // Only read what has arrived: readBytes() busy-waits, which starves the
+    // idle task and trips the watchdog when this runs in the loader task.
+    int available = stream->available();
+    if (available <= 0) {
+      if (!stream->connected()) {
+        break;
+      }
+      delay(5);
+      continue;
+    }
+    int count = stream->read(buffer + received, min(length - received, available));
     if (count > 0) {
       received += count;
       lastData = millis();
