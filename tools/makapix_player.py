@@ -20,9 +20,11 @@ import urllib.request
 from pathlib import Path
 
 BASE_URL = "https://makapix.club/api"
-DEVICE_MODEL = "pixel-jukebox-64x64"
-FIRMWARE_VERSION = "0.1.0"
-USER_AGENT = f"pixel-jukebox/{FIRMWARE_VERSION}"
+# This script registers as its own kind of player. It is not the firmware,
+# whose model and version are in include/config.h.
+DEVICE_MODEL = "pixel-jukebox-pc-tool"
+TOOL_VERSION = "1.0.0"
+USER_AGENT = f"{DEVICE_MODEL}/{TOOL_VERSION}"
 
 TOOLS_DIR = Path(__file__).resolve().parent
 STATE_FILE = TOOLS_DIR / ".player_state.json"
@@ -69,7 +71,7 @@ def provision(state):
     status, body = call(
         "POST",
         "/player/provision",
-        {"device_model": DEVICE_MODEL, "firmware_version": FIRMWARE_VERSION},
+        {"device_model": DEVICE_MODEL, "firmware_version": TOOL_VERSION},
     )
     if status != 201 or not body:
         sys.exit(f"Provision failed: HTTP {status} {body}")

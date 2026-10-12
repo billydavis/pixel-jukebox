@@ -4,12 +4,13 @@
 
 Reads the routes registered in src/network/api.cpp and looks for each one in
 docs/jukebox-api.md and postman/Pixel-Jukebox-API.postman_collection.json, and
-for anything those two describe that the firmware does not have. Needs no
-board. Exits non-zero if they disagree.
+for anything those two describe that the firmware does not have. Also checks
+the collection matches tools/make_postman.py. Needs no board. Exits non-zero if they disagree.
 """
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -63,6 +64,12 @@ for name, described in (("docs/jukebox-api.md", documented_routes()), ("the Post
         problems.append(f"Missing from {name}: {show(missing)}")
     if extra:
         problems.append(f"In {name} but not in the firmware: {show(extra)}")
+
+# The collection is generated; a hand edit would be lost the next time it is.
+generated = subprocess.run([sys.executable, str(ROOT / "tools/make_postman.py"), "--check"],
+                           capture_output=True, text=True)
+if generated.returncode != 0:
+    problems.append(generated.stdout.strip())
 
 print(f"{len(firmware)} routes in src/network/api.cpp")
 if problems:

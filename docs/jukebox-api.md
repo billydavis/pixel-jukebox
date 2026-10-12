@@ -78,7 +78,7 @@ the reply is `503` and nothing is queued.
   "device": {
     "name": "pixel-jukebox",
     "model": "pixel-jukebox-64x64",
-    "firmware": "0.8.0",
+    "firmware": "1.2.3",
     "ip": "192.168.4.105",
     "ssid": "Home Network",
     "rssi": -64,
@@ -98,6 +98,7 @@ the reply is `503` and nothing is queued.
 
 | Field | Meaning |
 |---|---|
+| `device.firmware` | The firmware version, `FIRMWARE_VERSION` in `include/config.h`. The value above is only an example |
 | `device.ssid` | The Wi-Fi network the board is on |
 | `device.rssi` | Wi-Fi signal strength in dBm |
 | `slot.name` | What is on screen: a slot from `GET /slots`, or in sound mode a visualizer from `GET /mode`; `null` between slots or when nothing can be shown |

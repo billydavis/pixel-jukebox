@@ -68,7 +68,7 @@ keep.
 | 4 | **Web assets.** Control and setup pages as `.html` files embedded at build time; a duplicate-ID check in the tests | Done, see below |
 | 5 | **Tidy `main.cpp`.** Move the diagnostics and the Wi-Fi lifecycle into their own modules | Done, see below |
 | 6 | **Regroup `src/`.** One mechanical commit | Done, see below |
-| 7 | **Metadata.** Give the PC tool its own identity; stop hard-coding the firmware version in the API example; commit the Postman generator | Not started |
+| 7 | **Metadata.** Give the PC tool its own identity; stop hard-coding the firmware version in the API example; commit the Postman generator | Done, see below |
 
 Steps 5 and 6 are the only ones that touch many files, which is why they
 follow the tests.
@@ -247,4 +247,38 @@ API smoke test passes 49 of 49 against the board running the regrouped build.
 Paths in the README, the API document, the tools and the earlier sections of
 this plan were updated to match. `architecture-review.md` was left as written,
 so three of its links point at files that have since moved or been replaced.
+
+## Step 7 results
+
+- **The PC tool has its own identity.** `tools/makapix_player.py` registers
+  with Makapix as `pixel-jukebox-pc-tool` version 1.0.0. It no longer claims
+  the firmware's model name, and there is no second copy of the firmware
+  version to drift.
+- **The firmware version has one home**, `FIRMWARE_VERSION` in
+  `include/config.h`. The API document's example now shows a made-up `1.2.3`
+  and says where the real value comes from, so it does not need editing on
+  every release.
+- **The Postman collection is generated.** `tools/make_postman.py` holds the 25
+  requests as a table and writes the JSON. It was checked against the
+  hand-built collection before replacing it and reproduced it exactly.
+  `tools/check_api_docs.py` now also fails if the committed collection differs
+  from what the generator produces.
+
+The firmware version moves to 0.9.0 with this step, marking the work in this
+plan: the diagnostics endpoint, the core library, the embedded web files and
+the regrouped source.
+
+## Where this leaves the review
+
+| # | Recommendation | Outcome |
+|---|---|---|
+| 1 | Group source files by domain | Done, with the five folders the review proposed |
+| 2 | Reduce responsibilities in `main.cpp` | Done: 314 lines to 167 |
+| 3 | Measure memory before optimizing | Done: no optimisation needed |
+| 4 | Keep the embedded UI maintainable | Done: real files, embedded at build time, with a check |
+| 5 | Tests and CI | Tests done; CI deferred by choice |
+| 6 | Reduce duplicated metadata | Done |
+
+Still open, by decision and not by oversight: the CI build (step 2), and a
+day-long soak reading of `GET /diagnostics` to rule out a slow leak.
 
