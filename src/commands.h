@@ -10,6 +10,7 @@ enum class CommandType : uint8_t {
   SetHold,       // value: 1 = hold, 0 = release
   SetBrightness, // value: 0-255
   WifiSetup,     // restart into the Wi-Fi setup hotspot
+  Reload,        // the mode changed: end the current slot and start the right one
 };
 
 struct Command {

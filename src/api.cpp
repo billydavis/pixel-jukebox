@@ -8,6 +8,7 @@
 #include "commands.h"
 #include "config.h"
 #include "display.h"
+#include "mode.h"
 #include "rotation.h"
 #include "status.h"
 #include "web_page.h"
@@ -98,6 +99,8 @@ static void handleStatus() {
     doc["artwork"] = nullptr;
   }
 
+  doc["mode"] = modeIsSound() ? "sound" : "rotation";
+  doc["visualizer"] = modeVisualizer();
   doc["brightness"] = displayBrightness();
   sendJson(200, doc);
 }
@@ -143,6 +146,45 @@ static void handlePutBrightness() {
     return;
   }
   sendQueued(commandSend(CommandType::SetBrightness, (uint8_t)value), "brightness");
+}
+
+static void sendMode() {
+  JsonDocument doc;
+  doc["mode"] = modeIsSound() ? "sound" : "rotation";
+  doc["visualizer"] = modeVisualizer();
+  JsonArray visualizers = doc["visualizers"].to<JsonArray>();
+  for (const SlotInfo &info : modeVisualizers()) {
+    JsonObject item = visualizers.add<JsonObject>();
+    item["name"] = info.name;
+    item["label"] = info.label;
+  }
+  sendJson(200, doc);
+}
+
+static void handleGetMode() { sendMode(); }
+
+// {"mode": "sound", "visualizer": "fire"} or {"mode": "rotation"}. Applied
+// directly; the panel switches within a moment.
+static void handlePutMode() {
+  JsonDocument body;
+  if (!readBody(body)) {
+    return;
+  }
+  String mode = body["mode"] | "";
+  if (mode != "sound" && mode != "rotation") {
+    sendError(400, "mode must be \"sound\" or \"rotation\"");
+    return;
+  }
+  if (!body["visualizer"].isNull() && !body["visualizer"].is<const char *>()) {
+    sendError(400, "visualizer must be a name from the visualizers list");
+    return;
+  }
+  String error;
+  if (!modeSet(mode == "sound", body["visualizer"] | "", error)) {
+    sendError(400, error.c_str());
+    return;
+  }
+  sendMode();
 }
 
 static void handleWifiSetup() { sendQueued(commandSend(CommandType::WifiSetup), "wifiSetup"); }
@@ -225,6 +267,8 @@ void apiBegin() {
   server.on(API_BASE "/hold", HTTP_POST, handleHold);
   server.on(API_BASE "/brightness", HTTP_GET, handleGetBrightness);
   server.on(API_BASE "/brightness", HTTP_PUT, handlePutBrightness);
+  server.on(API_BASE "/mode", HTTP_GET, handleGetMode);
+  server.on(API_BASE "/mode", HTTP_PUT, handlePutMode);
   server.on(API_BASE "/wifi/setup", HTTP_POST, handleWifiSetup);
   server.on(API_BASE "/slots", HTTP_GET, handleGetSlots);
   server.on(API_BASE "/slots", HTTP_PUT, handlePutSlots);

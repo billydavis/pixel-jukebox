@@ -9,6 +9,7 @@
 #include "commands.h"
 #include "config.h"
 #include "display.h"
+#include "mode.h"
 #include "pins.h"
 #include "rotation.h"
 #include "status.h"
@@ -108,14 +109,22 @@ static void runSlot(Slot *slot) {
         switch (command.type) {
           case CommandType::Next:
             Serial.println("Command: next");
+            if (modeIsSound()) {
+              modeNextVisualizer();
+            }
             statusSetHeld(false);
             slot->stop();
             return;
+          case CommandType::Reload:
+            statusSetHeld(false);
+            slot->stop();
+            return;
+          // A visualizer already stays put, so hold only applies to the rotation.
           case CommandType::ToggleHold:
-            wantHeld = !held;
+            wantHeld = !held && !modeIsSound();
             break;
           case CommandType::SetHold:
-            wantHeld = command.value != 0;
+            wantHeld = command.value != 0 && !modeIsSound();
             break;
           case CommandType::WifiSetup:
             enterWifiSetup();
@@ -249,6 +258,7 @@ void setup() {
   statusBegin();
   commandsBegin();
   rotationBegin();
+  modeBegin();
 }
 
 void loop() {
@@ -259,13 +269,23 @@ void loop() {
 
   maintainWifi();
 
-  Slot *slot = rotationCurrent();
+  // Sound mode shows one visualizer until the mode changes; otherwise the
+  // rotation decides.
+  bool sound = modeIsSound();
+  Slot *slot = sound ? modeSoundSlot() : rotationCurrent();
   if (slot->start()) {
     skippedInARow = 0;
     statusSetSlot(slot->name());
     Serial.printf("Slot: %s\n", slot->name());
     runSlot(slot);
     statusSetSlot("");
+  } else if (sound) {
+    // The microphones are unavailable, so go back to the rotation.
+    Serial.println("Sound mode could not start");
+    String error;
+    modeSet(false, "", error);
+    showMessage("Sound", "unavailable", red());
+    delay(MESSAGE_MS);
   } else {
     // Nothing to show yet (offline, still downloading, clock not set). Say so
     // once every slot has been skipped.
@@ -286,5 +306,7 @@ void loop() {
       }
     }
   }
-  rotationAdvance();
+  if (!sound) {
+    rotationAdvance();
+  }
 }

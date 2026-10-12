@@ -64,6 +64,8 @@ the reply is `503` and nothing is queued.
 | `POST` | `/hold` | Hold or release the current slot |
 | `GET` | `/brightness` | Read the brightness |
 | `PUT` | `/brightness` | Set the brightness |
+| `GET` | `/mode` | Rotation or sound mode, and the visualizers available |
+| `PUT` | `/mode` | Switch mode or pick a visualizer |
 | `GET` | `/slots` | The rotation and the slot types that can go in it |
 | `PUT` | `/slots` | Replace the rotation |
 | `POST` | `/wifi/setup` | Restart into the Wi-Fi setup hotspot |
@@ -75,7 +77,7 @@ the reply is `503` and nothing is queued.
   "device": {
     "name": "pixel-jukebox",
     "model": "pixel-jukebox-64x64",
-    "firmware": "0.6.0",
+    "firmware": "0.8.0",
     "ip": "192.168.4.105",
     "ssid": "Home Network",
     "rssi": -64,
@@ -87,6 +89,8 @@ the reply is `503` and nothing is queued.
     "owner": "Odio",
     "gifUrl": "https://vault.makapix.club/21/32/abc123.gif"
   },
+  "mode": "rotation",
+  "visualizer": "spectrum",
   "brightness": 32
 }
 ```
@@ -95,17 +99,20 @@ the reply is `503` and nothing is queued.
 |---|---|
 | `device.ssid` | The Wi-Fi network the board is on |
 | `device.rssi` | Wi-Fi signal strength in dBm |
-| `slot.name` | `makapix` or `clock`; `null` between slots or when nothing can be shown |
+| `slot.name` | What is on screen: a slot from `GET /slots`, or in sound mode a visualizer from `GET /mode`; `null` between slots or when nothing can be shown |
 | `slot.held` | `true` while the current slot is held |
 | `artwork` | The Makapix post on screen; `null` when the slot is not showing artwork (clock, registration code) |
 | `artwork.owner` | The artist's Makapix handle |
 | `artwork.gifUrl` | HTTPS address of the GIF being played, for clients that want to show it |
+| `mode` | `rotation` or `sound` |
+| `visualizer` | The visualizer sound mode uses, whether or not it is showing now |
 | `brightness` | 0-255 |
 
 ### `POST /next`
 
 Ends the current slot and moves to the next one in the rotation. On an artwork
-slot this shows the next artwork. It also releases a hold. No body.
+slot this shows the next artwork. It also releases a hold. In sound mode it
+steps to the next visualizer. No body.
 
 Reply: `202 {"queued":"next"}`
 
@@ -120,7 +127,8 @@ looping. Two small bars show in the top-right corner of the panel.
 | `{"held": false}` | Release | `202 {"queued":"release"}` |
 | none | Toggle | `202 {"queued":"toggleHold"}` |
 
-Setting the state it already has does nothing. `held` must be a JSON boolean;
+Setting the state it already has does nothing. Hold has no effect in sound
+mode, where the visualizer already stays on screen. `held` must be a JSON boolean;
 anything else is a `400`.
 
 ### `GET /brightness`
@@ -143,6 +151,47 @@ The value is saved on the board and restored after a restart.
 Brightness is limited by the 5V supply, not by the API. When the supply cannot
 keep up, white turns yellow and then red. On the board's USB-C power port this
 starts above about 32.
+
+### `GET /mode`
+
+The panel is in one of two modes. In `rotation` it works through the slots from
+`GET /slots`. In `sound` it shows one microphone-driven visualizer until told
+otherwise.
+
+```json
+{
+  "mode": "rotation",
+  "visualizer": "spectrum",
+  "visualizers": [
+    { "name": "spectrum", "label": "Spectrum bars" },
+    { "name": "vu", "label": "VU meter" },
+    { "name": "scope", "label": "Oscilloscope" },
+    { "name": "fire", "label": "Fire" }
+  ]
+}
+```
+
+The panel always starts in `rotation` after a restart. The chosen `visualizer`
+is saved and restored.
+
+### `PUT /mode`
+
+```json
+{ "mode": "sound", "visualizer": "fire" }
+```
+
+```json
+{ "mode": "rotation" }
+```
+
+`mode` is required. `visualizer` is optional and only used with `sound`; leave
+it out to keep the current one. Applied directly, not queued: the reply is `200`
+with the same body as `GET /mode`, and the panel switches within a moment,
+interrupting whatever is on screen. Returning to `rotation` carries on from
+where the rotation left off.
+
+It is a `400`, and nothing changes, if `mode` is not one of the two values or
+`visualizer` is not a name from the `visualizers` list.
 
 ### `GET /slots`
 

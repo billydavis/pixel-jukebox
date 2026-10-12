@@ -13,6 +13,7 @@ static const uint8_t MIC_GAIN = 0x0A;       // 30 dB, in 3 dB steps from 0
 static const int16_t TONE_AMPLITUDE = 12000; // of 32767
 static const int FADE_SAMPLES = SAMPLE_RATE / 100; // 10 ms, avoids clicks
 static const int CHUNK_FRAMES = 256;
+static const int OUTPUT_BUFFER_MS = 8 * CHUNK_FRAMES * 1000 / SAMPLE_RATE;
 
 static bool writeRegister(uint8_t reg, uint8_t value) {
   Wire.beginTransmission(ES8311_ADDRESS);
@@ -129,6 +130,12 @@ static bool setupI2s() {
 }
 
 bool audioBegin() {
+  static bool started = false;
+  static bool working = false;
+  if (started) {
+    return working;
+  }
+  started = true;
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN, 400000);
 
   // The codecs need MCLK running before they are configured.
@@ -137,8 +144,10 @@ bool audioBegin() {
   }
   audioSetVolume(60);
 
+  // The amplifier stays off except while a sound plays, so it adds no hiss.
   pinMode(SPEAKER_AMP_PIN, OUTPUT);
-  digitalWrite(SPEAKER_AMP_PIN, HIGH);
+  digitalWrite(SPEAKER_AMP_PIN, LOW);
+  working = true;
   return true;
 }
 
@@ -152,6 +161,7 @@ void audioTone(float frequencyHz, uint32_t durationMs) {
   const int total = SAMPLE_RATE * durationMs / 1000;
   const float step = 2.0f * PI * frequencyHz / SAMPLE_RATE;
 
+  digitalWrite(SPEAKER_AMP_PIN, HIGH);
   int sample = 0;
   while (sample < total) {
     int count = min(CHUNK_FRAMES, total - sample);
@@ -168,6 +178,39 @@ void audioTone(float frequencyHz, uint32_t durationMs) {
     }
     size_t written = 0;
     i2s_write(I2S_PORT, frames, count * 2 * sizeof(int16_t), &written, portMAX_DELAY);
+  }
+  delay(OUTPUT_BUFFER_MS); // let the queued audio finish before the amplifier goes off
+  digitalWrite(SPEAKER_AMP_PIN, LOW);
+}
+
+bool audioRead(int16_t *left, int16_t *right, int count) {
+  static int16_t frames[CHUNK_FRAMES * 2];
+  int done = 0;
+  while (done < count) {
+    int want = min(CHUNK_FRAMES, count - done);
+    size_t bytes = 0;
+    if (i2s_read(I2S_PORT, frames, want * 2 * sizeof(int16_t), &bytes, pdMS_TO_TICKS(200)) !=
+            ESP_OK ||
+        bytes == 0) {
+      return false;
+    }
+    int got = bytes / (2 * sizeof(int16_t));
+    for (int i = 0; i < got; i++) {
+      left[done + i] = frames[i * 2];
+      right[done + i] = frames[i * 2 + 1];
+    }
+    done += got;
+  }
+  return true;
+}
+
+void audioFlushInput() {
+  static int16_t frames[CHUNK_FRAMES * 2];
+  size_t bytes = 0;
+  for (int i = 0; i < 16; i++) {
+    if (i2s_read(I2S_PORT, frames, sizeof(frames), &bytes, 0) != ESP_OK || bytes == 0) {
+      break;
+    }
   }
 }
 

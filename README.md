@@ -34,6 +34,7 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 |---|---|
 | **Slots** | Rotates through screens: by default three artworks, then a clock for 10 seconds. The rotation is editable from the control page and saved on the board |
 | **Button** | BOOT button: short press skips to the next slot, long press holds the current one, a 5-second hold starts Wi-Fi setup |
+| **Sound mode** | Switch from the artwork to a visualizer driven by the onboard microphones: spectrum bars, VU meter, oscilloscope or fire. It stays on until you switch back, and scales itself to how loud the room is |
 | **Control page** | Open `http://pixel-jukebox.local` on a phone or PC: see the artwork and artist, skip, hold, set brightness |
 | **REST API** | Status, skip, hold and brightness over HTTP, found on the network as `pixel-jukebox.local` |
 | **Wi-Fi setup** | With no network configured, the board starts its own hotspot and a page for choosing one. No code editing needed |
@@ -66,7 +67,7 @@ Pin mapping is in [`include/pins.h`](include/pins.h).
 | Network | Makapix player API over HTTPS, ArduinoJson; images over plain HTTP from the vault |
 | Remote control | Built-in WebServer and mDNS, JSON over HTTP |
 | Storage | NVS (Preferences) for Wi-Fi details, the player key and token, brightness and the rotation |
-| Audio | ES8311 speaker codec and ES7210 microphone ADC over I2C and I2S (test builds only so far) |
+| Audio | ES7210 microphone ADC and ES8311 speaker codec over I2C and I2S; a built-in FFT for the visualizers |
 
 ## Getting started
 
@@ -110,7 +111,7 @@ Brightness (0-255) is set through the API and remembered across restarts; the st
 
 ## Control page
 
-Open `http://pixel-jukebox.local` (or the board's IP address) in a browser on the same network. The page shows what is on the panel and who made it, with Hold, Next and a brightness slider, and a Rotation section for choosing which slots play and for how long. On a keyboard, `N` skips and `H` holds. It is a single file built into the firmware, with no external assets.
+Open `http://pixel-jukebox.local` (or the board's IP address) in a browser on the same network. The page shows what is on the panel and who made it, with Hold, Next and a brightness slider, a Jukebox / Sound switch for choosing a visualizer, and a Rotation section for choosing which slots play and for how long. On a keyboard, `N` skips and `H` holds. It is a single file built into the firmware, with no external assets.
 
 ## REST API
 
@@ -177,6 +178,9 @@ The first run registers a second player on your account. Its key and token are k
 | `src/makapix.cpp` | Makapix player API and stored credentials |
 | `src/gif_player.cpp` | GIF download and frame-by-frame playback, with whole-number scaling |
 | `src/display.cpp` | Panel setup, text screens, colour check |
+| `src/mode.cpp` | Rotation or sound mode, and the chosen visualizer |
+| `src/slot_visualizers.cpp` | Spectrum bars, VU meter, oscilloscope and fire |
+| `src/audio_analysis.cpp` | Frequency analysis and automatic level scaling for the visualizers |
 | `src/audio.cpp` | Speaker output (ES8311) and microphone input (ES7210) |
 | `include/pins.h` | HUB75, I2C and audio GPIO mapping, panel size |
 | `include/ca_certs.h` | Root certificates trusted for makapix.club |
@@ -190,14 +194,14 @@ pio device monitor      # serial log at 115200 baud
 
 ## Roadmap
 
-Working today: registration, shuffled playback with preloading, a slot rotation with a clock, button, web and REST control, certificate checking, and the diagnostic builds.
+Working today: registration, shuffled playback with preloading, a slot rotation with a clock, a sound mode with four visualizers, button, web and REST control, certificate checking, and the diagnostic builds.
 
 Ideas for later:
 
 - Power the panel from the dedicated 5V input for full brightness
 - Report views, and MQTT for "send to device" commands from the Makapix site
 - A brightness schedule for day and night
-- Use the speaker, microphones and onboard sensors
+- Use the speaker and the onboard sensors
 - More of the API: show a specific post, sensors, per-slot settings
 - A companion app (Flutter)
 
@@ -206,8 +210,8 @@ Ideas borrowed from [Pixelix](https://github.com/BlueAndi/Pixelix), using parts 
 - More slot types
 - Keep time across restarts with the onboard clock chip
 - Room temperature and humidity (onboard sensor), and a weather screen
-- Sound-reactive spectrum display (onboard microphones)
-- Built-in effects such as fire, falling code, rainbow and Game of Life
+- More visualizers (waterfall, pulse ring, artwork that moves to the beat)
+- Built-in effects such as falling code, rainbow and Game of Life
 - A web page for settings, and firmware updates over Wi-Fi
 
 ## Acknowledgements

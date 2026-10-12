@@ -21,6 +21,7 @@ static const char WEB_PAGE[] PROGMEM = R"HTML(<!doctype html>
   --c:clamp(3px,calc((100vw - 52px)/64),6px);
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);
   font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;
   display:grid;place-items:start center;padding:20px 16px 28px}
@@ -50,6 +51,8 @@ button{font:700 15px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase
 button.go{background:var(--accent);color:var(--accent-ink)}
 button:active,button[aria-pressed=true]{transform:translate(5px,5px);box-shadow:0 0 0 var(--edge)}
 button[aria-pressed=true]{background:var(--held)}
+button.pick{min-height:48px;font-size:13px;letter-spacing:.1em}
+button.pick[aria-pressed=true]{background:var(--panel);box-shadow:inset 0 0 0 3px var(--accent)}
 button:disabled{opacity:.45;cursor:default;transform:none;box-shadow:5px 5px 0 var(--edge)}
 :focus-visible{outline:3px solid var(--accent);outline-offset:4px}
 .dim{display:grid;gap:10px}
@@ -108,7 +111,12 @@ kbd{font:inherit;color:var(--ink)}
       <p class="who" id="who">&nbsp;</p>
       <p class="sub" id="sub">&nbsp;</p>
     </div>
-    <div class="keys">
+    <div class="keys" role="group" aria-label="Mode">
+      <button id="mrot" class="pick" aria-pressed="true" disabled>Jukebox</button>
+      <button id="msnd" class="pick" aria-pressed="false" disabled>Sound</button>
+    </div>
+    <div class="keys" id="viz" role="group" aria-label="Visualizer" hidden></div>
+    <div class="keys" id="rotkeys">
       <button id="hold" aria-pressed="false" disabled>Hold</button>
       <button id="next" class="go" disabled>Next</button>
     </div>
@@ -151,7 +159,8 @@ function uptime(s){
 function render(online){
   document.body.classList.toggle('off',!online);
   $('link').textContent=online?'Live':st?'Lost contact, retrying':'Connecting';
-  for(const id of['hold','next','bri'])$(id).disabled=!online;
+  for(const id of['hold','next','bri','mrot','msnd'])$(id).disabled=!online;
+  $('viz').querySelectorAll('button').forEach(b=>b.disabled=!online);
   if(!online||!st)return;
 
   const art=st.artwork,slot=st.slot.name,img=$('art'),msg=$('msg');
@@ -170,6 +179,17 @@ function render(online){
     $('who').textContent=clock?'Clock':slot=='makapix'?'Waiting to be linked':'Between pieces';
     $('sub').textContent=clock?'Back to the art in a moment':slot=='makapix'?'Enter the code at makapix.club':' ';
   }
+
+  const snd=st.mode=='sound';
+  if(snd&&!art){
+    const label=(vizList.find(v=>v.name==st.visualizer)||{label:'Sound'}).label;
+    msg.className='';msg.textContent=label;
+    $('who').textContent=label;$('sub').textContent='Listening to the room';
+  }
+  $('mrot').setAttribute('aria-pressed',!snd);
+  $('msnd').setAttribute('aria-pressed',snd);
+  $('rotkeys').hidden=snd;$('viz').hidden=!snd;
+  $('viz').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.name==st.visualizer));
 
   const held=st.slot.held;
   $('led').classList.toggle('held',held);
@@ -199,6 +219,25 @@ async function act(method,path,body){
 }
 
 $('next').onclick=()=>act('POST','/next');
+
+let vizList=[];
+function setMode(mode,visualizer){
+  if(st){st.mode=mode;if(visualizer)st.visualizer=visualizer;render(true);}
+  act('PUT','/mode',visualizer?{mode,visualizer}:{mode});
+}
+$('mrot').onclick=()=>setMode('rotation');
+$('msnd').onclick=()=>setMode('sound');
+call('GET','/mode').then(m=>{
+  vizList=m.visualizers;
+  vizList.forEach(v=>{
+    const b=document.createElement('button');
+    b.className='pick';b.textContent=v.label;b.dataset.name=v.name;
+    b.setAttribute('aria-pressed','false');
+    b.onclick=()=>setMode('sound',v.name);
+    $('viz').appendChild(b);
+  });
+  if(st)render(true);
+}).catch(()=>{});
 $('hold').onclick=()=>{
   const held=!(st&&st.slot.held);
   if(st){st.slot.held=held;render(true);}
