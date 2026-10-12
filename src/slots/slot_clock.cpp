@@ -18,6 +18,8 @@ bool ClockSlot::start() {
   return true;
 }
 
+void ClockSlot::shown() { startedAt = millis(); }
+
 uint32_t ClockSlot::update() {
   struct tm now;
   if (getLocalTime(&now, 0) && now.tm_min != shownMinute) {

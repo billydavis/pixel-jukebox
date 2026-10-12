@@ -12,6 +12,7 @@
 #include "html_escape.h"
 #include "rotation_rules.h"
 #include "spectrum_math.h"
+#include "transitions.h"
 
 #ifdef ARDUINO
 #include <Arduino.h>
@@ -273,6 +274,108 @@ static void test_spectrum_decibels() {
   TEST_ASSERT_TRUE(std::isfinite(spectrum::toDb(0.0f))); // silence must not give -infinity
 }
 
+// --- transitions -----------------------------------------------------------
+
+static uint16_t imageA[transitions::PIXELS];
+static uint16_t imageB[transitions::PIXELS];
+static uint16_t rendered[transitions::PIXELS];
+static uint16_t renderedAgain[transitions::PIXELS];
+static const uint32_t SEEDS[] = {0, 1, 2, 3, 12345, 0xFFFFFFFFu};
+
+// Two different images in which every pixel is distinct, so a pixel in the
+// wrong place shows up as a mismatch.
+static void fillImages() {
+  for (int i = 0; i < transitions::PIXELS; i++) {
+    imageA[i] = (uint16_t)(i * 7 + 1);
+    imageB[i] = (uint16_t)(0xFFFF - i * 5);
+  }
+}
+
+static void test_transitions_list_is_complete_and_findable() {
+  TEST_ASSERT_EQUAL_INT(13, transitions::count());
+  for (int i = 0; i < transitions::count(); i++) {
+    TEST_ASSERT_EQUAL_INT(i, transitions::find(transitions::info(i).name)); // names are unique
+    TEST_ASSERT_TRUE(strlen(transitions::info(i).label) > 0);
+  }
+  TEST_ASSERT_EQUAL_INT(-1, transitions::find("nope"));
+  TEST_ASSERT_EQUAL_INT(-1, transitions::find("random")); // a setting, not a transition
+}
+
+static void test_transitions_start_on_the_old_image() {
+  fillImages();
+  for (int i = 0; i < transitions::count(); i++) {
+    for (uint32_t seed : SEEDS) {
+      transitions::render(i, 0.0f, seed, imageA, imageB, rendered);
+      TEST_ASSERT_EQUAL_UINT16_ARRAY_MESSAGE(imageA, rendered, transitions::PIXELS, transitions::info(i).name);
+    }
+  }
+}
+
+static void test_transitions_end_on_the_new_image() {
+  fillImages();
+  for (int i = 0; i < transitions::count(); i++) {
+    for (uint32_t seed : SEEDS) {
+      transitions::render(i, 1.0f, seed, imageA, imageB, rendered);
+      TEST_ASSERT_EQUAL_UINT16_ARRAY_MESSAGE(imageB, rendered, transitions::PIXELS, transitions::info(i).name);
+    }
+  }
+}
+
+static void test_transitions_change_something_part_way() {
+  fillImages();
+  for (int i = 0; i < transitions::count(); i++) {
+    transitions::render(i, 0.5f, 7, imageA, imageB, rendered);
+    TEST_ASSERT_TRUE_MESSAGE(memcmp(rendered, imageA, sizeof(rendered)) != 0, transitions::info(i).name);
+  }
+}
+
+static void test_transitions_repeat_exactly_for_one_seed() {
+  fillImages();
+  for (int i = 0; i < transitions::count(); i++) {
+    transitions::render(i, 0.37f, 99, imageA, imageB, rendered);
+    transitions::render(i, 0.37f, 99, imageA, imageB, renderedAgain);
+    TEST_ASSERT_EQUAL_UINT16_ARRAY_MESSAGE(rendered, renderedAgain, transitions::PIXELS, transitions::info(i).name);
+  }
+}
+
+static void test_transitions_tolerate_progress_out_of_range() {
+  fillImages();
+  for (int i = 0; i < transitions::count(); i++) {
+    transitions::render(i, -0.5f, 3, imageA, imageB, rendered);
+    TEST_ASSERT_EQUAL_UINT16_ARRAY_MESSAGE(imageA, rendered, transitions::PIXELS, transitions::info(i).name);
+    transitions::render(i, 1.5f, 3, imageA, imageB, rendered);
+    TEST_ASSERT_EQUAL_UINT16_ARRAY_MESSAGE(imageB, rendered, transitions::PIXELS, transitions::info(i).name);
+  }
+}
+
+// Sweeps every transition through its whole range. Nothing to assert beyond
+// not crashing, but run under a memory checker this would catch an
+// out-of-range read.
+static void test_transitions_survive_a_full_sweep() {
+  fillImages();
+  for (int i = 0; i < transitions::count(); i++) {
+    for (int step = 0; step <= 100; step++) {
+      transitions::render(i, step / 100.0f, SEEDS[step % 6], imageA, imageB, rendered);
+    }
+  }
+  TEST_ASSERT_TRUE(true);
+}
+
+// A wipe only ever shows pixels in their own place, from one image or the other.
+static void test_transitions_wipe_only_moves_the_edge() {
+  fillImages();
+  int index = transitions::find("wipe");
+  for (uint32_t seed : SEEDS) {
+    transitions::render(index, 0.25f, seed, imageA, imageB, rendered);
+    int fromNew = 0;
+    for (int i = 0; i < transitions::PIXELS; i++) {
+      TEST_ASSERT_TRUE(rendered[i] == imageA[i] || rendered[i] == imageB[i]);
+      fromNew += rendered[i] == imageB[i];
+    }
+    TEST_ASSERT_EQUAL_INT(transitions::PIXELS / 4, fromNew); // a quarter revealed
+  }
+}
+
 // ---------------------------------------------------------------------------
 
 static int runTests() {
@@ -303,6 +406,15 @@ static int runTests() {
   RUN_TEST(test_spectrum_a_tone_stays_out_of_distant_bands);
   RUN_TEST(test_spectrum_scale_maps_and_clamps);
   RUN_TEST(test_spectrum_decibels);
+
+  RUN_TEST(test_transitions_list_is_complete_and_findable);
+  RUN_TEST(test_transitions_start_on_the_old_image);
+  RUN_TEST(test_transitions_end_on_the_new_image);
+  RUN_TEST(test_transitions_change_something_part_way);
+  RUN_TEST(test_transitions_repeat_exactly_for_one_seed);
+  RUN_TEST(test_transitions_tolerate_progress_out_of_range);
+  RUN_TEST(test_transitions_survive_a_full_sweep);
+  RUN_TEST(test_transitions_wipe_only_moves_the_edge);
   return UNITY_END();
 }
 

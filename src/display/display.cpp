@@ -1,5 +1,6 @@
 #include "display/display.h"
 
+#include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 #include <Preferences.h>
 
 #include "pins.h"
@@ -7,14 +8,107 @@
 // 0-255. Over the USB-C power port, white tints yellow at 64 and red at 128.
 static const uint8_t DEFAULT_BRIGHTNESS = 32;
 
+static const int W = PANEL_RES_X;
+static const int H = PANEL_RES_Y;
+static const size_t FRAME_BYTES = W * H * sizeof(uint16_t);
+
 static Preferences prefs;
 static uint8_t brightness = DEFAULT_BRIGHTNESS;
 
-MatrixPanel_I2S_DMA *display = nullptr;
+Screen *display = nullptr;
 
-uint16_t colour::amber() { return display->color565(255, 200, 0); }
-uint16_t colour::red() { return display->color565(255, 0, 0); }
-uint16_t colour::green() { return display->color565(0, 255, 0); }
+uint16_t colour::amber() { return Screen::color565(255, 200, 0); }
+uint16_t colour::red() { return Screen::color565(255, 0, 0); }
+uint16_t colour::green() { return Screen::color565(0, 255, 0); }
+
+Screen::Screen(MatrixPanel_I2S_DMA *panel) : Adafruit_GFX(W, H), panel(panel) {}
+
+bool Screen::begin() {
+  if (!panel->begin()) {
+    return false;
+  }
+  // The frame copies live in external memory, which has plenty to spare.
+  shown = (uint16_t *)ps_calloc(1, FRAME_BYTES);
+  hidden = (uint16_t *)ps_calloc(1, FRAME_BYTES);
+  return shown && hidden;
+}
+
+void Screen::drawPixel(int16_t x, int16_t y, uint16_t colour) {
+  if (x < 0 || y < 0 || x >= W || y >= H) {
+    return;
+  }
+  if (live) {
+    shown[y * W + x] = colour;
+    panel->drawPixel(x, y, colour);
+  } else {
+    hidden[y * W + x] = colour;
+  }
+}
+
+void Screen::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t colour) {
+  int x0 = max((int)x, 0);
+  int y0 = max((int)y, 0);
+  int x1 = min(x + w, W);
+  int y1 = min(y + h, H);
+  if (x0 >= x1 || y0 >= y1) {
+    return;
+  }
+  uint16_t *frame = live ? shown : hidden;
+  for (int row = y0; row < y1; row++) {
+    for (int column = x0; column < x1; column++) {
+      frame[row * W + column] = colour;
+    }
+  }
+  if (live) {
+    panel->fillRect(x0, y0, x1 - x0, y1 - y0, colour);
+  }
+}
+
+void Screen::drawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t colour) {
+  fillRect(x, y, w, 1, colour);
+}
+
+void Screen::drawFastVLine(int16_t x, int16_t y, int16_t h, uint16_t colour) {
+  fillRect(x, y, 1, h, colour);
+}
+
+void Screen::fillScreen(uint16_t colour) { fillRect(0, 0, W, H, colour); }
+
+void Screen::clearScreen() {
+  if (live) {
+    memset(shown, 0, FRAME_BYTES);
+    panel->clearScreen();
+  } else {
+    memset(hidden, 0, FRAME_BYTES);
+  }
+}
+
+void Screen::drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b) {
+  drawPixel(x, y, color565(r, g, b));
+}
+
+void Screen::setBrightness8(uint8_t value) { panel->setBrightness8(value); }
+
+void Screen::setLive(bool nowLive) {
+  if (!nowLive) {
+    memset(hidden, 0, FRAME_BYTES);
+  }
+  live = nowLive;
+}
+
+const uint16_t *Screen::pixels() const { return live ? shown : hidden; }
+
+void Screen::present(const uint16_t *frame) {
+  for (int y = 0; y < H; y++) {
+    for (int x = 0; x < W; x++) {
+      uint16_t colour = frame[y * W + x];
+      if (shown[y * W + x] != colour) {
+        shown[y * W + x] = colour;
+        panel->drawPixel(x, y, colour);
+      }
+    }
+  }
+}
 
 bool setupDisplay() {
   HUB75_I2S_CFG::i2s_pins pins = {R1_PIN, G1_PIN, B1_PIN, R2_PIN, G2_PIN, B2_PIN, A_PIN,
@@ -22,7 +116,7 @@ bool setupDisplay() {
   HUB75_I2S_CFG config(PANEL_RES_X, PANEL_RES_Y, PANEL_CHAIN, pins);
   config.clkphase = false; // this panel shifts one pixel sideways with the default
 
-  display = new MatrixPanel_I2S_DMA(config);
+  display = new Screen(new MatrixPanel_I2S_DMA(config));
   if (!display->begin()) {
     return false;
   }

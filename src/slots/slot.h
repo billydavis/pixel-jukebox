@@ -14,6 +14,10 @@ class Slot {
   // this turn (nothing to show yet); stop() is not called in that case.
   virtual bool start() = 0;
 
+  // Called once the slot is fully on screen, after any transition into it.
+  // Time on screen is counted from here, so a transition does not eat into it.
+  virtual void shown() {}
+
   // Draws whatever is due and returns how many milliseconds until the next call.
   virtual uint32_t update() = 0;
 

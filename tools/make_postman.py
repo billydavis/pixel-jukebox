@@ -62,6 +62,15 @@ FOLDERS = [
         ("Set Rotation (art only)", "PUT", "slots", "Artwork only, no clock.",
          {"rotation": [{"slot": "makapix", "turns": 1}]}, 200),
     ]),
+    ("Transitions", [
+        ("Get Transition", "GET", "transition",
+         "The transition used between slots, and the effects available.", None, 200),
+        ("Transition: Random", "PUT", "transition",
+         "A different effect each time a slot changes. The default.", {"transition": "random"}, 200),
+        ("Transition: None", "PUT", "transition", "Slots change instantly.", {"transition": "none"}, 200),
+        ("Transition: Mosaic", "PUT", "transition",
+         "Always uses one effect. Any name from Get Transition works here.", {"transition": "mosaic"}, 200),
+    ]),
     ("Wi-Fi", [
         ("Start Wi-Fi Setup", "POST", "wifi/setup",
          "Restarts the board into its setup hotspot (network name Pixel-Jukebox). The board goes offline; "
@@ -76,6 +85,8 @@ FOLDERS = [
         ("Unknown Endpoint", "GET", "nope", "Expects 404.", None, 404),
         ("Unknown Visualizer", "PUT", "mode", "Expects 400; the mode is left unchanged.",
          {"mode": "sound", "visualizer": "nope"}, 400),
+        ("Unknown Transition", "PUT", "transition", "Expects 400; the transition is left unchanged.",
+         {"transition": "nope"}, 400),
     ]),
 ]
 

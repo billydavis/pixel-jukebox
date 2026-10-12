@@ -5,7 +5,7 @@
 
 Checks every endpoint in docs/jukebox-api.md except POST /wifi/setup, which
 would take the board off the network. Settings it changes (brightness, mode,
-rotation) are put back afterwards. Standard library only. Exits non-zero if
+rotation, transition) are put back afterwards. Standard library only. Exits non-zero if
 any check fails.
 """
 
@@ -74,6 +74,7 @@ except OSError as error:
 original_brightness = first["brightness"]
 original_rotation = call("GET", "/slots")[1]["rotation"]
 original_mode = call("GET", "/mode")[1]
+original_transition = call("GET", "/transition")[1]["transition"]
 
 try:
     section("Discovery and pages")
@@ -168,6 +169,19 @@ try:
         check(f"rotation rejects {label}", code == 400 and "error" in body, body)
     check("rejected rotations changed nothing", call("GET", "/slots")[1]["rotation"] == trial)
 
+    section("Transitions")
+    code, body = call("GET", "/transition")
+    names = [item["name"] for item in body.get("available", [])]
+    check("transition lists 13 effects", code == 200 and len(names) == 13 and len(set(names)) == 13, names)
+    for choice in ("none", "random", names[0], names[-1]):
+        code, body = call("PUT", "/transition", {"transition": choice})
+        check(f"transition can be set to {choice}",
+              code == 200 and call("GET", "/transition")[1]["transition"] == choice, body)
+    for bad in ({"transition": "nope"}, {"transition": 3}, {}):
+        code, body = call("PUT", "/transition", bad)
+        check(f"transition rejects {json.dumps(bad)}", code == 400 and "error" in body, body)
+    check("rejected values changed nothing", call("GET", "/transition")[1]["transition"] == names[-1])
+
 finally:
     section("Restoring settings")
     call("PUT", "/slots", {"rotation": original_rotation})
@@ -175,11 +189,13 @@ finally:
     call("PUT", "/mode", {"mode": original_mode["mode"], "visualizer": original_mode["visualizer"]}
          if original_mode["mode"] == "sound" else {"mode": "rotation"})
     call("POST", "/hold", {"held": False})
+    call("PUT", "/transition", {"transition": original_transition})
     time.sleep(SETTLE_S)
     restored = (call("GET", "/slots")[1]["rotation"] == original_rotation
                 and call("GET", "/brightness")[1]["value"] == original_brightness
-                and call("GET", "/mode")[1]["mode"] == original_mode["mode"])
-    check("rotation, brightness and mode are back as they were", restored)
+                and call("GET", "/mode")[1]["mode"] == original_mode["mode"]
+                and call("GET", "/transition")[1]["transition"] == original_transition)
+    check("rotation, brightness, mode and transition are back as they were", restored)
 
 print(f"\n{checks - len(failures)} of {checks} checks passed")
 if failures:

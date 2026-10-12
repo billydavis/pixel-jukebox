@@ -1,9 +1,52 @@
 #pragma once
 
+#include <Adafruit_GFX.h>
 #include <Arduino.h>
-#include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 
-extern MatrixPanel_I2S_DMA *display;
+class MatrixPanel_I2S_DMA;
+
+// Everything is drawn through this. It passes drawing on to the LED panel and
+// keeps a copy of what is showing, so the picture can be read back. It can
+// also be taken off the panel for a moment: drawing then goes to a hidden
+// frame, which is how the next slot's first screen is prepared for a
+// transition while the old one is still showing.
+class Screen : public Adafruit_GFX {
+ public:
+  explicit Screen(MatrixPanel_I2S_DMA *panel);
+  bool begin();
+
+  void drawPixel(int16_t x, int16_t y, uint16_t colour) override;
+  void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t colour) override;
+  void drawFastHLine(int16_t x, int16_t y, int16_t w, uint16_t colour) override;
+  void drawFastVLine(int16_t x, int16_t y, int16_t h, uint16_t colour) override;
+  void fillScreen(uint16_t colour) override;
+  void clearScreen();
+  void drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b);
+  void setBrightness8(uint8_t brightness);
+
+  static uint16_t color565(uint8_t r, uint8_t g, uint8_t b) {
+    return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+  }
+
+  // false: drawing goes to a hidden frame, starting from black, and the panel
+  // keeps showing what it had. true: drawing reaches the panel again; the
+  // hidden frame is dropped, so show it with present() first if it is wanted.
+  void setLive(bool live);
+
+  // The frame being drawn to: what is on the panel, or the hidden frame.
+  const uint16_t *pixels() const;
+
+  // Puts a whole frame on the panel, repainting only the pixels that differ.
+  void present(const uint16_t *frame);
+
+ private:
+  MatrixPanel_I2S_DMA *panel;
+  uint16_t *shown = nullptr;  // what the panel is showing
+  uint16_t *hidden = nullptr; // drawn to while not live
+  bool live = true;
+};
+
+extern Screen *display;
 
 // The colours used for status text: in progress, wrong, and fine.
 namespace colour {

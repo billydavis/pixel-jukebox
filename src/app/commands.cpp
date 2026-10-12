@@ -19,6 +19,8 @@ bool commandSend(CommandType type, uint8_t value) {
 
 bool commandReceive(Command &command) { return xQueueReceive(queue, &command, 0) == pdTRUE; }
 
+bool commandPeek(Command &command) { return xQueuePeek(queue, &command, 0) == pdTRUE; }
+
 // A long press fires as soon as it is long enough; a short press fires on release.
 static void buttonTask(void *) {
   pinMode(BUTTON_PIN, INPUT_PULLUP);

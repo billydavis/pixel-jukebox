@@ -33,6 +33,7 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 | Area | What's included |
 |---|---|
 | **Slots** | Rotates through screens: by default three artworks, then a clock for 10 seconds. The rotation is editable from the control page and saved on the board |
+| **Transitions** | Thirteen effects between slots, such as mosaic, melt, dissolve and slide. Random by default, or pick one, or turn them off. They never eat into a slot's time on screen |
 | **Button** | BOOT button: short press skips to the next slot, long press holds the current one, a 5-second hold starts Wi-Fi setup |
 | **Sound mode** | Switch from the artwork to a visualizer driven by the onboard microphones: spectrum bars, VU meter, oscilloscope or fire. It stays on until you switch back, and scales itself to how loud the room is |
 | **Control page** | Open `http://pixel-jukebox.local` on a phone or PC: see the artwork and artist, skip, hold, set brightness |
@@ -111,7 +112,7 @@ Brightness (0-255) is set through the API and remembered across restarts; the st
 
 ## Control page
 
-Open `http://pixel-jukebox.local` (or the board's IP address) in a browser on the same network. The page shows what is on the panel and who made it, with Hold, Next and a brightness slider, a Jukebox / Sound switch for choosing a visualizer, and a Rotation section for choosing which slots play and for how long. On a keyboard, `N` skips and `H` holds. It is a single file, [`web/index.html`](web/index.html), compiled into the firmware, with no external assets.
+Open `http://pixel-jukebox.local` (or the board's IP address) in a browser on the same network. The page shows what is on the panel and who made it, with Hold, Next and a brightness slider, a Jukebox / Sound switch for choosing a visualizer, and a Rotation section for choosing which slots play, for how long, and with which transition between them. On a keyboard, `N` skips and `H` holds. It is a single file, [`web/index.html`](web/index.html), compiled into the firmware, with no external assets.
 
 ## REST API
 
@@ -170,6 +171,7 @@ The firmware source is grouped by area. `#include` paths are written from `src/`
 | **`src/app/`** | **What the panel is doing and how it is told** |
 | `src/app/rotation.cpp` | The slot types and the saved rotation |
 | `src/app/mode.cpp` | Rotation or sound mode, and the chosen visualizer |
+| `src/app/transition.cpp` | Which transition plays between slots, and playing it |
 | `src/app/commands.cpp` | Command queue and the BOOT button |
 | `src/app/status.cpp` | Shared "now showing" state read by the API |
 | `src/app/telemetry.cpp` | Memory and task headroom for `GET /diagnostics` |
@@ -180,7 +182,7 @@ The firmware source is grouped by area. `#include` paths are written from `src/`
 | `src/slots/slot_clock.cpp` | Clock slot (network time) |
 | `src/slots/slot_visualizers.cpp` | Spectrum bars, VU meter, oscilloscope and fire |
 | **`src/display/`** | **The panel** |
-| `src/display/display.cpp` | Panel setup, text screens, colour check |
+| `src/display/display.cpp` | The screen everything draws through (with an off-panel frame for transitions), text screens, colour check |
 | `src/display/gif_player.cpp` | GIF download and frame-by-frame playback, with whole-number scaling |
 | **`src/audio/`** | **Speaker and microphones** |
 | `src/audio/audio.cpp` | Speaker output (ES8311) and microphone input (ES7210) |
@@ -232,7 +234,7 @@ Checks the pages in `web/` for duplicate element IDs, script references to IDs t
 powershell -File tools/run_unit_tests.ps1
 ```
 
-Runs the unit tests in `test/` for the hardware-free code in `lib/jukebox_core` (small-GIF padding, HTML escaping, rotation rules, the visualizers' frequency maths). It compiles them on the PC with the Visual Studio C++ compiler, so it takes a few seconds and needs no board.
+Runs the unit tests in `test/` for the hardware-free code in `lib/jukebox_core` (small-GIF padding, HTML escaping, rotation rules, the visualizers' frequency maths, the transitions). It compiles them on the PC with the Visual Studio C++ compiler, so it takes a few seconds and needs no board.
 
 The same tests also run on the board itself, built by the ESP32 compiler, with `pio test -e waveshare-s3-rgb-matrix`. That replaces the firmware, so upload the regular firmware again afterwards.
 

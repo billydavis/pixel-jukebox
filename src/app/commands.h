@@ -26,3 +26,6 @@ bool commandSend(CommandType type, uint8_t value = 0);
 
 // Non-blocking; returns false when no command is waiting.
 bool commandReceive(Command &command);
+
+// Looks at the next command without taking it.
+bool commandPeek(Command &command);

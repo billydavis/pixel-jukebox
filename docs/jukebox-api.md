@@ -69,6 +69,8 @@ the reply is `503` and nothing is queued.
 | `PUT` | `/mode` | Switch mode or pick a visualizer |
 | `GET` | `/slots` | The rotation and the slot types that can go in it |
 | `PUT` | `/slots` | Replace the rotation |
+| `GET` | `/transition` | The transition played between slots |
+| `PUT` | `/transition` | Choose the transition |
 | `POST` | `/wifi/setup` | Restart into the Wi-Fi setup hotspot |
 
 ### `GET /status`
@@ -266,6 +268,43 @@ The rotation is saved on the board and restored after a restart.
 It is a `400`, and nothing changes, if `rotation` is not an array of 1 to
 `maxEntries` entries, a `slot` is not one of the `available` names, or `turns`
 is not a whole number from 1 to `maxTurns`.
+
+### `GET /transition`
+
+When one slot gives way to the next in the rotation, a short transition
+(about 0.7 seconds) blends the old picture into the new one.
+
+```json
+{
+  "transition": "random",
+  "available": [
+    { "name": "crossfade", "label": "Crossfade" },
+    { "name": "mosaic", "label": "Mosaic" }
+  ]
+}
+```
+
+`transition` is `random` (a different effect each time, never the same twice
+running; the default), `none`, or one `name` from `available`. The list above
+is shortened: there are thirteen, `crossfade`, `fade`, `slide`, `wipe`, `iris`,
+`blinds`, `mosaic`, `dissolve`, `melt`, `checkerboard`, `scanline`, `spiral`
+and `rain`.
+
+A transition is extra time between slots. A slot's own time on screen is
+counted from when it is fully showing, so a 30-second artwork is still shown
+for 30 seconds. `POST /next` during a transition cuts it short. Sound mode
+does not use transitions.
+
+### `PUT /transition`
+
+```json
+{ "transition": "mosaic" }
+```
+
+Applied directly: the reply is `200` with the same body as `GET /transition`,
+and the choice is used from the next change of slot. It is saved on the board.
+It is a `400`, and nothing changes, if `transition` is not `random`, `none` or
+a name from `available`.
 
 ### `POST /wifi/setup`
 

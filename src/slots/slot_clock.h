@@ -7,6 +7,7 @@ class ClockSlot : public Slot {
  public:
   const char *name() const override { return "clock"; }
   bool start() override;
+  void shown() override;
   uint32_t update() override;
   bool finished() const override;
   void redraw() override;

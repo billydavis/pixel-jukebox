@@ -12,7 +12,9 @@
 #include "app/rotation.h"
 #include "app/status.h"
 #include "app/telemetry.h"
+#include "app/transition.h"
 #include "network/web_assets.h"
+#include "transitions.h"
 
 #define API_BASE "/api/v1"
 
@@ -194,6 +196,38 @@ static void handlePutMode() {
   sendMode();
 }
 
+static void sendTransition() {
+  JsonDocument doc;
+  doc["transition"] = transitionChoice();
+  JsonArray available = doc["available"].to<JsonArray>();
+  for (int i = 0; i < transitions::count(); i++) {
+    JsonObject item = available.add<JsonObject>();
+    item["name"] = transitions::info(i).name;
+    item["label"] = transitions::info(i).label;
+  }
+  sendJson(200, doc);
+}
+
+static void handleGetTransition() { sendTransition(); }
+
+// {"transition": "random" | "none" | a name from the available list}
+static void handlePutTransition() {
+  JsonDocument body;
+  if (!readBody(body)) {
+    return;
+  }
+  if (!body["transition"].is<const char *>()) {
+    sendError(400, "transition must be \"random\", \"none\" or a name from the available list");
+    return;
+  }
+  String error;
+  if (!transitionSetChoice(body["transition"].as<String>(), error)) {
+    sendError(400, error.c_str());
+    return;
+  }
+  sendTransition();
+}
+
 static void handleWifiSetup() { sendQueued(commandSend(CommandType::WifiSetup), "wifiSetup"); }
 
 static void sendSlots() {
@@ -277,6 +311,8 @@ void apiBegin() {
   server.on(API_BASE "/brightness", HTTP_PUT, handlePutBrightness);
   server.on(API_BASE "/mode", HTTP_GET, handleGetMode);
   server.on(API_BASE "/mode", HTTP_PUT, handlePutMode);
+  server.on(API_BASE "/transition", HTTP_GET, handleGetTransition);
+  server.on(API_BASE "/transition", HTTP_PUT, handlePutTransition);
   server.on(API_BASE "/wifi/setup", HTTP_POST, handleWifiSetup);
   server.on(API_BASE "/slots", HTTP_GET, handleGetSlots);
   server.on(API_BASE "/slots", HTTP_PUT, handlePutSlots);

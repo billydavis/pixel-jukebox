@@ -170,6 +170,8 @@ bool MakapixSlot::startPlaying() {
   return true;
 }
 
+void MakapixSlot::shown() { startedAt = millis(); }
+
 uint32_t MakapixSlot::update() {
   switch (mode) {
     case Mode::Registering:

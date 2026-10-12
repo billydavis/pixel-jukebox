@@ -11,6 +11,7 @@ class MakapixSlot : public Slot {
 
   const char *name() const override { return "makapix"; }
   bool start() override;
+  void shown() override;
   uint32_t update() override;
   bool finished() const override;
   void redraw() override;

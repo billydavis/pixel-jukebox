@@ -2,8 +2,8 @@
 // 64x64 LED matrix.
 //
 // This file brings the board up and runs one slot after another. What is
-// chosen to run comes from rotation.cpp and mode.cpp; Wi-Fi is kept up by
-// connection.cpp.
+// chosen to run comes from rotation.cpp and mode.cpp, how one gives way to
+// the next from transition.cpp, and Wi-Fi is kept up by connection.cpp.
 
 #include <Arduino.h>
 
@@ -16,12 +16,14 @@
 #include "app/rotation.h"
 #include "app/status.h"
 #include "app/telemetry.h"
+#include "app/transition.h"
 
 static const uint32_t MESSAGE_MS = 1500;
 static const uint32_t SKIPPED_SLOT_MS = 200;
 static const uint32_t COMMAND_POLL_MS = 5;
 
 static size_t skippedInARow = 0;
+static uint16_t *outgoing = nullptr; // the frame a transition starts from
 
 // Two small bars in the top-right corner while the current slot is held.
 static void drawHoldMarker() {
@@ -123,6 +125,8 @@ void setup() {
   commandsBegin();
   rotationBegin();
   modeBegin();
+  transitionBegin();
+  outgoing = (uint16_t *)ps_malloc(PANEL_RES_X * PANEL_RES_Y * sizeof(uint16_t));
 }
 
 void loop() {
@@ -137,7 +141,25 @@ void loop() {
   // rotation decides.
   bool sound = modeIsSound();
   Slot *slot = sound ? modeSoundSlot() : rotationCurrent();
-  if (slot->start()) {
+
+  // For a transition, the slot draws its first frame off the panel while the
+  // old picture stays up, then the two are blended. Sound mode switches at once.
+  bool animate = !sound && outgoing && transitionEnabled();
+  if (animate) {
+    memcpy(outgoing, display->pixels(), PANEL_RES_X * PANEL_RES_Y * sizeof(uint16_t));
+    display->setLive(false);
+  }
+  bool started = slot->start();
+  if (animate) {
+    if (started) {
+      slot->update();
+      transitionPlay(outgoing, display->pixels());
+    }
+    display->setLive(true);
+  }
+
+  if (started) {
+    slot->shown();
     skippedInARow = 0;
     statusSetSlot(slot->name());
     Serial.printf("Slot: %s\n", slot->name());
