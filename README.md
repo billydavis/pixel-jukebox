@@ -33,7 +33,7 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 | Area | What's included |
 |---|---|
 | **Slots** | Rotates through screens: by default three artworks, then a clock for 10 seconds. The rotation is editable from the control page and saved on the board |
-| **Artwork cache** | With a microSD card in the slot, every artwork played is saved to it (up to 1,500 pieces or 1 GB), for playing without a connection. No card, no cache; the card is never formatted by the board |
+| **Offline play** | With a microSD card in the slot, every artwork played is saved to it (up to 1,500 pieces or 1 GB). When Makapix or the Wi-Fi is unreachable, the board shuffles through those copies instead, and goes back to fresh art when the connection returns. No card, no cache; the card is never formatted by the board |
 | **Transitions** | Thirteen effects between slots, such as mosaic, melt, dissolve and slide. Random by default, or pick one, or turn them off. They never eat into a slot's time on screen |
 | **Button** | BOOT button: short press skips to the next slot, long press holds the current one, a 5-second hold starts Wi-Fi setup |
 | **Sound mode** | Switch from the artwork to a visualizer driven by the onboard microphones: spectrum bars, VU meter, oscilloscope or fire. It stays on until you switch back, and scales itself to how loud the room is |
@@ -92,7 +92,7 @@ On first boot the panel shows "WiFi setup" and starts an open network named `Pix
 
 To skip this step, copy `include/secrets.example.h` to `include/secrets.h` and fill in your network before uploading. Details saved through the setup page take priority over that file.
 
-To change networks later, hold the BOOT button for 5 seconds, or use **Change Wi-Fi** on the control page. If the saved network can't be joined at startup, the panel offers setup again by itself, and goes back to retrying the saved network after three minutes with nobody connected.
+To change networks later, hold the BOOT button for 5 seconds, or use **Change Wi-Fi** on the control page. If the saved network can't be joined at startup, the panel offers setup again by itself, and goes back to retrying the saved network after three minutes with nobody connected. The exception is a board with artwork cached on its card: it plays that instead and keeps retrying in the background, on the basis that the router is more likely down than the password wrong. Hold BOOT for 5 seconds to open setup in that case.
 
 ### Makapix registration
 

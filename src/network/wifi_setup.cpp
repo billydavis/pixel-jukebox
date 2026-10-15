@@ -72,6 +72,16 @@ bool wifiConnect(uint32_t timeoutMs) {
   return true;
 }
 
+void wifiRetry() {
+  String ssid, password;
+  credentials(ssid, password);
+  if (ssid.isEmpty()) {
+    return;
+  }
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid.c_str(), password.c_str());
+}
+
 void wifiRequestSetup() {
   prefs.putBool("wifi_setup", true);
   ESP.restart();

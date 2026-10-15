@@ -7,6 +7,7 @@
 #include "config.h"
 #include "display/display.h"
 #include "network/wifi_setup.h"
+#include "storage/art_cache.h"
 
 static const uint32_t JOIN_TIMEOUT_MS = 20000;
 static const int BOOT_ATTEMPTS = 2;
@@ -27,6 +28,17 @@ void connectionStart() {
       return; // connectionMaintain() announces the connection
     }
   }
+  // With art on the card there is still something to show, so keep playing
+  // and keep trying; the router is more likely down than the password wrong.
+  // Holding BOOT for five seconds still opens setup.
+  if (artCacheAvailable()) {
+    Serial.println("Could not join the saved network; playing from the card");
+    showMessage("WiFi", "offline,\nplaying card", colour::amber());
+    delay(MESSAGE_MS);
+    lastAttempt = millis();
+    wifiRetry();
+    return;
+  }
   Serial.println("Could not join the saved network");
   wifiSetupRun(true);
 }
@@ -46,6 +58,14 @@ void connectionMaintain() {
       return;
     }
     lastAttempt = millis();
+
+    // Art on the card keeps playing, so retry in the background rather than
+    // stopping the show for twenty seconds every minute.
+    if (artCacheAvailable()) {
+      Serial.println("Wi-Fi down; trying again in the background");
+      wifiRetry();
+      return;
+    }
 
     showMessage("WiFi", "joining...", colour::amber());
     if (!wifiConnect(JOIN_TIMEOUT_MS)) {

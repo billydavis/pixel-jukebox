@@ -22,12 +22,13 @@ void statusSetHeld(bool held) {
   current.held = held;
 }
 
-void statusSetArtwork(uint32_t postId, const String &owner, const String &gifUrl) {
+void statusSetArtwork(uint32_t postId, const String &owner, const String &gifUrl, bool fromCache) {
   Guard guard;
   current.hasArtwork = true;
   current.postId = postId;
   current.owner = owner;
   current.gifUrl = gifUrl;
+  current.fromCache = fromCache;
 }
 
 void statusClearArtwork() {
@@ -36,6 +37,7 @@ void statusClearArtwork() {
   current.postId = 0;
   current.owner = "";
   current.gifUrl = "";
+  current.fromCache = false;
 }
 
 PlayerStatus statusGet() {

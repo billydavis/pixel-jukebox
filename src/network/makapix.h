@@ -11,6 +11,7 @@ struct Artwork {
   String ownerHandle;
   String gifUrl; // plain-HTTP vault URL of the GIF rendition
   uint32_t dwellMs;
+  bool fromCache = false; // played from the card, not downloaded
 };
 
 enum class LinkStatus { Linked, Pending, RateLimited, Failed };

@@ -90,7 +90,8 @@ the reply is `503` and nothing is queued.
   "artwork": {
     "postId": 647,
     "owner": "Odio",
-    "gifUrl": "https://vault.makapix.club/21/32/abc123.gif"
+    "gifUrl": "https://vault.makapix.club/21/32/abc123.gif",
+    "source": "makapix"
   },
   "mode": "rotation",
   "visualizer": "spectrum",
@@ -107,7 +108,8 @@ the reply is `503` and nothing is queued.
 | `slot.held` | `true` while the current slot is held |
 | `artwork` | The Makapix post on screen; `null` when the slot is not showing artwork (clock, registration code) |
 | `artwork.owner` | The artist's Makapix handle |
-| `artwork.gifUrl` | HTTPS address of the GIF being played, for clients that want to show it |
+| `artwork.gifUrl` | HTTPS address of the GIF being played, for clients that want to show it. Empty when the artwork is playing from the card |
+| `artwork.source` | `makapix` when downloaded for this turn, `card` when played from the board's offline copy because Makapix or the Wi-Fi could not be reached |
 | `mode` | `rotation` or `sound` |
 | `visualizer` | The visualizer sound mode uses, whether or not it is showing now |
 | `brightness` | 0-255 |
@@ -131,7 +133,7 @@ sizes are in bytes.
   "card": { "present": true, "mounted": true, "ready": true, "type": "SD", "capacityBytes": 2032664576,
             "fileSystem": "FAT32", "totalBytes": 2027028480, "freeBytes": 2026909696 },
   "cache": { "enabled": true, "artworks": 11, "bytes": 66985, "budgetBytes": 1073741824,
-             "maxArtworks": 1500, "storedSinceStart": 11 }
+             "maxArtworks": 1500, "storedSinceStart": 11, "playedSinceStart": 0 }
 }
 ```
 
@@ -142,7 +144,7 @@ sizes are in bytes.
 | `tasks` | `lowestFree` is the least stack each task has had spare. `loader` is short-lived and appears once it has run |
 | `artwork` | Artworks downloaded since startup and the size of the largest |
 | `card` | The microSD card. `present` means a card answered; `mounted` that it has a FAT file system the board can read; `ready` that it also passed a write test. When it cannot be used, `problem` says why. The card is never formatted by the board |
-| `cache` | Artworks saved on the card. `budgetBytes` is the most the cache will use (at most 1 GB, always leaving 64 MB of the card free); beyond that, or past `maxArtworks`, the artwork that has gone longest unplayed is removed |
+| `cache` | Artworks saved on the card. `budgetBytes` is the most the cache will use (at most 1 GB, always leaving 64 MB of the card free); beyond that, or past `maxArtworks`, the artwork that has gone longest unplayed is removed. `playedSinceStart` counts artworks played from the card while offline |
 
 ### `POST /next`
 

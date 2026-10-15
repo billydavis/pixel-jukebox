@@ -163,7 +163,13 @@ function render(online){
   if(!online||!st)return;
 
   const art=st.artwork,slot=st.slot.name,img=$('art'),msg=$('msg');
-  if(art){
+  if(art&&!art.gifUrl){
+    // Played from the board's card: there is no web address to preview it from.
+    img.hidden=true;img.removeAttribute('src');delete img.dataset.post;
+    msg.hidden=false;msg.className='';msg.textContent='Playing from the card';
+    $('who').textContent=art.owner?'@'+art.owner:'Unknown artist';
+    $('sub').textContent='Makapix post '+art.postId+', offline copy';
+  }else if(art){
     if(img.dataset.post!=art.postId){img.dataset.post=art.postId;img.src=art.gifUrl;}
     img.alt='Artwork by '+art.owner;
     img.hidden=false;msg.hidden=true;

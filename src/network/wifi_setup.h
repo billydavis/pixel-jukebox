@@ -18,6 +18,9 @@ bool wifiHasCredentials();
 // Joins the stored network. Returns false if it is not connected in time.
 bool wifiConnect(uint32_t timeoutMs);
 
+// Asks the Wi-Fi driver to try the stored network again and returns at once.
+void wifiRetry();
+
 // Restarts into the setup hotspot. The saved network is kept, and is used
 // again if nobody completes setup.
 void wifiRequestSetup();

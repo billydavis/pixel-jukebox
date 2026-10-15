@@ -100,6 +100,7 @@ static void handleStatus() {
     artwork["postId"] = status.postId;
     artwork["owner"] = status.owner;
     artwork["gifUrl"] = status.gifUrl;
+    artwork["source"] = status.fromCache ? "card" : "makapix";
   } else {
     doc["artwork"] = nullptr;
   }

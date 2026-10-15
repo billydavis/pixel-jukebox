@@ -15,4 +15,19 @@ void artCacheBegin();
 // loudly: a card problem only means the artwork is not cached.
 void artCacheStore(uint32_t postId, const String &owner, uint32_t dwellMs, const uint8_t *data, size_t size);
 
+// True when there is at least one artwork to play without a connection.
+bool artCacheAvailable();
+
+struct CachedArtwork {
+  uint32_t postId;
+  String owner;
+  uint32_t dwellMs;
+  uint8_t *data; // PSRAM, freed by the caller
+  size_t size;
+};
+
+// Reads the next artwork in a shuffled pass through the cache. An artwork that
+// cannot be read is removed and the next one tried. Loader task only.
+bool artCacheTake(CachedArtwork &artwork);
+
 void artCacheReport(JsonObject report);

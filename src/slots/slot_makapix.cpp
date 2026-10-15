@@ -37,9 +37,28 @@ static LoadStatus pendingStatus;
 static SemaphoreHandle_t loaderDone;
 static bool loading = false;
 
+// The next artwork from the card, when Makapix cannot supply one.
+static bool loadFromCache(LoadedArtwork &loaded) {
+  CachedArtwork cached;
+  if (!artCacheTake(cached)) {
+    return false;
+  }
+  makapix::Artwork artwork;
+  artwork.postId = cached.postId;
+  artwork.ownerHandle = cached.owner;
+  artwork.dwellMs = cached.dwellMs;
+  artwork.fromCache = true;
+  loaded = {artwork, cached.data, cached.size};
+  return true;
+}
+
 // Takes the next artwork from the queue (fetching a new page when it runs out)
-// and downloads it, skipping ones that fail to download.
+// and downloads it, skipping ones that fail to download. Without a connection,
+// or when Makapix cannot be reached, it plays from the card instead.
 static LoadStatus loadNext(LoadedArtwork &loaded) {
+  if (WiFi.status() != WL_CONNECTED) {
+    return loadFromCache(loaded) ? LoadStatus::Ready : LoadStatus::Failed;
+  }
   for (int attempt = 0; attempt < MAX_LOAD_ATTEMPTS; attempt++) {
     if (queueIndex >= queue.size()) {
       queueIndex = 0;
@@ -48,7 +67,7 @@ static LoadStatus loadNext(LoadedArtwork &loaded) {
         return LoadStatus::Unauthorized;
       }
       if (status == makapix::QueryStatus::Failed || queue.empty()) {
-        return LoadStatus::Failed;
+        return loadFromCache(loaded) ? LoadStatus::Ready : LoadStatus::Failed;
       }
       Serial.printf("Queued %u artworks\n", (unsigned)queue.size());
     }
@@ -70,7 +89,7 @@ static LoadStatus loadNext(LoadedArtwork &loaded) {
     loaded = {artwork, data, size};
     return LoadStatus::Ready;
   }
-  return LoadStatus::Failed;
+  return loadFromCache(loaded) ? LoadStatus::Ready : LoadStatus::Failed;
 }
 
 static void loaderTask(void *) {
@@ -98,8 +117,9 @@ void MakapixSlot::begin() {
 
 bool MakapixSlot::start() {
   mode = Mode::Idle;
-  if (WiFi.status() != WL_CONNECTED && !loading) {
-    return false;
+  if (WiFi.status() != WL_CONNECTED) {
+    // Offline: the loader can still play from the card.
+    return (loading || artCacheAvailable()) ? startPlaying() : false;
   }
   return makapix::isRegistered() ? startPlaying() : startRegistration();
 }
@@ -148,8 +168,8 @@ bool MakapixSlot::startPlaying() {
 
   LoadedArtwork current = pending;
   startLoading(); // preload the next one while this one plays
-  Serial.printf("Playing post %u (%u bytes)\n", (unsigned)current.artwork.postId,
-                (unsigned)current.size);
+  Serial.printf("Playing post %u (%u bytes%s)\n", (unsigned)current.artwork.postId, (unsigned)current.size,
+                current.artwork.fromCache ? ", from the card" : "");
   if (!gifOpen(current.data, current.size)) {
     free(current.data);
     return false;
@@ -160,7 +180,7 @@ bool MakapixSlot::startPlaying() {
   if (shareUrl.startsWith("http://")) {
     shareUrl = "https://" + shareUrl.substring(7);
   }
-  statusSetArtwork(current.artwork.postId, current.artwork.ownerHandle, shareUrl);
+  statusSetArtwork(current.artwork.postId, current.artwork.ownerHandle, shareUrl, current.artwork.fromCache);
   mode = Mode::Playing;
   startedAt = millis();
   data = current.data;
