@@ -27,6 +27,14 @@ static const uint32_t COMMAND_POLL_MS = 5;
 static size_t skippedInARow = 0;
 static uint16_t *outgoing = nullptr; // the frame a transition starts from
 
+// The slot has no card-detect switch, so a card is only looked for at start-up.
+static void restartBoard() {
+  Serial.println("Command: restart");
+  showMessage("Pixel", "Jukebox\nrestarting", colour::amber());
+  delay(MESSAGE_MS);
+  ESP.restart();
+}
+
 // Two small bars in the top-right corner while the current slot is held.
 static void drawHoldMarker() {
   uint16_t white = display->color565(255, 255, 255);
@@ -71,6 +79,9 @@ static void runSlot(Slot *slot) {
           case CommandType::WifiSetup:
             connectionEnterSetup();
             break;
+          case CommandType::Restart:
+            restartBoard();
+            break;
           case CommandType::SetBrightness:
             Serial.printf("Command: brightness %u\n", command.value);
             displaySetBrightness(command.value);
@@ -105,6 +116,8 @@ static void handleCommandsWhileIdle() {
       displaySetBrightness(command.value);
     } else if (command.type == CommandType::WifiSetup) {
       connectionEnterSetup();
+    } else if (command.type == CommandType::Restart) {
+      restartBoard();
     }
   }
 }

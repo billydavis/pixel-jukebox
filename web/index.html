@@ -72,6 +72,9 @@ button.sm:disabled{box-shadow:3px 3px 0 var(--edge)}
 select{flex:1;min-width:0;min-height:44px;padding:0 10px;border:0;border-radius:0;
   font:15px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--panel)}
 .field{display:block;margin:20px 0 8px;font:13px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0 0 12px;font:13px/1.4 var(--mono)}
+.facts dt{color:var(--dim)}
+.facts dd{margin:0;color:var(--ink)}
 .note.wifi{margin:0 0 14px}
 .note{margin:10px 0 0;min-height:1.4em;font:12px/1.4 var(--mono);color:var(--dim)}
 footer{font:12px/1.6 var(--mono);color:var(--dim);text-align:center;overflow-wrap:anywhere}
@@ -131,6 +134,12 @@ kbd{font:inherit;color:var(--ink)}
         <select id="trans"></select>
       </div>
       <p class="note" id="rotnote" role="status"></p>
+    </details>
+    <details class="rot" id="cardbox">
+      <summary>Card</summary>
+      <dl class="facts" id="cardfacts"></dl>
+      <p class="note wifi" id="cardnote" role="status">&nbsp;</p>
+      <button id="restart" class="sm">Restart panel</button>
     </details>
     <details class="rot">
       <summary>Wi-Fi</summary>
@@ -269,6 +278,45 @@ $('wifi').onclick=()=>{
   $('wifi').disabled=true;$('wifi').textContent='Restarting';
   $('wifinote').textContent='Join the Pixel-Jukebox network on your phone to choose a new network.';
   call('POST','/wifi/setup').catch(()=>{});
+};
+
+function size(bytes){
+  return bytes>=1<<30?(bytes/(1<<30)).toFixed(1)+' GB':bytes>=1<<20?Math.round(bytes/(1<<20))+' MB':Math.round(bytes/1024)+' KB';
+}
+async function loadCard(){
+  const facts=$('cardfacts'),note=$('cardnote');
+  try{
+    const r=await call('GET','/card'),c=r.card,k=r.cache,rows=[];
+    if(c.ready){
+      rows.push(['Status','Ready'],['Card',c.type+', '+c.fileSystem+', '+size(c.capacityBytes)],
+        ['Free',size(c.freeBytes)],['Offline copies',k.artworks+' artworks, '+size(k.bytes)],
+        ['Played offline',k.playedSinceStart+' since the panel started']);
+      note.textContent='Art played online is saved here and shown when Makapix or the Wi-Fi is down.';
+    }else{
+      rows.push(['Status',c.present?'Card not usable':'No card']);
+      note.textContent=c.present?'The card '+c.problem.replace(/^the card /,'')+'. Then restart the panel.'
+        :'Put in a FAT32 card and restart the panel to keep offline copies of the art.';
+    }
+    facts.textContent='';
+    rows.forEach(([k2,v])=>{
+      const dt=document.createElement('dt'),dd=document.createElement('dd');
+      dt.textContent=k2;dd.textContent=v;facts.append(dt,dd);
+    });
+  }catch(e){note.textContent='Could not read the card status.';}
+}
+$('cardbox').ontoggle=()=>{if($('cardbox').open)loadCard();};
+let restartArmed=0;
+$('restart').onclick=()=>{
+  if(!restartArmed){
+    restartArmed=setTimeout(()=>{restartArmed=0;$('restart').textContent='Restart panel';},6000);
+    $('restart').textContent='Tap again to confirm';
+    return;
+  }
+  clearTimeout(restartArmed);restartArmed=0;
+  $('restart').textContent='Restarting';
+  $('cardnote').textContent='The panel is restarting. This page reconnects by itself.';
+  call('POST','/restart').catch(()=>{});
+  setTimeout(()=>{$('restart').textContent='Restart panel';loadCard();},15000);
 };
 
 let rot=null;

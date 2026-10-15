@@ -61,6 +61,8 @@ the reply is `503` and nothing is queued.
 | `GET` | (the base path, `/api/v1`) | Device name and API base path |
 | `GET` | `/status` | What the panel is showing, plus device information |
 | `GET` | `/diagnostics` | Memory and task headroom |
+| `GET` | `/card` | The microSD card and the offline artwork on it |
+| `POST` | `/restart` | Restart the board |
 | `POST` | `/next` | Skip to the next slot |
 | `POST` | `/hold` | Hold or release the current slot |
 | `GET` | `/brightness` | Read the brightness |
@@ -145,6 +147,19 @@ sizes are in bytes.
 | `artwork` | Artworks downloaded since startup and the size of the largest |
 | `card` | The microSD card. `present` means a card answered; `mounted` that it has a FAT file system the board can read; `ready` that it also passed a write test. When it cannot be used, `problem` says why. The card is never formatted by the board |
 | `cache` | Artworks saved on the card. `budgetBytes` is the most the cache will use (at most 1 GB, always leaving 64 MB of the card free); beyond that, or past `maxArtworks`, the artwork that has gone longest unplayed is removed. `playedSinceStart` counts artworks played from the card while offline |
+
+### `GET /card`
+
+The `card` and `cache` blocks of `GET /diagnostics` on their own: whether a
+card is present and usable, its size and free space, and the artworks stored
+on it for playing offline. The fields are described under `GET /diagnostics`.
+
+### `POST /restart`
+
+Restarts the board. No body. Reply: `202 {"queued":"restart"}`; the API stops
+answering for a few seconds while it starts again. The card slot has no
+card-detect switch, so a card is only looked for at start-up: restart after
+inserting or swapping one.
 
 ### `POST /next`
 

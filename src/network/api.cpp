@@ -233,6 +233,15 @@ static void handlePutTransition() {
   sendTransition();
 }
 
+static void handleCard() {
+  JsonDocument doc;
+  cardReport(doc["card"].to<JsonObject>());
+  artCacheReport(doc["cache"].to<JsonObject>());
+  sendJson(200, doc);
+}
+
+static void handleRestart() { sendQueued(commandSend(CommandType::Restart), "restart"); }
+
 static void handleWifiSetup() { sendQueued(commandSend(CommandType::WifiSetup), "wifiSetup"); }
 
 static void sendSlots() {
@@ -318,6 +327,8 @@ void apiBegin() {
   server.on(API_BASE "/mode", HTTP_PUT, handlePutMode);
   server.on(API_BASE "/transition", HTTP_GET, handleGetTransition);
   server.on(API_BASE "/transition", HTTP_PUT, handlePutTransition);
+  server.on(API_BASE "/card", HTTP_GET, handleCard);
+  server.on(API_BASE "/restart", HTTP_POST, handleRestart);
   server.on(API_BASE "/wifi/setup", HTTP_POST, handleWifiSetup);
   server.on(API_BASE "/slots", HTTP_GET, handleGetSlots);
   server.on(API_BASE "/slots", HTTP_PUT, handlePutSlots);

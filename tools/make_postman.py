@@ -71,6 +71,13 @@ FOLDERS = [
         ("Transition: Mosaic", "PUT", "transition",
          "Always uses one effect. Any name from Get Transition works here.", {"transition": "mosaic"}, 200),
     ]),
+    ("Card", [
+        ("Get Card", "GET", "card",
+         "The microSD card and the offline artwork cache on it.", None, 200),
+        ("Restart Panel", "POST", "restart",
+         "Restarts the board. The card is only looked for at start-up, so do this after inserting one.",
+         None, 202),
+    ]),
     ("Wi-Fi", [
         ("Start Wi-Fi Setup", "POST", "wifi/setup",
          "Restarts the board into its setup hotspot (network name Pixel-Jukebox). The board goes offline; "

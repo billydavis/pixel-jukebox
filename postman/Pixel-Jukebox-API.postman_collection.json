@@ -1021,6 +1021,79 @@
       ]
     },
     {
+      "name": "Card",
+      "item": [
+        {
+          "name": "Get Card",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/card",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "card"
+              ]
+            },
+            "description": "The microSD card and the offline artwork cache on it."
+          },
+          "response": []
+        },
+        {
+          "name": "Restart Panel",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 202', function () {",
+                  "  pm.response.to.have.status(202);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/restart",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "restart"
+              ]
+            },
+            "description": "Restarts the board. The card is only looked for at start-up, so do this after inserting one."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Wi-Fi",
       "item": [
         {

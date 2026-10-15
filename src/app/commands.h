@@ -11,6 +11,7 @@ enum class CommandType : uint8_t {
   SetBrightness, // value: 0-255
   WifiSetup,     // restart into the Wi-Fi setup hotspot
   Reload,        // the mode changed: end the current slot and start the right one
+  Restart,       // restart the board, for instance after a card is inserted
 };
 
 struct Command {

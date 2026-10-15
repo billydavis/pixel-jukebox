@@ -99,6 +99,10 @@ try:
     check("diagnostics shows no crash since startup",
           body.get("lastReset") not in ("crash", "watchdog", "brownout"), body.get("lastReset"))
 
+    code, body = call("GET", "/card")
+    check("card status reports the card and the cache",
+          code == 200 and "present" in body.get("card", {}) and "enabled" in body.get("cache", {}), body)
+
     section("Mode")
     call("PUT", "/mode", {"mode": "rotation"})
     check("starts from rotation mode", wait_for(lambda s: s["mode"] == "rotation" and s["slot"]["name"], 25))
