@@ -279,6 +279,26 @@ the regrouped source.
 | 5 | Tests and CI | Tests done; CI deferred by choice |
 | 6 | Reduce duplicated metadata | Done |
 
-Still open, by decision and not by oversight: the CI build (step 2), and a
-day-long soak reading of `GET /diagnostics` to rule out a slow leak.
+Still open, by decision and not by oversight: the CI build (step 2).
+
+## Soak result
+
+Read from `GET /diagnostics` after 29 hours of continuous running on firmware
+0.10.0, in the normal rotation with random transitions, with no restart in
+that time.
+
+| Measure | After 9 minutes (step 1) | After 29 hours |
+|---|---|---|
+| Internal heap free | 135,868 | 137,484 |
+| Internal heap, lowest seen | 61,700 | 64,968 |
+| Largest free heap block | 81,908 | 98,292 |
+| PSRAM, lowest free seen | 16.5 MB | 16.0 MB |
+| Task stacks, lowest free | 5,864 / 5,816 / 10,356 / 1,252 | 5,832 / 5,768 / 10,336 / 1,244 |
+| Artworks downloaded | 68 | 2,947 |
+| Largest artwork | 188 KB | 484 KB |
+
+There is no leak: free heap is unchanged after 2,947 artworks, and the largest
+free block has not shrunk, so the heap is not fragmenting either. Peak PSRAM
+use was about 0.8 MB, with the largest artwork at 484 KB against the 4 MB
+limit. The step 1 conclusions stand.
 

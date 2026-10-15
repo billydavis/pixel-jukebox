@@ -51,7 +51,7 @@ FOLDERS = [
     ("Brightness", [
         ("Get Brightness", "GET", "brightness", "Reads the brightness (0-255).", None, 200),
         ("Set Brightness", "PUT", "brightness",
-         "Sets the brightness (0-255). Saved on the board. On USB-C power, white tints above about 32.",
+         "Sets the brightness (0-255). Saved on the board.",
          {"value": 32}, 202),
     ]),
     ("Rotation", [

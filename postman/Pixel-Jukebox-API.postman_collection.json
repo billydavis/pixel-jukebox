@@ -687,7 +687,7 @@
                 "brightness"
               ]
             },
-            "description": "Sets the brightness (0-255). Saved on the board. On USB-C power, white tints above about 32.",
+            "description": "Sets the brightness (0-255). Saved on the board.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"value\": 32\n}",

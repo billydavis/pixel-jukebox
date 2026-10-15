@@ -179,8 +179,9 @@ brightness is left unchanged. Reply: `202 {"queued":"brightness"}`.
 The value is saved on the board and restored after a restart.
 
 Brightness is limited by the 5V supply, not by the API. When the supply cannot
-keep up, white turns yellow and then red. On the board's USB-C power port this
-starts above about 32.
+keep up, white turns yellow and then red at higher settings. If that happens,
+check the panel's power lead is properly connected and the supply is rated
+high enough.
 
 ### `GET /mode`
 

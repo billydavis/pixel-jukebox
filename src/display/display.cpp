@@ -5,7 +5,8 @@
 
 #include "pins.h"
 
-// 0-255. Over the USB-C power port, white tints yellow at 64 and red at 128.
+// 0-255. The starting value on a new board; a brightness set through the API
+// is saved and used instead.
 static const uint8_t DEFAULT_BRIGHTNESS = 32;
 
 static const int W = PANEL_RES_X;
