@@ -33,6 +33,7 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 | Area | What's included |
 |---|---|
 | **Slots** | Rotates through screens: by default three artworks, then a clock for 10 seconds. The rotation is editable from the control page and saved on the board |
+| **Artwork cache** | With a microSD card in the slot, every artwork played is saved to it (up to 1,500 pieces or 1 GB), for playing without a connection. No card, no cache; the card is never formatted by the board |
 | **Transitions** | Thirteen effects between slots, such as mosaic, melt, dissolve and slide. Random by default, or pick one, or turn them off. They never eat into a slot's time on screen |
 | **Button** | BOOT button: short press skips to the next slot, long press holds the current one, a 5-second hold starts Wi-Fi setup |
 | **Sound mode** | Switch from the artwork to a visualizer driven by the onboard microphones: spectrum bars, VU meter, oscilloscope or fire. It stays on until you switch back, and scales itself to how loud the room is |
@@ -54,6 +55,7 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 |---|---|
 | Waveshare ESP32-S3-RGB-Matrix | Driver board; ESP32-S3 with 32 MB octal flash and 16 MB octal PSRAM |
 | Waveshare RGB-Matrix-P2-64x64 | HUB75 panel, 2 mm pitch, 1/32 scan |
+| microSD card (optional) | Any size, formatted FAT32 (or FAT16) on a computer first. Cards of 64 GB and up usually come as exFAT, which the board cannot read |
 | 5V supply | Waveshare advises 4 A per panel. Make sure the panel's power lead is firmly connected: a poor connection makes white turn yellow or red as brightness rises |
 
 Pin mapping is in [`include/pins.h`](include/pins.h).
@@ -193,6 +195,9 @@ The firmware source is grouped by area. `#include` paths are written from `src/`
 | `src/network/api.cpp` | HTTP server and mDNS |
 | `src/network/makapix.cpp` | Makapix player API and stored credentials |
 | `src/network/web_assets.h` | Names for the `web/` files once they are embedded in the firmware |
+| **`src/storage/`** | **The microSD card** |
+| `src/storage/card.cpp` | Finding and mounting the card, never formatting it |
+| `src/storage/art_cache.cpp` | Saving played artworks to the card, within a size budget |
 | **Outside `src/`** | |
 | `web/` | The control page and the Wi-Fi setup pages, as ordinary HTML and CSS files |
 | `lib/jukebox_core/` | Hardware-free logic, covered by the unit tests |
@@ -234,7 +239,7 @@ Checks the pages in `web/` for duplicate element IDs, script references to IDs t
 powershell -File tools/run_unit_tests.ps1
 ```
 
-Runs the unit tests in `test/` for the hardware-free code in `lib/jukebox_core` (small-GIF padding, HTML escaping, rotation rules, the visualizers' frequency maths, the transitions). It compiles them on the PC with the Visual Studio C++ compiler, so it takes a few seconds and needs no board.
+Runs the unit tests in `test/` for the hardware-free code in `lib/jukebox_core` (small-GIF padding, HTML escaping, rotation rules, the visualizers' frequency maths, the transitions, the cache index). It compiles them on the PC with the Visual Studio C++ compiler, so it takes a few seconds and needs no board.
 
 The same tests also run on the board itself, built by the ESP32 compiler, with `pio test -e waveshare-s3-rgb-matrix`. That replaces the firmware, so upload the regular firmware again afterwards.
 

@@ -127,7 +127,11 @@ sizes are in bytes.
     { "name": "display", "stack": 8192, "lowestFree": 5864 },
     { "name": "api", "stack": 8192, "lowestFree": 5816 }
   ],
-  "artwork": { "downloaded": 42, "largestBytes": 187850 }
+  "artwork": { "downloaded": 42, "largestBytes": 187850 },
+  "card": { "present": true, "mounted": true, "ready": true, "type": "SD", "capacityBytes": 2032664576,
+            "fileSystem": "FAT32", "totalBytes": 2027028480, "freeBytes": 2026909696 },
+  "cache": { "enabled": true, "artworks": 11, "bytes": 66985, "budgetBytes": 1073741824,
+             "maxArtworks": 1500, "storedSinceStart": 11 }
 }
 ```
 
@@ -137,6 +141,8 @@ sizes are in bytes.
 | `heap`, `psram` | Internal and external memory. `lowestFree` is the least that has been free since startup; `largestBlock` is the biggest single allocation possible now |
 | `tasks` | `lowestFree` is the least stack each task has had spare. `loader` is short-lived and appears once it has run |
 | `artwork` | Artworks downloaded since startup and the size of the largest |
+| `card` | The microSD card. `present` means a card answered; `mounted` that it has a FAT file system the board can read; `ready` that it also passed a write test. When it cannot be used, `problem` says why. The card is never formatted by the board |
+| `cache` | Artworks saved on the card. `budgetBytes` is the most the cache will use (at most 1 GB, always leaving 64 MB of the card free); beyond that, or past `maxArtworks`, the artwork that has gone longest unplayed is removed |
 
 ### `POST /next`
 

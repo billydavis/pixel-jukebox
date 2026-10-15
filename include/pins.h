@@ -34,3 +34,9 @@
 #define SPEAKER_AMP_PIN 11 // high = amplifier on
 
 #define BUTTON_PIN 0 // BOOT button, low when pressed
+
+// microSD slot, 1-bit SD bus. Source: p64's hardware tests on the same board
+// (github.com/fabkury/p64, firmware/main/Kconfig.projbuild).
+#define SD_CLK_PIN 1
+#define SD_CMD_PIN 44
+#define SD_D0_PIN 17

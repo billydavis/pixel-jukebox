@@ -16,6 +16,8 @@
 #include "app/rotation.h"
 #include "app/status.h"
 #include "app/telemetry.h"
+#include "storage/art_cache.h"
+#include "storage/card.h"
 #include "app/transition.h"
 
 static const uint32_t MESSAGE_MS = 1500;
@@ -117,6 +119,8 @@ void setup() {
   drawTestPattern();
   delay(1500);
   runDiagnostics();
+  cardBegin();
+  artCacheBegin();
 
   telemetryRegisterTask("display", xTaskGetCurrentTaskHandle(), getArduinoLoopTaskStackSize());
   connectionStart();

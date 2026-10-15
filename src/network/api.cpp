@@ -14,6 +14,8 @@
 #include "app/telemetry.h"
 #include "app/transition.h"
 #include "network/web_assets.h"
+#include "storage/art_cache.h"
+#include "storage/card.h"
 #include "transitions.h"
 
 #define API_BASE "/api/v1"
@@ -111,6 +113,8 @@ static void handleStatus() {
 static void handleDiagnostics() {
   JsonDocument doc;
   telemetryReport(doc.to<JsonObject>());
+  cardReport(doc["card"].to<JsonObject>());
+  artCacheReport(doc["cache"].to<JsonObject>());
   sendJson(200, doc);
 }
 

@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "cache_index.h"
 #include "gif_pad.h"
 #include "html_escape.h"
 #include "rotation_rules.h"
@@ -376,6 +377,88 @@ static void test_transitions_wipe_only_moves_the_edge() {
   }
 }
 
+// --- cache_index -----------------------------------------------------------
+
+static cache::Entry cacheStorage[8];
+
+static void test_cache_records_survive_a_round_trip() {
+  cache::Index index(cacheStorage, 8);
+  cache::Entry entry = cache::Index::make(4242, 7, 30000, 1234, "Odio");
+  std::string line = cache::Index::addLine(entry);
+  TEST_ASSERT_EQUAL_STRING("A 4242 7 30000 1234 Odio\n", line.c_str());
+
+  TEST_ASSERT_TRUE(index.apply(line.c_str()));
+  const cache::Entry *found = index.find(4242);
+  TEST_ASSERT_NOT_NULL(found);
+  TEST_ASSERT_EQUAL_UINT32(7, found->seq);
+  TEST_ASSERT_EQUAL_UINT32(30000, found->dwellMs);
+  TEST_ASSERT_EQUAL_UINT32(1234, found->bytes);
+  TEST_ASSERT_EQUAL_STRING("Odio", found->owner);
+}
+
+static void test_cache_replay_keeps_the_latest_and_honours_removals() {
+  cache::Index index(cacheStorage, 8);
+  const char *log[] = {"A 1 1 30000 100 alpha\n", "A 2 2 30000 200 beta\n", "A 1 3 30000 100 alpha\n",
+                       "R 2\n", "A 3 4 15000 300 gamma\n"};
+  for (const char *line : log) {
+    TEST_ASSERT_TRUE(index.apply(line));
+  }
+  TEST_ASSERT_EQUAL_INT(2, index.count());
+  TEST_ASSERT_EQUAL_UINT32(3, index.find(1)->seq); // the later record wins
+  TEST_ASSERT_NULL(index.find(2));
+  TEST_ASSERT_EQUAL_UINT64(400, index.totalBytes());
+  TEST_ASSERT_EQUAL_UINT32(5, index.nextSeq());
+}
+
+static void test_cache_ignores_damaged_lines() {
+  cache::Index index(cacheStorage, 8);
+  const char *bad[] = {"", "\n", "X 1 2 3 4 who\n", "A\n", "A 1 2 3\n", "A 1 2 3 4\n", // cut short
+                       "A 1 2 3 4 \n", "A x 2 3 4 who\n", "A 1 2 3 4z who\n", "A 0 2 3 4 who\n",
+                       "A 99999999999 2 3 4 who\n", "R\n", "R abc\n", "A -1 2 3 4 who\n"};
+  for (const char *line : bad) {
+    TEST_ASSERT_FALSE_MESSAGE(index.apply(line), line);
+  }
+  TEST_ASSERT_EQUAL_INT(0, index.count());
+}
+
+static void test_cache_oldest_is_the_lowest_sequence() {
+  cache::Index index(cacheStorage, 8);
+  TEST_ASSERT_EQUAL_INT(-1, index.oldest());
+  index.put(cache::Index::make(10, 5, 0, 1, "a"));
+  index.put(cache::Index::make(11, 2, 0, 1, "b"));
+  index.put(cache::Index::make(12, 9, 0, 1, "c"));
+  TEST_ASSERT_EQUAL_UINT32(11, index.at(index.oldest()).postId);
+
+  index.put(cache::Index::make(11, 10, 0, 1, "b")); // played again: no longer the oldest
+  TEST_ASSERT_EQUAL_UINT32(10, index.at(index.oldest()).postId);
+}
+
+static void test_cache_stops_at_capacity_but_still_updates() {
+  cache::Index index(cacheStorage, 3);
+  for (uint32_t id = 1; id <= 3; id++) {
+    TEST_ASSERT_TRUE(index.put(cache::Index::make(id, id, 0, 1, "x")));
+  }
+  TEST_ASSERT_FALSE(index.put(cache::Index::make(4, 4, 0, 1, "x")));
+  TEST_ASSERT_TRUE(index.put(cache::Index::make(2, 9, 0, 1, "x"))); // existing entry
+  TEST_ASSERT_EQUAL_INT(3, index.count());
+  TEST_ASSERT_TRUE(index.remove(1));
+  TEST_ASSERT_FALSE(index.remove(1));
+  TEST_ASSERT_TRUE(index.put(cache::Index::make(4, 4, 0, 1, "x")));
+}
+
+static void test_cache_owner_names_cannot_break_a_line() {
+  cache::Entry entry = cache::Index::make(5, 1, 0, 1, "two words\nA 6 1 1 1 forged");
+  TEST_ASSERT_TRUE(strchr(entry.owner, ' ') == nullptr);
+  TEST_ASSERT_TRUE(strchr(entry.owner, '\n') == nullptr);
+
+  cache::Index index(cacheStorage, 8);
+  TEST_ASSERT_TRUE(index.apply(cache::Index::addLine(entry).c_str()));
+  TEST_ASSERT_EQUAL_INT(1, index.count()); // the forged record did not appear
+  TEST_ASSERT_EQUAL_STRING("-", cache::Index::make(5, 1, 0, 1, "").owner);
+  TEST_ASSERT_EQUAL_INT(cache::OWNER_CHARS - 1,
+                        (int)strlen(cache::Index::make(5, 1, 0, 1, "abcdefghijklmnopqrstuvwxyz0123456789").owner));
+}
+
 // ---------------------------------------------------------------------------
 
 static int runTests() {
@@ -415,6 +498,13 @@ static int runTests() {
   RUN_TEST(test_transitions_tolerate_progress_out_of_range);
   RUN_TEST(test_transitions_survive_a_full_sweep);
   RUN_TEST(test_transitions_wipe_only_moves_the_edge);
+
+  RUN_TEST(test_cache_records_survive_a_round_trip);
+  RUN_TEST(test_cache_replay_keeps_the_latest_and_honours_removals);
+  RUN_TEST(test_cache_ignores_damaged_lines);
+  RUN_TEST(test_cache_oldest_is_the_lowest_sequence);
+  RUN_TEST(test_cache_stops_at_capacity_but_still_updates);
+  RUN_TEST(test_cache_owner_names_cannot_break_a_line);
   return UNITY_END();
 }
 

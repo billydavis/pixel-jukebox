@@ -7,6 +7,7 @@
 #include "display/gif_player.h"
 #include "app/status.h"
 #include "app/telemetry.h"
+#include "storage/art_cache.h"
 
 static const uint32_t CODE_VALID_MS = 15 * 60 * 1000;
 static const uint32_t CODE_SHOW_MS = 45000; // per turn, so other slots still get shown
@@ -65,6 +66,7 @@ static LoadStatus loadNext(LoadedArtwork &loaded) {
       continue;
     }
     telemetryNoteImage(size);
+    artCacheStore(artwork.postId, artwork.ownerHandle, artwork.dwellMs, data, size);
     loaded = {artwork, data, size};
     return LoadStatus::Ready;
   }
