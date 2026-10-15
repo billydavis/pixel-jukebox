@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/badge/PlatformIO-Arduino-F5822A?logo=platformio&logoColor=white" />
     <img src="https://img.shields.io/badge/HUB75-64x64-8A2BE2" />
     <img src="https://img.shields.io/badge/Makapix-Club-FF4081" />
-    <img src="https://img.shields.io/badge/License-MIT-3DA639" />
+    <img src="https://img.shields.io/badge/License-Apache_2.0-3DA639" />
   </p>
 </div>
 
@@ -54,7 +54,7 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 |---|---|
 | Waveshare ESP32-S3-RGB-Matrix | Driver board; ESP32-S3 with 32 MB octal flash and 16 MB octal PSRAM |
 | Waveshare RGB-Matrix-P2-64x64 | HUB75 panel, 2 mm pitch, 1/32 scan |
-| 5V supply | Waveshare advises 4 A per panel; over the board's USB-C power port, white tints above brightness 32 |
+| 5V supply | Waveshare advises 4 A per panel. Make sure the panel's power lead is firmly connected: a poor connection makes white turn yellow or red as brightness rises |
 
 Pin mapping is in [`include/pins.h`](include/pins.h).
 
@@ -135,7 +135,7 @@ Three extra PlatformIO environments run a check at boot and then carry on as nor
 pio run -e colour-check -t upload
 ```
 
-Shows white at brightness 32, 64 and 128, then colour bars. If white turns yellow or red as the brightness rises, the 5V supply is sagging: lower the brightness or use a stronger supply.
+Shows white at brightness 32, 64 and 128, then colour bars. If white turns yellow or red as the brightness rises, the 5V supply is sagging: check the power wiring first, then the supply's rating.
 
 ```sh
 pio run -e speaker-test -t upload
@@ -270,10 +270,16 @@ Ideas borrowed from [Pixelix](https://github.com/BlueAndi/Pixelix), using parts 
 
 ## Acknowledgements
 
-Pixel Jukebox is inspired by [Pixelix](https://github.com/BlueAndi/Pixelix) by BlueAndi, a far more complete LED matrix firmware with a plugin system, web interface and its own Makapix player. Seeing Makapix art on a Pixelix display is what started this project. Pixel Jukebox is written from scratch as a learning project and shares no code with Pixelix.
+Pixel Jukebox has two inspirations. The first is [p64](https://github.com/fabkury/p64) by fabkury, who also runs Makapix Club. It is a desk display built on exactly the same Waveshare board and panel, and it is the reference this project turns to for feature ideas and for solutions to problems that hardware throws up. Pixel Jukebox is not a clone of p64 and is written independently, but because the two share their hardware, many of their choices will look alike.
+
+p64 is licensed under the Apache License 2.0. Where Pixel Jukebox adapts code from it rather than just an idea, the file says so and keeps p64's copyright and licence notice, as that licence requires.
+
+The second is [Pixelix](https://github.com/BlueAndi/Pixelix) by BlueAndi, a far more complete LED matrix firmware with a plugin system, web interface and its own Makapix player. It is a source of ideas only; Pixel Jukebox shares no code with Pixelix.
 
 Thanks also to [Makapix Club](https://makapix.club) for the open player API and its documentation, and to the authors of the libraries listed under Stack.
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE) for details.
+
+Versions up to and including firmware 0.10.0 (commit `55bd0d2`) were released under the MIT License, and copies taken under those terms remain under them.
