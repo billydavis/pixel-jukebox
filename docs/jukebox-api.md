@@ -62,6 +62,11 @@ the reply is `503` and nothing is queued.
 | `GET` | `/status` | What the panel is showing, plus device information |
 | `GET` | `/diagnostics` | Memory and task headroom |
 | `GET` | `/card` | The microSD card and the offline artwork on it |
+| `GET` | `/card/art` | The artworks saved on the card, a page at a time |
+| `GET` | `/card/art/{postId}.gif` | One saved artwork's GIF |
+| `POST` | `/card/art/{postId}/show` | Show a saved artwork now |
+| `DELETE` | `/card/art/{postId}` | Delete a saved artwork from the card |
+| `DELETE` | `/card/art` | Delete every saved artwork |
 | `POST` | `/restart` | Restart the board |
 | `POST` | `/next` | Skip to the next slot |
 | `POST` | `/hold` | Hold or release the current slot |
@@ -146,13 +151,58 @@ sizes are in bytes.
 | `tasks` | `lowestFree` is the least stack each task has had spare. `loader` is short-lived and appears once it has run |
 | `artwork` | Artworks downloaded since startup and the size of the largest |
 | `card` | The microSD card. `present` means a card answered; `mounted` that it has a FAT file system the board can read; `ready` that it also passed a write test. When it cannot be used, `problem` says why. The card is never formatted by the board |
-| `cache` | Artworks saved on the card. `budgetBytes` is the most the cache will use (at most 1 GB, always leaving 64 MB of the card free); beyond that, or past `maxArtworks`, the artwork that has gone longest unplayed is removed. `playedSinceStart` counts artworks played from the card while offline |
+| `cache` | Artworks saved on the card. `budgetBytes` is the most the cache will use (at most 1 GB, always leaving 64 MB of the card free); beyond that, or past `maxArtworks`, the artwork that has gone longest unplayed is removed. `playedSinceStart` counts artworks played from the card, offline or asked for from the gallery |
 
 ### `GET /card`
 
 The `card` and `cache` blocks of `GET /diagnostics` on their own: whether a
 card is present and usable, its size and free space, and the artworks stored
 on it for playing offline. The fields are described under `GET /diagnostics`.
+
+### `GET /card/art`
+
+The artworks saved on the card, the most recently played first. Query
+parameters: `offset` (default 0) and `limit` (default 24, at most 60).
+
+```json
+{
+  "artworks": [
+    { "postId": 2486, "owner": "Odio", "bytes": 1593, "dwellMs": 30000 }
+  ],
+  "offset": 0,
+  "total": 100
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `total` | Artworks on the card altogether |
+| `artworks[].bytes` | Size of the GIF on the card |
+| `artworks[].dwellMs` | How long the artist asked for it to be shown |
+
+With no usable card the list is empty and `total` is 0.
+
+### `GET /card/art/{postId}.gif`
+
+The GIF as saved on the card, `image/gif`. Browsers may keep it for a day,
+since a saved artwork never changes. `404` when it is not on the card.
+
+### `POST /card/art/{postId}/show`
+
+Shows a saved artwork on the panel as soon as the current slot gives way, with
+the usual transition, for the artwork's own time. The rotation then carries on
+where it was. Releases a hold. No body. Reply: `202 {"queued":"show"}`.
+`404` when it is not on the card; `409` in sound mode.
+
+### `DELETE /card/art/{postId}`
+
+Deletes one artwork from the card. Reply: `200 {"removed":2486}`; `404` when
+it is not on the card. If it is on the panel it finishes its turn.
+
+### `DELETE /card/art`
+
+Deletes every saved artwork. Reply: `200 {"removed":100}`. Art is saved again
+as it plays online.
 
 ### `POST /restart`
 

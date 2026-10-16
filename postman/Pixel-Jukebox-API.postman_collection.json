@@ -10,6 +10,12 @@
       "value": "192.168.4.105",
       "type": "string",
       "description": "The board's IP address or hostname, no scheme or port (e.g. 192.168.4.105 or pixel-jukebox.local)."
+    },
+    {
+      "key": "post_id",
+      "value": "2486",
+      "type": "string",
+      "description": "A postId from List Saved Art, for the requests on one saved artwork."
     }
   ],
   "item": [
@@ -1058,6 +1064,185 @@
           "response": []
         },
         {
+          "name": "List Saved Art",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/card/art",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "card",
+                "art"
+              ]
+            },
+            "description": "The artworks saved on the card, the most recently played first. Paged with offset and limit (up to 60); see the API document."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Saved Artwork Image",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/card/art/{{post_id}}.gif",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "card",
+                "art",
+                "{{post_id}}.gif"
+              ]
+            },
+            "description": "The GIF of one saved artwork. Set the post_id variable to a postId from List Saved Art."
+          },
+          "response": []
+        },
+        {
+          "name": "Show Saved Artwork",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 202', function () {",
+                  "  pm.response.to.have.status(202);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/card/art/{{post_id}}/show",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "card",
+                "art",
+                "{{post_id}}",
+                "show"
+              ]
+            },
+            "description": "Shows one saved artwork on the panel now; the rotation then carries on. 409 in sound mode."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Saved Artwork",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/card/art/{{post_id}}",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "card",
+                "art",
+                "{{post_id}}"
+              ]
+            },
+            "description": "Deletes one artwork from the card."
+          },
+          "response": []
+        },
+        {
+          "name": "Clear Saved Art",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/card/art",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "card",
+                "art"
+              ]
+            },
+            "description": "Deletes every artwork saved on the card. Art is saved again as it plays online."
+          },
+          "response": []
+        },
+        {
           "name": "Restart Panel",
           "event": [
             {
@@ -1311,6 +1496,43 @@
               ]
             },
             "description": "Expects 404."
+          },
+          "response": []
+        },
+        {
+          "name": "Artwork Not On The Card",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 404', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/card/art/999999999/show",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "card",
+                "art",
+                "999999999",
+                "show"
+              ]
+            },
+            "description": "Expects 404; nothing is shown."
           },
           "response": []
         },

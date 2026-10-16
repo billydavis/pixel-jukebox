@@ -4,8 +4,8 @@
 
 Looks for duplicate element IDs, script and label references to IDs that do not
 exist, anything loaded from outside the board, placeholders the firmware does
-not fill in, and colour tokens that differ between the control page and the
-setup pages. Needs no board. Exits non-zero if anything is wrong.
+not fill in, and colour tokens that differ between the control page, the
+gallery and the setup pages. Needs no board. Exits non-zero if anything is wrong.
 """
 
 import re
@@ -15,7 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
-PAGES = ["index.html", "setup.html", "setup_check.html", "setup_done.html"]
+PAGES = ["index.html", "gallery.html", "setup.html", "setup_check.html", "setup_done.html"]
 STYLESHEET = "setup.css"
 TOKENS = ["--bg", "--panel", "--edge", "--ink", "--dim", "--accent", "--accent-ink", "--held"]
 
@@ -100,13 +100,15 @@ for name in PAGES:
         if f'"{placeholder}"' not in firmware:
             problems.append(f"{name}: {placeholder} is never filled in by src/network/wifi_setup.cpp")
 
-control, setup = tokens(texts["index.html"]), tokens(texts[STYLESHEET])
-for name in TOKENS:
-    if not control[name] or not setup[name]:
-        problems.append(f"colour token {name} is missing from index.html or {STYLESHEET}")
-    elif control[name] != setup[name]:
-        problems.append(f"colour token {name} differs: index.html has {control[name]}, "
-                        f"{STYLESHEET} has {setup[name]}")
+control = tokens(texts["index.html"])
+for other in ("gallery.html", STYLESHEET):
+    theirs = tokens(texts[other])
+    for name in TOKENS:
+        if not control[name] or not theirs[name]:
+            problems.append(f"colour token {name} is missing from index.html or {other}")
+        elif control[name] != theirs[name]:
+            problems.append(f"colour token {name} differs: index.html has {control[name]}, "
+                            f"{other} has {theirs[name]}")
 
 for name, size in sizes.items():
     print(f"  {name:<18} {size:>6} bytes")

@@ -19,6 +19,7 @@
 #include "storage/art_cache.h"
 #include "storage/card.h"
 #include "app/transition.h"
+#include "slots/slot_makapix.h"
 
 static const uint32_t MESSAGE_MS = 1500;
 static const uint32_t SKIPPED_SLOT_MS = 200;
@@ -26,6 +27,7 @@ static const uint32_t COMMAND_POLL_MS = 5;
 
 static size_t skippedInARow = 0;
 static uint16_t *outgoing = nullptr; // the frame a transition starts from
+static uint32_t requestedPost = 0;   // an artwork asked for from the gallery
 
 // The slot has no card-detect switch, so a card is only looked for at start-up.
 static void restartBoard() {
@@ -82,6 +84,15 @@ static void runSlot(Slot *slot) {
           case CommandType::Restart:
             restartBoard();
             break;
+          case CommandType::ShowArtwork:
+            if (modeIsSound()) {
+              break;
+            }
+            Serial.printf("Command: show post %u\n", (unsigned)command.value);
+            requestedPost = command.value;
+            statusSetHeld(false);
+            slot->stop();
+            return;
           case CommandType::SetBrightness:
             Serial.printf("Command: brightness %u\n", command.value);
             displaySetBrightness(command.value);
@@ -118,6 +129,8 @@ static void handleCommandsWhileIdle() {
       connectionEnterSetup();
     } else if (command.type == CommandType::Restart) {
       restartBoard();
+    } else if (command.type == CommandType::ShowArtwork && !modeIsSound()) {
+      requestedPost = command.value;
     }
   }
 }
@@ -157,7 +170,15 @@ void loop() {
   // Sound mode shows one visualizer until the mode changes; otherwise the
   // rotation decides.
   bool sound = modeIsSound();
-  Slot *slot = sound ? modeSoundSlot() : rotationCurrent();
+  // An artwork asked for from the gallery plays between turns of the rotation,
+  // which then carries on where it was.
+  MakapixSlot *requested = nullptr;
+  if (!sound && requestedPost) {
+    requested = rotationArtworkSlot();
+    requested->request(requestedPost);
+    requestedPost = 0;
+  }
+  Slot *slot = sound ? modeSoundSlot() : requested ? requested : rotationCurrent();
 
   // For a transition, the slot draws its first frame off the panel while the
   // old picture stays up, then the two are blended. Sound mode switches at once.
@@ -182,6 +203,8 @@ void loop() {
     Serial.printf("Slot: %s\n", slot->name());
     runSlot(slot);
     statusSetSlot("");
+  } else if (requested) {
+    // Removed from the card since it was asked for: carry on with the rotation.
   } else if (sound) {
     // The microphones are unavailable, so go back to the rotation.
     Serial.println("Sound mode could not start");
@@ -200,7 +223,7 @@ void loop() {
     delay(SKIPPED_SLOT_MS);
     handleCommandsWhileIdle();
   }
-  if (!sound) {
+  if (!sound && !requested) {
     rotationAdvance();
   }
 }

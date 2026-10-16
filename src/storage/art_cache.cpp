@@ -1,5 +1,6 @@
 #include "storage/art_cache.h"
 
+#include <algorithm>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <vector>
@@ -205,6 +206,45 @@ static void forget(uint32_t postId) {
   appendLog(cache::Index::removeLine(postId));
 }
 
+// Reads an artwork's file into PSRAM, with room for gifPadSmall(). Null when
+// it is missing, too large or not a GIF. Called with the lock held.
+static uint8_t *readArt(uint32_t postId, size_t &size) {
+  FILE *file = fopen(artPath(postId).c_str(), "rb");
+  if (!file) {
+    return nullptr;
+  }
+  uint8_t *data = nullptr;
+  size = 0;
+  if (fseek(file, 0, SEEK_END) == 0) {
+    long length = ftell(file);
+    if (length > 6 && (uint64_t)length <= budget) {
+      size = length;
+      data = (uint8_t *)ps_malloc(size + GIF_PAD_BYTES);
+      if (data && (fseek(file, 0, SEEK_SET) != 0 || fread(data, 1, size, file) != size)) {
+        free(data);
+        data = nullptr;
+      }
+    }
+  }
+  fclose(file);
+  if (data && memcmp(data, "GIF8", 4) != 0) {
+    free(data);
+    data = nullptr;
+  }
+  return data;
+}
+
+// Hands out an artwork that has just been read, noting the play. Called with
+// the lock held.
+static void markPlayed(cache::Entry entry, uint8_t *data, size_t size, CachedArtwork &artwork) {
+  // Playing counts as use, so it is not the next to be removed.
+  entry.seq = catalogue->nextSeq();
+  catalogue->put(entry);
+  appendLog(cache::Index::addLine(entry));
+  played++;
+  artwork = {entry.postId, entry.owner, entry.dwellMs, data, gifPadSmall(data, size)};
+}
+
 // Every cached artwork once, in random order, then a fresh order.
 static bool nextInOrder(uint32_t &postId) {
   for (int pass = 0; pass < 2; pass++) {
@@ -236,42 +276,112 @@ bool artCacheTake(CachedArtwork &artwork) {
     if (!nextInOrder(postId)) {
       return false;
     }
-    cache::Entry entry = *catalogue->find(postId);
-
-    FILE *file = fopen(artPath(postId).c_str(), "rb");
-    uint8_t *data = nullptr;
-    size_t size = 0;
-    if (file && fseek(file, 0, SEEK_END) == 0) {
-      long length = ftell(file);
-      if (length > 6 && (uint64_t)length <= budget) {
-        size = length;
-        data = (uint8_t *)ps_malloc(size + GIF_PAD_BYTES);
-        if (data && (fseek(file, 0, SEEK_SET) != 0 || fread(data, 1, size, file) != size)) {
-          free(data);
-          data = nullptr;
-        }
-      }
-    }
-    if (file) {
-      fclose(file);
-    }
-    if (!data || memcmp(data, "GIF8", 4) != 0) {
-      free(data);
+    size_t size;
+    uint8_t *data = readArt(postId, size);
+    if (!data) {
       Serial.printf("Cache: post %u could not be read, removing it\n", (unsigned)postId);
       forget(postId);
       continue;
     }
-
-    // Playing counts as use, so it is not the next to be removed.
-    entry.seq = catalogue->nextSeq();
-    catalogue->put(entry);
-    appendLog(cache::Index::addLine(entry));
-    played++;
-
-    artwork = {postId, entry.owner, entry.dwellMs, data, gifPadSmall(data, size)};
+    markPlayed(*catalogue->find(postId), data, size, artwork);
     return true;
   }
   return false;
+}
+
+bool artCacheTakePost(uint32_t postId, CachedArtwork &artwork) {
+  if (!catalogue) {
+    return false;
+  }
+  Guard guard;
+  const cache::Entry *entry = catalogue->find(postId);
+  if (!entry) {
+    return false;
+  }
+  size_t size;
+  uint8_t *data = readArt(postId, size);
+  if (!data) {
+    Serial.printf("Cache: post %u could not be read, removing it\n", (unsigned)postId);
+    forget(postId);
+    return false;
+  }
+  markPlayed(*entry, data, size, artwork);
+  return true;
+}
+
+bool artCacheReadFile(uint32_t postId, uint8_t *&data, size_t &size) {
+  if (!catalogue) {
+    return false;
+  }
+  Guard guard;
+  if (!catalogue->find(postId)) {
+    return false;
+  }
+  data = readArt(postId, size);
+  return data != nullptr;
+}
+
+bool artCacheHas(uint32_t postId) {
+  if (!catalogue) {
+    return false;
+  }
+  Guard guard;
+  return catalogue->find(postId) != nullptr;
+}
+
+void artCacheList(uint32_t offset, uint32_t limit, JsonObject out) {
+  JsonArray items = out["artworks"].to<JsonArray>();
+  out["offset"] = offset;
+  if (!catalogue) {
+    out["total"] = 0;
+    return;
+  }
+  Guard guard;
+  std::vector<int> byRecent(catalogue->count());
+  for (int i = 0; i < catalogue->count(); i++) {
+    byRecent[i] = i;
+  }
+  std::sort(byRecent.begin(), byRecent.end(),
+            [](int a, int b) { return catalogue->at(a).seq > catalogue->at(b).seq; });
+  out["total"] = catalogue->count();
+  for (uint32_t i = offset; i < byRecent.size() && i < offset + limit; i++) {
+    const cache::Entry &entry = catalogue->at(byRecent[i]);
+    JsonObject item = items.add<JsonObject>();
+    item["postId"] = entry.postId;
+    item["owner"] = entry.owner;
+    item["bytes"] = entry.bytes;
+    item["dwellMs"] = entry.dwellMs;
+  }
+}
+
+bool artCacheRemove(uint32_t postId) {
+  if (!catalogue) {
+    return false;
+  }
+  Guard guard;
+  if (!catalogue->find(postId)) {
+    return false;
+  }
+  forget(postId);
+  return true;
+}
+
+int artCacheClear() {
+  if (!catalogue) {
+    return 0;
+  }
+  Guard guard;
+  int removed = catalogue->count();
+  for (int i = 0; i < removed; i++) {
+    remove(artPath(catalogue->at(i).postId).c_str());
+  }
+  catalogue->clear();
+  remove(LOG_FILE);
+  removeStrayFiles();
+  order.clear();
+  orderPosition = 0;
+  Serial.printf("Cache: cleared %d artworks\n", removed);
+  return removed;
 }
 
 void artCacheReport(JsonObject report) {

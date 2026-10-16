@@ -8,6 +8,8 @@
 #include "slots/slot_makapix.h"
 
 static MakapixSlot makapixSlot;
+
+MakapixSlot *rotationArtworkSlot() { return &makapixSlot; }
 static ClockSlot clockSlot;
 
 struct SlotType {

@@ -114,7 +114,7 @@ Brightness (0-255) is set through the API and remembered across restarts; the st
 
 ## Control page
 
-Open `http://pixel-jukebox.local` (or the board's IP address) in a browser on the same network. The page shows what is on the panel and who made it, with Hold, Next and a brightness slider, a Jukebox / Sound switch for choosing a visualizer, and a Rotation section for choosing which slots play, for how long, and with which transition between them. A Card section shows the microSD card's state and the offline copies on it, with a button to restart the panel after inserting a card. On a keyboard, `N` skips and `H` holds. It is a single file, [`web/index.html`](web/index.html), compiled into the firmware, with no external assets.
+Open `http://pixel-jukebox.local` (or the board's IP address) in a browser on the same network. The page shows what is on the panel and who made it, with Hold, Next and a brightness slider, a Jukebox / Sound switch for choosing a visualizer, and a Rotation section for choosing which slots play, for how long, and with which transition between them. A Card section shows the microSD card's state and the offline copies on it, with a button to restart the panel after inserting a card. **Browse saved art** opens a gallery of every artwork on the card, most recently played first: tap one to show it on the panel now or remove it, or clear the lot. On a keyboard, `N` skips and `H` holds. It is a single file, [`web/index.html`](web/index.html), compiled into the firmware, with no external assets.
 
 ## REST API
 

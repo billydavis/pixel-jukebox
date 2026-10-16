@@ -4,6 +4,7 @@
 #include <ESPmDNS.h>
 #include <WebServer.h>
 #include <WiFi.h>
+#include <uri/UriBraces.h>
 
 #include "app/commands.h"
 #include "config.h"
@@ -66,6 +67,8 @@ static bool readBody(JsonDocument &doc) {
 }
 
 static void handlePage() { server.send_P(200, "text/html", WEB_INDEX_HTML); }
+
+static void handleGalleryPage() { server.send_P(200, "text/html", WEB_GALLERY_HTML); }
 
 static void handleApiRoot() {
   JsonDocument doc;
@@ -240,6 +243,87 @@ static void handleCard() {
   sendJson(200, doc);
 }
 
+// --- the gallery of artworks cached on the card --------------------------------
+
+static const uint32_t GALLERY_PAGE_DEFAULT = 24;
+static const uint32_t GALLERY_PAGE_MAX = 60;
+
+// A whole-number query argument, or `fallback` when it is absent or not a number.
+static uint32_t numberArg(const char *name, uint32_t fallback) {
+  String text = server.arg(name);
+  if (text.isEmpty()) {
+    return fallback;
+  }
+  char *end;
+  unsigned long value = strtoul(text.c_str(), &end, 10);
+  return *end == '\0' ? value : fallback;
+}
+
+// The postId in the path, or 0 when it is not a plain number.
+static uint32_t pathPostId() {
+  String text = server.pathArg(0);
+  if (text.isEmpty() || text.length() > 9) {
+    return 0;
+  }
+  for (char c : text) {
+    if (!isdigit(c)) {
+      return 0;
+    }
+  }
+  return text.toInt();
+}
+
+static void handleListArt() {
+  JsonDocument doc;
+  uint32_t limit = numberArg("limit", GALLERY_PAGE_DEFAULT);
+  artCacheList(numberArg("offset", 0), limit < 1 ? 1 : min(limit, GALLERY_PAGE_MAX), doc.to<JsonObject>());
+  sendJson(200, doc);
+}
+
+static void handleArtImage() {
+  uint32_t postId = pathPostId();
+  uint8_t *data = nullptr;
+  size_t size = 0;
+  if (!postId || !artCacheReadFile(postId, data, size)) {
+    sendError(404, "That artwork is not on the card");
+    return;
+  }
+  // An artwork never changes once saved, so the browser may keep it.
+  server.sendHeader("Cache-Control", "max-age=86400");
+  server.send_P(200, "image/gif", (const char *)data, size);
+  free(data);
+}
+
+static void handleShowArt() {
+  uint32_t postId = pathPostId();
+  if (!postId || !artCacheHas(postId)) {
+    sendError(404, "That artwork is not on the card");
+    return;
+  }
+  if (modeIsSound()) {
+    sendError(409, "The panel is in sound mode; switch to rotation to show artwork");
+    return;
+  }
+  sendQueued(commandSend(CommandType::ShowArtwork, postId), "show");
+}
+
+static void handleRemoveArt() {
+  uint32_t postId = pathPostId();
+  if (!postId || !artCacheRemove(postId)) {
+    sendError(404, "That artwork is not on the card");
+    return;
+  }
+  JsonDocument doc;
+  doc["removed"] = postId;
+  sendJson(200, doc);
+}
+
+static void handleClearArt() {
+  JsonDocument doc;
+  doc["removed"] = artCacheClear();
+  sendJson(200, doc);
+}
+
 static void handleRestart() { sendQueued(commandSend(CommandType::Restart), "restart"); }
 
 static void handleWifiSetup() { sendQueued(commandSend(CommandType::WifiSetup), "wifiSetup"); }
@@ -316,6 +400,7 @@ void apiBegin() {
   started = true;
 
   server.on("/", HTTP_GET, handlePage);
+  server.on("/gallery", HTTP_GET, handleGalleryPage);
   server.on(API_BASE, HTTP_GET, handleApiRoot);
   server.on(API_BASE "/status", HTTP_GET, handleStatus);
   server.on(API_BASE "/diagnostics", HTTP_GET, handleDiagnostics);
@@ -328,6 +413,11 @@ void apiBegin() {
   server.on(API_BASE "/transition", HTTP_GET, handleGetTransition);
   server.on(API_BASE "/transition", HTTP_PUT, handlePutTransition);
   server.on(API_BASE "/card", HTTP_GET, handleCard);
+  server.on(API_BASE "/card/art", HTTP_GET, handleListArt);
+  server.on(API_BASE "/card/art", HTTP_DELETE, handleClearArt);
+  server.on(UriBraces(API_BASE "/card/art/{}.gif"), HTTP_GET, handleArtImage);
+  server.on(UriBraces(API_BASE "/card/art/{}/show"), HTTP_POST, handleShowArt);
+  server.on(UriBraces(API_BASE "/card/art/{}"), HTTP_DELETE, handleRemoveArt);
   server.on(API_BASE "/restart", HTTP_POST, handleRestart);
   server.on(API_BASE "/wifi/setup", HTTP_POST, handleWifiSetup);
   server.on(API_BASE "/slots", HTTP_GET, handleGetSlots);

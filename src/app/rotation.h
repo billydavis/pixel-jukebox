@@ -5,6 +5,8 @@
 
 #include "slots/slot.h"
 
+class MakapixSlot;
+
 // The order slots are shown in. Saved on the board and editable through the
 // API; every call is safe from any task.
 
@@ -38,3 +40,6 @@ void rotationAdvance();
 
 // Turns in one full pass.
 size_t rotationTurns();
+
+// The artwork slot, for showing one artwork outside the rotation.
+MakapixSlot *rotationArtworkSlot();

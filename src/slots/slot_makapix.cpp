@@ -117,6 +117,11 @@ void MakapixSlot::begin() {
 
 bool MakapixSlot::start() {
   mode = Mode::Idle;
+  if (requestedPost) {
+    uint32_t postId = requestedPost;
+    requestedPost = 0;
+    return showFromCard(postId);
+  }
   if (WiFi.status() != WL_CONNECTED) {
     // Offline: the loader can still play from the card.
     return (loading || artCacheAvailable()) ? startPlaying() : false;
@@ -168,6 +173,28 @@ bool MakapixSlot::startPlaying() {
 
   LoadedArtwork current = pending;
   startLoading(); // preload the next one while this one plays
+  return play(current);
+}
+
+// One artwork asked for from the gallery. The preloaded one stays waiting for
+// the next turn.
+bool MakapixSlot::showFromCard(uint32_t postId) {
+  LoadedArtwork requested;
+  CachedArtwork cached;
+  if (!artCacheTakePost(postId, cached)) {
+    Serial.printf("Post %u is no longer on the card\n", (unsigned)postId);
+    return false;
+  }
+  requested.artwork.postId = cached.postId;
+  requested.artwork.ownerHandle = cached.owner;
+  requested.artwork.dwellMs = cached.dwellMs;
+  requested.artwork.fromCache = true;
+  requested.data = cached.data;
+  requested.size = cached.size;
+  return play(requested);
+}
+
+bool MakapixSlot::play(const LoadedArtwork &current) {
   Serial.printf("Playing post %u (%u bytes%s)\n", (unsigned)current.artwork.postId, (unsigned)current.size,
                 current.artwork.fromCache ? ", from the card" : "");
   if (!gifOpen(current.data, current.size)) {

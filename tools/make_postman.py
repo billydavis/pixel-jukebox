@@ -74,6 +74,17 @@ FOLDERS = [
     ("Card", [
         ("Get Card", "GET", "card",
          "The microSD card and the offline artwork cache on it.", None, 200),
+        ("List Saved Art", "GET", "card/art",
+         "The artworks saved on the card, the most recently played first. Paged with offset and limit "
+         "(up to 60); see the API document.", None, 200),
+        ("Get Saved Artwork Image", "GET", "card/art/{{post_id}}.gif",
+         "The GIF of one saved artwork. Set the post_id variable to a postId from List Saved Art.", None, 200),
+        ("Show Saved Artwork", "POST", "card/art/{{post_id}}/show",
+         "Shows one saved artwork on the panel now; the rotation then carries on. 409 in sound mode.", None, 202),
+        ("Remove Saved Artwork", "DELETE", "card/art/{{post_id}}",
+         "Deletes one artwork from the card.", None, 200),
+        ("Clear Saved Art", "DELETE", "card/art",
+         "Deletes every artwork saved on the card. Art is saved again as it plays online.", None, 200),
         ("Restart Panel", "POST", "restart",
          "Restarts the board. The card is only looked for at start-up, so do this after inserting one.",
          None, 202),
@@ -90,6 +101,7 @@ FOLDERS = [
         ("Unknown Slot", "PUT", "slots", "Expects 400; the rotation is left unchanged.",
          {"rotation": [{"slot": "nope", "turns": 1}]}, 400),
         ("Unknown Endpoint", "GET", "nope", "Expects 404.", None, 404),
+        ("Artwork Not On The Card", "POST", "card/art/999999999/show", "Expects 404; nothing is shown.", None, 404),
         ("Unknown Visualizer", "PUT", "mode", "Expects 400; the mode is left unchanged.",
          {"mode": "sound", "visualizer": "nope"}, 400),
         ("Unknown Transition", "PUT", "transition", "Expects 400; the transition is left unchanged.",
@@ -137,6 +149,11 @@ collection = {
         "type": "string",
         "description": "The board's IP address or hostname, no scheme or port "
                        "(e.g. 192.168.4.105 or pixel-jukebox.local).",
+    }, {
+        "key": "post_id",
+        "value": "2486",
+        "type": "string",
+        "description": "A postId from List Saved Art, for the requests on one saved artwork.",
     }],
     "item": [{"name": folder, "item": [request(*entry) for entry in entries]} for folder, entries in FOLDERS],
 }

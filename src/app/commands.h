@@ -12,18 +12,19 @@ enum class CommandType : uint8_t {
   WifiSetup,     // restart into the Wi-Fi setup hotspot
   Reload,        // the mode changed: end the current slot and start the right one
   Restart,       // restart the board, for instance after a card is inserted
+  ShowArtwork,   // value: a postId cached on the card, to show now
 };
 
 struct Command {
   CommandType type;
-  uint8_t value;
+  uint32_t value;
 };
 
 // Creates the queue and starts watching the BOOT button:
 // short press = Next, long press = ToggleHold, held for 5 seconds = WifiSetup.
 void commandsBegin();
 
-bool commandSend(CommandType type, uint8_t value = 0);
+bool commandSend(CommandType type, uint32_t value = 0);
 
 // Non-blocking; returns false when no command is waiting.
 bool commandReceive(Command &command);

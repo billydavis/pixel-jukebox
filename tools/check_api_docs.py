@@ -21,9 +21,15 @@ BASE = "/api/v1"
 def firmware_routes():
     source = (ROOT / "src/network/api.cpp").read_text(encoding="utf-8")
     routes = set()
-    for path, method in re.findall(r'server\.on\(API_BASE(?:\s*"([^"]*)")?,\s*HTTP_(\w+)', source):
-        routes.add((method, path))
+    pattern = r'server\.on\((?:UriBraces\()?API_BASE(?:\s*"([^"]*)")?\)?,\s*HTTP_(\w+)'
+    for path, method in re.findall(pattern, source):
+        routes.add((method, same_params(path)))
     return routes
+
+
+def same_params(path):
+    """Writes every path parameter as {}, however it is named."""
+    return re.sub(r"\{+[^{}/]*\}+", "{}", path)
 
 
 def documented_routes():
@@ -33,7 +39,7 @@ def documented_routes():
     routes = set()
     for method, path in re.findall(r"^\| `(\w+)` \| (.+?) \|", table, re.M):
         match = re.fullmatch(r"`(/[^`]*)`", path)
-        routes.add((method, match.group(1) if match else ""))  # the base path row has no path of its own
+        routes.add((method, same_params(match.group(1)) if match else ""))  # the base path row has no path of its own
     return routes
 
 
@@ -47,7 +53,7 @@ def postman_routes():
             request = item["request"]
             path = "/" + "/".join(request["url"]["path"])
             if path.startswith(BASE):
-                routes.add((request["method"], path[len(BASE):]))
+                routes.add((request["method"], same_params(path[len(BASE):])))
     return routes
 
 

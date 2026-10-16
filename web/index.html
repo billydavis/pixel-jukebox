@@ -68,6 +68,9 @@ input[type=range]:disabled{opacity:.45}
 button.sm{min-height:44px;min-width:44px;padding:0 10px;font-size:17px;letter-spacing:0;box-shadow:3px 3px 0 var(--edge)}
 button.sm:active{transform:translate(3px,3px)}
 button.sm:disabled{box-shadow:3px 3px 0 var(--edge)}
+a.btn{display:inline-flex;align-items:center;min-height:44px;padding:0 10px;color:var(--accent-ink);background:var(--accent);
+  font:700 17px/1 var(--mono);text-transform:uppercase;text-decoration:none;box-shadow:3px 3px 0 var(--edge)}
+a.btn:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--edge)}
 .add{display:flex;gap:10px}
 select{flex:1;min-width:0;min-height:44px;padding:0 10px;border:0;border-radius:0;
   font:15px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--panel)}
@@ -139,7 +142,10 @@ kbd{font:inherit;color:var(--ink)}
       <summary>Card</summary>
       <dl class="facts" id="cardfacts"></dl>
       <p class="note wifi" id="cardnote" role="status">&nbsp;</p>
-      <button id="restart" class="sm">Restart panel</button>
+      <div class="add">
+        <a class="sm btn" id="gallery" href="/gallery" hidden>Browse saved art</a>
+        <button id="restart" class="sm">Restart panel</button>
+      </div>
     </details>
     <details class="rot">
       <summary>Wi-Fi</summary>
@@ -172,18 +178,14 @@ function render(online){
   if(!online||!st)return;
 
   const art=st.artwork,slot=st.slot.name,img=$('art'),msg=$('msg');
-  if(art&&!art.gifUrl){
-    // Played from the board's card: there is no web address to preview it from.
-    img.hidden=true;img.removeAttribute('src');delete img.dataset.post;
-    msg.hidden=false;msg.className='';msg.textContent='Playing from the card';
-    $('who').textContent=art.owner?'@'+art.owner:'Unknown artist';
-    $('sub').textContent='Makapix post '+art.postId+', offline copy';
-  }else if(art){
-    if(img.dataset.post!=art.postId){img.dataset.post=art.postId;img.src=art.gifUrl;}
+  if(art){
+    // Played from the board's card, the preview comes from the card too.
+    const card=art.source=='card';
+    if(img.dataset.post!=art.postId){img.dataset.post=art.postId;img.src=card?API+'/card/art/'+art.postId+'.gif':art.gifUrl;}
     img.alt='Artwork by '+art.owner;
     img.hidden=false;msg.hidden=true;
     $('who').textContent=art.owner?'@'+art.owner:'Unknown artist';
-    $('sub').textContent='Makapix post '+art.postId;
+    $('sub').textContent='Makapix post '+art.postId+(card?', from the card':'');
   }else{
     img.hidden=true;img.removeAttribute('src');delete img.dataset.post;msg.hidden=false;
     const clock=slot=='clock';
@@ -287,10 +289,11 @@ async function loadCard(){
   const facts=$('cardfacts'),note=$('cardnote');
   try{
     const r=await call('GET','/card'),c=r.card,k=r.cache,rows=[];
+    $('gallery').hidden=!(c.ready&&k.artworks);
     if(c.ready){
       rows.push(['Status','Ready'],['Card',c.type+', '+c.fileSystem+', '+size(c.capacityBytes)],
         ['Free',size(c.freeBytes)],['Offline copies',k.artworks+' artworks, '+size(k.bytes)],
-        ['Played offline',k.playedSinceStart+' since the panel started']);
+        ['From the card',k.playedSinceStart+' played since the panel started']);
       note.textContent='Art played online is saved here and shown when Makapix or the Wi-Fi is down.';
     }else{
       rows.push(['Status',c.present?'Card not usable':'No card']);

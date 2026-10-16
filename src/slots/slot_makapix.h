@@ -3,11 +3,16 @@
 #include "network/makapix.h"
 #include "slots/slot.h"
 
+struct LoadedArtwork;
+
 // Plays one Makapix artwork per turn, preloading the next in the background.
 // While the device is not registered it shows the registration code instead.
 class MakapixSlot : public Slot {
  public:
   void begin();
+
+  // The next start() shows this artwork from the card instead, once.
+  void request(uint32_t postId) { requestedPost = postId; }
 
   const char *name() const override { return "makapix"; }
   bool start() override;
@@ -22,10 +27,13 @@ class MakapixSlot : public Slot {
 
   bool startRegistration();
   bool startPlaying();
+  bool showFromCard(uint32_t postId);
+  bool play(const LoadedArtwork &artwork);
   uint32_t updateRegistration();
   uint32_t updatePlaying();
 
   Mode mode = Mode::Idle;
+  uint32_t requestedPost = 0;
   uint32_t startedAt = 0;
 
   // Registration

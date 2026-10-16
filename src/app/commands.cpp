@@ -12,7 +12,7 @@ static const uint32_t BUTTON_STACK_BYTES = 2048;
 
 static QueueHandle_t queue;
 
-bool commandSend(CommandType type, uint8_t value) {
+bool commandSend(CommandType type, uint32_t value) {
   Command command = {type, value};
   return xQueueSend(queue, &command, 0) == pdTRUE;
 }

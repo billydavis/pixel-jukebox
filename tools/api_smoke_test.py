@@ -103,6 +103,19 @@ try:
     check("card status reports the card and the cache",
           code == 200 and "present" in body.get("card", {}) and "enabled" in body.get("cache", {}), body)
 
+    code, body = call("GET", "/card/art?limit=2")
+    check("saved art lists at most the page asked for",
+          code == 200 and isinstance(body.get("artworks"), list) and len(body["artworks"]) <= 2
+          and isinstance(body.get("total"), int), body)
+    if body.get("artworks"):
+        first = body["artworks"][0]["postId"]
+        image = urllib.request.urlopen(f"{BASE}/card/art/{first}.gif", timeout=10).read()
+        check("a saved artwork's image is a GIF", image[:4] == b"GIF8", image[:16])
+    code, body = call("POST", "/card/art/999999999/show")
+    check("showing an artwork that is not on the card is refused", code == 404, body)
+    code, body = call("DELETE", "/card/art/abc")
+    check("removing with a postId that is not a number is refused", code == 404, body)
+
     section("Mode")
     call("PUT", "/mode", {"mode": "rotation"})
     check("starts from rotation mode", wait_for(lambda s: s["mode"] == "rotation" and s["slot"]["name"], 25))
