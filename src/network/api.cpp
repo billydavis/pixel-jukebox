@@ -12,6 +12,7 @@
 #include "config.h"
 #include "display/display.h"
 #include "app/mode.h"
+#include "app/night.h"
 #include "app/rotation.h"
 #include "app/status.h"
 #include "app/telemetry.h"
@@ -121,7 +122,12 @@ static void handleStatus() {
 
   doc["mode"] = modeIsSound() ? "sound" : "rotation";
   doc["visualizer"] = modeVisualizer();
-  doc["brightness"] = displayBrightness();
+  NightNow night = nightNow();
+  doc["brightness"] = night.brightness;
+  JsonObject nightState = doc["night"].to<JsonObject>();
+  nightState["active"] = night.night;
+  nightState["panel"] = night.off ? "off" : night.clockOnly ? "clock" : "playing";
+  nightState["overridden"] = night.overridden;
   JsonObject panel = doc["panel"].to<JsonObject>();
   panel["mode"] = displayModeName(displayMode());
   panel["refreshHz"] = display->refreshHz();
@@ -162,7 +168,7 @@ static void handleHold() {
 
 static void handleGetBrightness() {
   JsonDocument doc;
-  doc["value"] = displayBrightness();
+  doc["value"] = nightNow().brightness; // what is showing: the night schedule may have dimmed it
   sendJson(200, doc);
 }
 
@@ -494,6 +500,71 @@ static void handlePutPanel() {
   sendJson(202, doc);
 }
 
+// --- the night schedule ------------------------------------------------------------
+
+static void sendNight(int status) {
+  JsonDocument doc;
+  nightReport(doc.to<JsonObject>());
+  sendJson(status, doc);
+}
+
+static void handleGetNight() { sendNight(200); }
+
+// Any of {"enabled", "start", "end", "action", "brightness", "fadeMinutes"};
+// the rest stay as they are.
+static void handlePutNight() {
+  JsonDocument body;
+  if (!readBody(body)) {
+    return;
+  }
+  night::Settings settings = nightSettings();
+  if (!body["enabled"].isNull()) {
+    if (!body["enabled"].is<bool>()) {
+      sendError(400, "enabled must be true or false");
+      return;
+    }
+    settings.enabled = body["enabled"];
+  }
+  for (const char *field : {"start", "end"}) {
+    if (body[field].isNull()) {
+      continue;
+    }
+    uint16_t minutes;
+    if (!body[field].is<const char *>() || !night::parseTime(body[field].as<const char *>(), minutes)) {
+      sendError(400, "start and end are times like \"22:00\"");
+      return;
+    }
+    (strcmp(field, "start") == 0 ? settings.start : settings.end) = minutes;
+  }
+  if (!body["action"].isNull()) {
+    if (!body["action"].is<const char *>() || !night::actionFromName(body["action"].as<const char *>(), settings.action)) {
+      sendError(400, "action must be \"dim\", \"off\" or \"clock\"");
+      return;
+    }
+  }
+  if (!body["brightness"].isNull()) {
+    if (!body["brightness"].is<int>() || body["brightness"].as<int>() < 0 || body["brightness"].as<int>() > 255) {
+      sendError(400, "brightness must be 0-255");
+      return;
+    }
+    settings.brightness = body["brightness"].as<int>();
+  }
+  if (!body["fadeMinutes"].isNull()) {
+    if (!body["fadeMinutes"].is<int>() || body["fadeMinutes"].as<int>() < 0 ||
+        body["fadeMinutes"].as<int>() > night::MAX_FADE_MINUTES) {
+      sendError(400, "fadeMinutes must be 0-60");
+      return;
+    }
+    settings.fadeMinutes = body["fadeMinutes"].as<int>();
+  }
+  String error;
+  if (!nightSetSettings(settings, error)) {
+    sendError(400, error.c_str());
+    return;
+  }
+  sendNight(200);
+}
+
 static void handleRestart() { sendQueued(commandSend(CommandType::Restart), "restart"); }
 
 static void handleWifiSetup() { sendQueued(commandSend(CommandType::WifiSetup), "wifiSetup"); }
@@ -610,6 +681,8 @@ void apiBegin() {
   server.on(API_BASE "/hold", HTTP_POST, handleHold);
   server.on(API_BASE "/brightness", HTTP_GET, handleGetBrightness);
   server.on(API_BASE "/brightness", HTTP_PUT, handlePutBrightness);
+  server.on(API_BASE "/night", HTTP_GET, handleGetNight);
+  server.on(API_BASE "/night", HTTP_PUT, handlePutNight);
   server.on(API_BASE "/panel", HTTP_GET, handleGetPanel);
   server.on(API_BASE "/panel", HTTP_PUT, handlePutPanel);
   server.on(API_BASE "/mode", HTTP_GET, handleGetMode);

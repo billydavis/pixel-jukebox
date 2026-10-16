@@ -13,6 +13,7 @@
 #include "app/diagnostics.h"
 #include "display/display.h"
 #include "app/mode.h"
+#include "app/night.h"
 #include "network/connection.h"
 #include "network/reporter.h"
 #include "pins.h"
@@ -31,6 +32,8 @@ static const uint32_t COMMAND_POLL_MS = 5;
 static size_t skippedInARow = 0;
 static uint16_t *outgoing = nullptr; // the frame a transition starts from
 static uint32_t requestedPost = 0;   // an artwork asked for from the gallery
+static bool nightClockShowing = false; // the clock is on because of the night schedule
+static const uint32_t NIGHT_CHECK_MS = 500;
 
 // The slot has no card-detect switch, so a card is only looked for at start-up.
 static void restartBoard() {
@@ -47,9 +50,25 @@ static void drawHoldMarker() {
   display->fillRect(PANEL_RES_X - 3, 1, 2, 5, white);
 }
 
+// True when the night schedule wants something other than `slot` on screen.
+static bool nightWantsChange(Slot *slot) {
+  NightNow now = nightNow();
+  if (now.off) {
+    return true;
+  }
+  if (modeIsSound()) {
+    return false;
+  }
+  if (now.clockOnly) {
+    return slot != rotationClockSlot();
+  }
+  return nightClockShowing; // the clock-only night is over
+}
+
 // Runs a started slot until it finishes or a command ends it.
 static void runSlot(Slot *slot) {
   bool held = false;
+  uint32_t nightCheckedAt = millis();
   for (;;) {
     uint32_t updatedAt = millis();
     uint32_t waitMs = slot->update();
@@ -64,6 +83,7 @@ static void runSlot(Slot *slot) {
         switch (command.type) {
           case CommandType::Next:
             Serial.println("Command: next");
+            nightWake(); // only does anything on a clock-only night
             if (modeIsSound()) {
               modeNextVisualizer();
             }
@@ -98,7 +118,7 @@ static void runSlot(Slot *slot) {
             return;
           case CommandType::SetBrightness:
             Serial.printf("Command: brightness %u\n", command.value);
-            displaySetBrightness(command.value);
+            nightSetBrightness(command.value);
             break;
         }
         if (wantHeld != held) {
@@ -110,6 +130,15 @@ static void runSlot(Slot *slot) {
           } else {
             slot->redraw(); // clears the marker
           }
+        }
+      }
+      nightTick();
+      if (millis() - nightCheckedAt >= NIGHT_CHECK_MS) {
+        nightCheckedAt = millis();
+        if (nightWantsChange(slot)) {
+          statusSetHeld(false);
+          slot->stop();
+          return;
         }
       }
       delay(COMMAND_POLL_MS);
@@ -127,7 +156,7 @@ static void handleCommandsWhileIdle() {
   Command command;
   while (commandReceive(command)) {
     if (command.type == CommandType::SetBrightness) {
-      displaySetBrightness(command.value);
+      nightSetBrightness(command.value);
     } else if (command.type == CommandType::WifiSetup) {
       connectionEnterSetup();
     } else if (command.type == CommandType::Restart) {
@@ -135,6 +164,45 @@ static void handleCommandsWhileIdle() {
     } else if (command.type == CommandType::ShowArtwork && !modeIsSound()) {
       requestedPost = command.value;
     }
+  }
+}
+
+// The night schedule has the panel dark: nothing plays, so nothing is
+// downloaded or reported. Next, art from the gallery or a brightness change
+// wakes it for a while.
+static void nightDark() {
+  statusSetSlot("");
+  display->clearScreen();
+  uint32_t until = millis() + 1000;
+  while ((int32_t)(millis() - until) < 0) {
+    Command command;
+    while (commandReceive(command)) {
+      switch (command.type) {
+        case CommandType::ShowArtwork:
+          requestedPost = command.value;
+          nightWake();
+          return;
+        case CommandType::Next:
+          nightWake();
+          return;
+        case CommandType::SetBrightness:
+          nightSetBrightness(command.value);
+          return;
+        case CommandType::WifiSetup:
+          connectionEnterSetup();
+          break;
+        case CommandType::Restart:
+          restartBoard();
+          break;
+        default:
+          break; // nothing to hold or reload while dark
+      }
+    }
+    nightTick();
+    if (!nightNow().off) {
+      return;
+    }
+    delay(20);
   }
 }
 
@@ -162,6 +230,7 @@ void setup() {
   reporterBegin(); // after rotationBegin(), which starts the Makapix client
   modeBegin();
   transitionBegin();
+  nightBegin();
   outgoing = (uint16_t *)ps_malloc(PANEL_RES_X * PANEL_RES_Y * sizeof(uint16_t));
 }
 
@@ -173,6 +242,13 @@ void loop() {
 
   connectionMaintain();
   clockChipMaintain();
+  nightTick();
+  NightNow night = nightNow();
+  if (night.off) {
+    nightClockShowing = false;
+    nightDark();
+    return;
+  }
 
   // Sound mode shows one visualizer until the mode changes; otherwise the
   // rotation decides.
@@ -185,11 +261,18 @@ void loop() {
     requested->request(requestedPost);
     requestedPost = 0;
   }
-  Slot *slot = sound ? modeSoundSlot() : requested ? requested : rotationCurrent();
+  // On a clock-only night the clock takes the place of the rotation.
+  bool nightClock = !sound && !requested && night.clockOnly;
+  Slot *slot = sound       ? modeSoundSlot()
+               : requested ? requested
+               : nightClock ? rotationClockSlot()
+                            : rotationCurrent();
 
   // For a transition, the slot draws its first frame off the panel while the
-  // old picture stays up, then the two are blended. Sound mode switches at once.
-  bool animate = !sound && outgoing && transitionEnabled();
+  // old picture stays up, then the two are blended. Sound mode switches at
+  // once, and the night clock does not blend into itself every ten seconds.
+  bool animate = !sound && outgoing && transitionEnabled() && !(nightClock && nightClockShowing);
+  nightClockShowing = nightClock;
   if (animate) {
     memcpy(outgoing, display->pixels(), PANEL_RES_X * PANEL_RES_Y * sizeof(uint16_t));
     display->setLive(false);
@@ -230,7 +313,7 @@ void loop() {
     delay(SKIPPED_SLOT_MS);
     handleCommandsWhileIdle();
   }
-  if (!sound && !requested) {
+  if (!sound && !requested && !nightClock) {
     rotationAdvance();
   }
 }

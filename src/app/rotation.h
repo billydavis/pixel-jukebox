@@ -45,3 +45,6 @@ size_t rotationTurns();
 
 // The artwork slot, for showing one artwork outside the rotation.
 MakapixSlot *rotationArtworkSlot();
+
+// The clock slot, for the night schedule's clock-only nights.
+Slot *rotationClockSlot();

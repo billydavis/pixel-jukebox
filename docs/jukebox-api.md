@@ -69,6 +69,8 @@ the reply is `503` and nothing is queued.
 | `DELETE` | `/likes/{postId}` | Take the like back |
 | `GET` | `/views` | Whether views are reported to Makapix |
 | `PUT` | `/views` | Turn view reports on or off |
+| `GET` | `/night` | The night schedule |
+| `PUT` | `/night` | Change the night schedule |
 | `GET` | `/panel` | The panel mode and refresh rate |
 | `PUT` | `/panel` | Switch between normal and photo mode |
 | `GET` | `/card` | The microSD card and the offline artwork on it |
@@ -115,6 +117,7 @@ the reply is `503` and nothing is queued.
   "mode": "rotation",
   "visualizer": "spectrum",
   "brightness": 32,
+  "night": { "active": false, "panel": "playing", "overridden": false },
   "panel": { "mode": "normal", "refreshHz": 100 }
 }
 ```
@@ -134,7 +137,8 @@ the reply is `503` and nothing is queued.
 | `artwork.channel` | The channel it came from, as `channelLabel` in `GET /slots`; `null` when from the card |
 | `mode` | `rotation` or `sound` |
 | `visualizer` | The visualizer sound mode uses, whether or not it is showing now |
-| `brightness` | 0-255 |
+| `brightness` | 0-255, as showing now: the night schedule may have lowered it |
+| `night` | Whether it is night by the schedule, what the panel is doing (`playing`, `clock` or `off`) and whether someone has taken over for a while; see `GET /night` |
 | `panel` | The panel mode and how often the panel redraws; see `GET /panel` |
 
 ### `GET /diagnostics`
@@ -290,6 +294,54 @@ from the clock chip when the network has not answered yet; with no time at all
 `{"report": true}` starts again. Saved on the board. Reply: the same document
 as `GET /views`. `400` unless `report` is `true` or `false`.
 
+### `GET /night`
+
+```json
+{
+  "enabled": true,
+  "start": "22:00",
+  "end": "07:00",
+  "action": "dim",
+  "brightness": 8,
+  "fadeMinutes": 10,
+  "now": { "phase": "night", "panel": "playing", "brightness": 8, "nextSwitch": "07:00" }
+}
+```
+
+Between `start` and `end` (local time; past midnight when `end` is earlier)
+the panel does one of three things, fading from the day brightness over
+`fadeMinutes` and back again when night ends:
+
+| `action` | At night |
+|---|---|
+| `dim` | The art keeps playing at `brightness` |
+| `clock` | Only the clock, at `brightness`; no transitions |
+| `off` | Fades to black, then nothing plays, so no art is downloaded and no views are reported |
+
+Moving the brightness by night (`PUT /brightness`) takes over for an hour or
+until the next switch, whichever is sooner, without changing the saved day
+level. On a `clock` or `off` night, `POST /next` (or showing art from the
+gallery) does the same at the day brightness. The schedule needs the time: with
+none known (power lost, no battery, no network) it waits.
+
+| `now` field | Meaning |
+|---|---|
+| `phase` | `disabled`, `no time`, `day`, `night` or `overridden` |
+| `panel` | `playing`, `clock` or `off` |
+| `brightness` | The level showing now |
+| `nextSwitch` | When night next starts or ends, local time |
+| `overrideMinutesLeft` | While `overridden`, how long until the schedule takes over again |
+
+Off by default.
+
+### `PUT /night`
+
+Any of `enabled`, `start`, `end`, `action`, `brightness` and `fadeMinutes`;
+the others stay as they are. Saved on the board. Reply: `200` with the
+`GET /night` document. `400`, and nothing changes, for a time that is not
+`HH:MM`, `start` equal to `end`, an unknown `action`, `brightness` outside
+0-255, or `fadeMinutes` outside 0-60. A change ends any override.
+
 ### `GET /panel`
 
 ```json
@@ -411,7 +463,7 @@ anything else is a `400`.
 `value` must be a whole number from 0 to 255; anything else is a `400` and the
 brightness is left unchanged. Reply: `202 {"queued":"brightness"}`.
 
-The value is saved on the board and restored after a restart.
+The value is saved on the board and restored after a restart. While the night schedule is changing the brightness, it is not saved: it takes over for an hour or until the schedule's next switch (see `GET /night`). `GET /brightness` gives the level showing now.
 
 Brightness is limited by the 5V supply, not by the API. When the supply cannot
 keep up, white turns yellow and then red at higher settings. If that happens,

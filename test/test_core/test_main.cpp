@@ -14,6 +14,7 @@
 #include "gif_pad.h"
 #include "html_escape.h"
 #include "likes_book.h"
+#include "night_rules.h"
 #include "rotation_rules.h"
 #include "rtc_time.h"
 #include "spectrum_math.h"
@@ -880,6 +881,106 @@ static void test_channels_a_refused_parse_changes_nothing() {
   TEST_ASSERT_EQUAL_STRING("cat", c.value.c_str());
 }
 
+// --- the night schedule --------------------------------------------------------
+
+static uint32_t at(int hours, int minutes, int seconds = 0) { return hours * 3600 + minutes * 60 + seconds; }
+
+static night::Settings tenToSeven() {
+  night::Settings s;
+  s.enabled = true;
+  s.start = 22 * 60;
+  s.end = 7 * 60;
+  s.fadeMinutes = 10;
+  return s;
+}
+
+static void test_night_times_parse_and_format() {
+  uint16_t m = 0;
+  TEST_ASSERT_TRUE(night::parseTime("22:00", m));
+  TEST_ASSERT_EQUAL_UINT16(1320, m);
+  TEST_ASSERT_TRUE(night::parseTime("00:00", m));
+  TEST_ASSERT_EQUAL_UINT16(0, m);
+  TEST_ASSERT_TRUE(night::parseTime("23:59", m));
+  TEST_ASSERT_EQUAL_STRING("07:05", night::formatTime(425).c_str());
+  const char *bad[] = {"24:00", "7:00", "07:60", "0700", "07-00", "", "ab:cd", "07:00 "};
+  for (const char *text : bad) {
+    TEST_ASSERT_FALSE_MESSAGE(night::parseTime(text, m), text);
+  }
+}
+
+static void test_night_wraps_past_midnight() {
+  night::Settings s = tenToSeven();
+  TEST_ASSERT_FALSE(night::isNight(s, at(21, 59, 59)));
+  TEST_ASSERT_TRUE(night::isNight(s, at(22, 0)));
+  TEST_ASSERT_TRUE(night::isNight(s, at(0, 0)));
+  TEST_ASSERT_TRUE(night::isNight(s, at(6, 59, 59)));
+  TEST_ASSERT_FALSE(night::isNight(s, at(7, 0)));
+  TEST_ASSERT_FALSE(night::isNight(s, at(12, 0)));
+}
+
+static void test_night_within_one_day_works_too() {
+  night::Settings s = tenToSeven();
+  s.start = 13 * 60; // an afternoon nap
+  s.end = 15 * 60;
+  TEST_ASSERT_TRUE(night::isNight(s, at(14, 0)));
+  TEST_ASSERT_FALSE(night::isNight(s, at(16, 0)));
+  TEST_ASSERT_FALSE(night::isNight(s, at(2, 0)));
+}
+
+static void test_night_off_or_empty_is_never_night() {
+  night::Settings s = tenToSeven();
+  s.enabled = false;
+  TEST_ASSERT_FALSE(night::isNight(s, at(23, 0)));
+  TEST_ASSERT_EQUAL_FLOAT(0, night::depth(s, at(23, 0)));
+  s.enabled = true;
+  s.end = s.start;
+  TEST_ASSERT_FALSE(night::isNight(s, at(22, 0)));
+  std::string error;
+  TEST_ASSERT_FALSE(night::valid(s, error));
+}
+
+static void test_night_fades_in_and_out() {
+  night::Settings s = tenToSeven();
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.0f, night::depth(s, at(21, 59)));
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.0f, night::depth(s, at(22, 0)));
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.5f, night::depth(s, at(22, 5)));
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 1.0f, night::depth(s, at(22, 10)));
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 1.0f, night::depth(s, at(3, 0)));
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 1.0f, night::depth(s, at(7, 0)));   // day starts here, fading up
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.5f, night::depth(s, at(7, 5)));
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.0f, night::depth(s, at(7, 10)));
+  s.fadeMinutes = 0;
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 1.0f, night::depth(s, at(22, 0)));
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.0f, night::depth(s, at(7, 0)));
+}
+
+static void test_night_blend_goes_from_day_to_night() {
+  TEST_ASSERT_EQUAL_UINT8(51, night::blend(51, 8, 0));
+  TEST_ASSERT_EQUAL_UINT8(8, night::blend(51, 8, 1));
+  TEST_ASSERT_EQUAL_UINT8(30, night::blend(51, 8, 0.5f)); // 29.5 rounds up
+  TEST_ASSERT_EQUAL_UINT8(0, night::blend(51, 0, 1));
+  TEST_ASSERT_EQUAL_UINT8(100, night::blend(10, 100, 2.0f)); // out of range is clamped
+}
+
+static void test_night_next_switch() {
+  night::Settings s = tenToSeven();
+  TEST_ASSERT_EQUAL_UINT32(3600, night::secondsToNextSwitch(s, at(21, 0)));
+  TEST_ASSERT_EQUAL_UINT32(7 * 3600, night::secondsToNextSwitch(s, at(0, 0)));
+  TEST_ASSERT_EQUAL_UINT32(9 * 3600, night::secondsToNextSwitch(s, at(22, 0))); // just started: next is 07:00
+}
+
+static void test_night_actions_and_limits() {
+  night::Action a;
+  TEST_ASSERT_TRUE(night::actionFromName("clock", a));
+  TEST_ASSERT_EQUAL_STRING("clock", night::actionName(a));
+  TEST_ASSERT_FALSE(night::actionFromName("sleep", a));
+  night::Settings s = tenToSeven();
+  std::string error;
+  TEST_ASSERT_TRUE(night::valid(s, error));
+  s.fadeMinutes = 61;
+  TEST_ASSERT_FALSE(night::valid(s, error));
+}
+
 static int runTests() {
   UNITY_BEGIN();
   RUN_TEST(test_gif_pad_grows_a_small_gif);
@@ -965,6 +1066,15 @@ static int runTests() {
   RUN_TEST(test_channels_names_in_any_script_are_counted_in_characters);
   RUN_TEST(test_channels_reject_what_is_not_a_channel);
   RUN_TEST(test_channels_a_refused_parse_changes_nothing);
+
+  RUN_TEST(test_night_times_parse_and_format);
+  RUN_TEST(test_night_wraps_past_midnight);
+  RUN_TEST(test_night_within_one_day_works_too);
+  RUN_TEST(test_night_off_or_empty_is_never_night);
+  RUN_TEST(test_night_fades_in_and_out);
+  RUN_TEST(test_night_blend_goes_from_day_to_night);
+  RUN_TEST(test_night_next_switch);
+  RUN_TEST(test_night_actions_and_limits);
   return UNITY_END();
 }
 

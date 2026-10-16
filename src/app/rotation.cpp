@@ -13,6 +13,8 @@ static MakapixSlot makapixSlot;
 MakapixSlot *rotationArtworkSlot() { return &makapixSlot; }
 static ClockSlot clockSlot;
 
+Slot *rotationClockSlot() { return &clockSlot; }
+
 struct SlotType {
   SlotInfo info;
   Slot *slot;

@@ -59,9 +59,13 @@ uint16_t green();
 bool setupDisplay();
 
 // Brightness is 0-255 and is remembered across restarts. Call
-// displaySetBrightness() from the display loop only.
+// displaySetBrightness() from the display loop only. This is the day level:
+// the night schedule shows other levels with displayApplyBrightness(), which
+// is not saved.
 uint8_t displayBrightness();
 void displaySetBrightness(uint8_t value);
+void displayApplyBrightness(uint8_t value);
+uint8_t displayAppliedBrightness();
 
 // Normal shows colours most accurately. Photo redraws the panel about five
 // times as often, so cameras and phones film it without dark bands rolling

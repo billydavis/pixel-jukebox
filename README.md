@@ -33,6 +33,7 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 | Area | What's included |
 |---|---|
 | **Slots** | Rotates through screens: by default three artworks, then a clock for 10 seconds. The rotation is editable from the control page and saved on the board |
+| **Night schedule** | Between two times, the panel dims the art, shows only the clock, or turns off, fading over a few minutes each way. Moving the brightness or pressing Next at night takes over for an hour |
 | **Photo mode** | A switch on the control page redraws the panel about five times as often (about 500 Hz), so phones and cameras film it without dark bands rolling through. Dark shades are less smooth, so it is off by default. The panel restarts to switch |
 | **Clock chip** | The board's clock chip keeps the time through restarts, so the clock and view reports have it before Wi-Fi is up. It is set from internet time whenever that answers. A backup battery keeps the time through power cuts too: a non-rechargeable 3 V coin cell (CR2032 or CR1220) on the 2-pin JST-SH 1.0 mm connector J4, pin 1 positive. The board does not charge it |
 | **Channels** | Each artwork slot in the rotation can play its own Makapix channel: everything, featured art, your own art, one artist, a hashtag, or the art you have liked. For example two featured pieces, one tagged #cat, one you liked, then the clock |

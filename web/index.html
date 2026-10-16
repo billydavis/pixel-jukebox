@@ -80,11 +80,14 @@ a.btn{display:inline-flex;align-items:center;min-height:44px;padding:0 10px;colo
   font:700 17px/1 var(--mono);text-transform:uppercase;text-decoration:none;box-shadow:3px 3px 0 var(--edge)}
 a.btn:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--edge)}
 .add{display:flex;gap:10px}
-select,input[type=text]{flex:1;min-width:0;min-height:44px;padding:0 10px;border:0;border-radius:0;
+select,input[type=text],input[type=time]{flex:1;min-width:0;min-height:44px;padding:0 10px;border:0;border-radius:0;
   font:15px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--panel)}
 input[type=text]::placeholder{color:var(--dim)}
 .add.wrap{flex-wrap:wrap}.add.wrap select{flex-basis:100%}
 .rot .nm small.bad{color:var(--held)}
+.times{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.times input{width:100%;color-scheme:dark}
+#nightbox .dim{margin-top:20px}
 .field{display:block;margin:20px 0 8px;font:13px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
 .facts{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0 0 12px;font:13px/1.4 var(--mono)}
 .facts dt{color:var(--dim)}
@@ -158,6 +161,30 @@ kbd{font:inherit;color:var(--ink)}
       </div>
       <p class="note" id="rotnote" role="status"></p>
     </details>
+    <details class="rot" id="nightbox">
+      <summary>Night</summary>
+      <div class="row">
+        <span class="nm">Night schedule</span>
+        <button id="nighton" class="sm toggle" aria-pressed="false">Off</button>
+      </div>
+      <div class="times">
+        <div><label class="field" for="nstart">From</label><input id="nstart" type="time" required></div>
+        <div><label class="field" for="nend">Until</label><input id="nend" type="time" required></div>
+      </div>
+      <label class="field" for="naction">At night</label>
+      <div class="add">
+        <select id="naction">
+          <option value="dim">Dim the art</option>
+          <option value="clock">Show only the clock</option>
+          <option value="off">Turn the panel off</option>
+        </select>
+      </div>
+      <div class="dim" id="nlevelbox">
+        <label for="nlevel"><span>Night brightness</span><output id="nlevelv">--</output></label>
+        <input id="nlevel" type="range" min="1" max="128" step="1" value="8">
+      </div>
+      <p class="note" id="nightnote" role="status"></p>
+    </details>
     <details class="rot" id="mkbox">
       <summary>Makapix</summary>
       <div class="row">
@@ -219,6 +246,10 @@ function render(online){
     img.hidden=false;msg.hidden=true;
     $('who').textContent=art.owner?'@'+art.owner:'Unknown artist';
     $('sub').textContent='Makapix post '+art.postId+(card?', from the card':art.channel&&art.channel!='Everything'?' · '+art.channel:'');
+  }else if(st.night&&st.night.panel=='off'){
+    img.hidden=true;img.removeAttribute('src');delete img.dataset.post;msg.hidden=false;
+    msg.className='';msg.textContent='Off for the night';
+    $('who').textContent='Night';$('sub').textContent='Next wakes it for a while';
   }else{
     img.hidden=true;img.removeAttribute('src');delete img.dataset.post;msg.hidden=false;
     const clock=slot=='clock';
@@ -374,6 +405,46 @@ async function loadMk(){
     });
   }catch(e){$('viewsnote').textContent='Could not read the Makapix settings.';}
 }
+let nightCfg=null;
+function nightNote(n){
+  const s=n.now;
+  if(!n.enabled)return 'Off. Turn it on to dim the panel, show only the clock, or turn it off at night.';
+  if(s.phase=='no time')return 'Waiting for the time: the schedule starts once the panel knows it.';
+  const what=n.action=='off'?'panel off':n.action=='clock'?'clock only, at '+n.brightness:'dimmed to '+n.brightness;
+  if(s.phase=='overridden')return 'Taken over by hand for '+s.overrideMinutesLeft+' more minute'+(s.overrideMinutesLeft==1?'':'s')+'.';
+  if(s.phase=='night')return 'Night now ('+what+') until '+s.nextSwitch+'.';
+  return 'Day now. Night ('+what+') starts at '+s.nextSwitch+'.';
+}
+function showNight(n){
+  nightCfg=n;
+  $('nighton').setAttribute('aria-pressed',n.enabled);$('nighton').textContent=n.enabled?'On':'Off';
+  if(document.activeElement!=$('nstart'))$('nstart').value=n.start;
+  if(document.activeElement!=$('nend'))$('nend').value=n.end;
+  $('naction').value=n.action;
+  $('nlevel').value=n.brightness;$('nlevelv').textContent=n.brightness;
+  $('nlevelbox').hidden=n.action=='off';
+  $('nightnote').textContent=nightNote(n);
+}
+async function loadNight(){
+  try{showNight(await call('GET','/night'));}catch(e){$('nightnote').textContent='Could not read the night schedule.';}
+}
+async function saveNight(change){
+  try{
+    showNight(await call('PUT','/night',change));
+    clearTimeout(timer);timer=setTimeout(poll,300);
+  }catch(e){
+    $('nightnote').textContent=e.reason?'Not saved: '+e.reason+'.':'Could not save. Try again.';
+    loadNight();
+  }
+}
+$('nightbox').ontoggle=()=>{if($('nightbox').open)loadNight();};
+$('nighton').onclick=()=>saveNight({enabled:$('nighton').getAttribute('aria-pressed')!='true'});
+$('nstart').onchange=()=>{if($('nstart').value)saveNight({start:$('nstart').value});};
+$('nend').onchange=()=>{if($('nend').value)saveNight({end:$('nend').value});};
+$('naction').onchange=()=>saveNight({action:$('naction').value});
+$('nlevel').oninput=e=>{$('nlevelv').textContent=e.target.value;};
+$('nlevel').onchange=e=>saveNight({brightness:+e.target.value});
+
 $('mkbox').ontoggle=()=>{if($('mkbox').open)loadMk();};
 $('views').onclick=async()=>{
   const on=$('views').getAttribute('aria-pressed')!='true';

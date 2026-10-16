@@ -148,6 +148,22 @@ try:
     code, after = call("GET", "/slots")
     check("rejected channels changed nothing", after.get("rotation") == slots.get("rotation"), after.get("rotation"))
 
+    section("Night")
+    code, night = call("GET", "/night")
+    check("the night schedule shows its settings and state",
+          code == 200 and isinstance(night.get("enabled"), bool) and night.get("action") in ("dim", "off", "clock")
+          and night.get("now", {}).get("phase") in ("disabled", "no time", "day", "night", "overridden"), night)
+    for bad in ({"start": "25:00"}, {"end": "7:00"}, {"action": "sleep"}, {"brightness": 300},
+                {"fadeMinutes": 61}, {"enabled": "yes"}, {"start": night.get("end", "07:00")}):
+        code, body = call("PUT", "/night", bad)
+        check(f"the night schedule rejects {bad}", code == 400, body)
+    settings = {k: night.get(k) for k in ("enabled", "start", "end", "action", "brightness", "fadeMinutes")}
+    code, body = call("PUT", "/night", settings)
+    check("the night schedule accepts its own settings unchanged",
+          code == 200 and {k: body.get(k) for k in settings} == settings, body)
+    code, now = call("GET", "/status")
+    check("status says whether it is night", isinstance(now.get("night", {}).get("active"), bool), now.get("night"))
+
     section("Panel")
     code, panel = call("GET", "/panel")
     check("the panel says its mode and refresh rate",

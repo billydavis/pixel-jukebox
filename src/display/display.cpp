@@ -138,7 +138,7 @@ bool setupDisplay() {
   }
   Serial.printf("Panel: %s mode, %d Hz\n", displayModeName(mode), display->refreshHz());
   brightness = prefs.getUChar("brightness", DEFAULT_BRIGHTNESS);
-  display->setBrightness8(brightness);
+  displayApplyBrightness(brightness);
   display->clearScreen();
   return true;
 }
@@ -159,14 +159,23 @@ bool displayModeFromName(const String &name, PanelMode &value) {
 
 void displaySaveMode(PanelMode value) { prefs.putBool("photo", value == PanelMode::Photo); }
 
+static uint8_t applied = 0; // what the panel is showing now
+
 void displaySetBrightness(uint8_t value) {
   if (value == brightness) {
     return;
   }
   brightness = value;
-  display->setBrightness8(brightness);
+  displayApplyBrightness(brightness);
   prefs.putUChar("brightness", brightness);
 }
+
+void displayApplyBrightness(uint8_t value) {
+  applied = value;
+  display->setBrightness8(value);
+}
+
+uint8_t displayAppliedBrightness() { return applied; }
 
 // Colour gradient with a marker in each corner, to check wiring and orientation:
 // red = top-left, green = top-right, blue = bottom-left, white = bottom-right.
