@@ -289,7 +289,7 @@ Ideas borrowed from [Pixelix](https://github.com/BlueAndi/Pixelix), using parts 
 
 - More slot types
 - Keep time across restarts with the onboard clock chip
-- Room temperature and humidity (onboard sensor), and a weather screen
+- A weather screen
 - More visualizers (waterfall, pulse ring, artwork that moves to the beat)
 - Built-in effects such as falling code, rainbow and Game of Life
 - A web page for settings, and firmware updates over Wi-Fi

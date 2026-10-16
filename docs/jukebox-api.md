@@ -158,6 +158,8 @@ sizes are in bytes.
   ],
   "artwork": { "downloaded": 42, "largestBytes": 187850 },
   "crash": { "present": true, "task": "loader", "cause": "StoreProhibited" },
+  "case": { "present": true, "temperatureC": 31.8, "humidityPercent": 33.0, "lowestC": 24.6,
+            "highestC": 32.1, "secondsAgo": 12 },
   "clock": { "source": "network", "utc": "2026-10-16T15:55:14Z",
              "chip": { "present": true, "keptTimeAtStart": true, "lastSetUtc": "2026-10-16T15:54:59Z",
                        "driftSecondsAtLastSet": -1 } },
@@ -174,6 +176,7 @@ sizes are in bytes.
 | `heap`, `psram` | Internal and external memory. `lowestFree` is the least that has been free since startup; `largestBlock` is the biggest single allocation possible now |
 | `tasks` | `lowestFree` is the least stack each task has had spare. `loader` is short-lived and appears once it has run |
 | `artwork` | Artworks downloaded since startup and the size of the largest |
+| `case` | Temperature and humidity inside the case, from the board's SHTC3 sensor, read once a minute; `lowestC` and `highestC` since start-up. The board and the panel warm the air around the sensor, so this is how hot the electronics run, not the room: expect several degrees above it, and humidity correspondingly lower. `null` until the first reading; `present` is `false` if the sensor did not answer |
 | `crash` | Whether a crash record is stored, and if so which task crashed and why. Details from `GET /crash` |
 | `clock.source` | Where the time came from: `network` (internet time, checked about hourly), `clock chip` (the board's PCF85063, read at start-up, until the network answers) or `not set`. `utc` is `null` until the time is known |
 | `clock.chip` | The clock chip. `keptTimeAtStart` is `false` after the power was off, unless a backup battery is fitted. It is set from the network each time that answers; `driftSecondsAtLastSet` is how far it had wandered by then (a second either way is rounding: it counts whole seconds) |

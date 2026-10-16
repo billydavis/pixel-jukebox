@@ -23,8 +23,8 @@ Priority is a suggestion until it has been agreed.
 | 8 | Auto-rotation from the motion sensor | M | Blocked | Also needs the case, to know how the panel stands |
 | 9 | ~~Keep time with the onboard clock chip~~ | S | Done (0.15.0) | Keeps time through restarts. Through power cuts only with a backup battery on J4 (CR2032 ordered; test by unplugging the panel, then check `keptTimeAtStart`) |
 | 10 | ~~Day and night brightness schedule~~ | S-M | Done (0.19.0) | Dim, clock only or off between two times, with fades and an hour's override. Later: follow sunset and sunrise from a rough location |
-| 11 | Room temperature and humidity slot | S | 3 | Onboard SHTC3 sensor (found at 0x70) |
-| 12 | Weather slot | M | 4 | Needs a weather service |
+| 11 | ~~Room temperature and humidity~~ | S | Done differently (0.20.0) | The sensor sits in the warm case (p64 measured 31.8 C and 33 % there), so it cannot give room readings and no external sensor will be added. It reports the case temperature and humidity in `/diagnostics` instead |
+| 12 | Weather slot | M | 4 | Needs a weather service. The only way to show a temperature that means anything, since room readings are out |
 | 13 | Use the speaker | S | 5 | For example a chime on a like or on the hour |
 | 14 | ~~Raise the default brightness~~ | S | Closed | Not wanted: the panel looks better dim (the owner runs it at about 51 of 255), and lower brightness means less heat and slower LED ageing. Below about 20 the darkest shades start to vanish |
 | 15 | Shorten the 40 s wait before playing offline at boot | S | 4 | Two 20 s attempts to join Wi-Fi when the router is down |
@@ -60,3 +60,4 @@ Priority is a suggestion until it has been agreed.
 | 26 | Refresh the README roadmap | S | with the next commit | Lists done items as ideas (full brightness, show a specific post) |
 | 27 | CI build on GitHub | S | Deferred | Deferred by choice in the architecture plan |
 | 31 | ~~Crash records in diagnostics~~ | S | Done (0.16.0) | `GET /crash`, `tools/decode_crash.py`. One record from an earlier, unarchived build was found: the loader, a null-pointer write while freeing memory. Watch for it again |
+| 33 | Memory headroom review | S-M | 3 | Internal RAM is about 108 KB free at rest but dips to about 42-50 KB during each Makapix TLS session (0.20.0). p64 keeps 48 KB as a floor. Look at what sits in internal RAM (task stacks, feed queues of Strings, JSON) and move what can go to PSRAM |

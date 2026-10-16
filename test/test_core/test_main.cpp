@@ -17,6 +17,7 @@
 #include "night_rules.h"
 #include "rotation_rules.h"
 #include "rtc_time.h"
+#include "shtc3_math.h"
 #include "spectrum_math.h"
 #include "tap_detector.h"
 #include "transitions.h"
@@ -981,6 +982,41 @@ static void test_night_actions_and_limits() {
   TEST_ASSERT_FALSE(night::valid(s, error));
 }
 
+// --- the case temperature sensor --------------------------------------------------
+
+static void test_shtc3_checksum_matches_the_datasheet() {
+  const uint8_t example[] = {0xBE, 0xEF}; // Sensirion's worked example
+  TEST_ASSERT_EQUAL_HEX8(0x92, shtc3::crc(example, 2));
+}
+
+static void test_shtc3_decodes_a_measurement() {
+  // 0x6666 is 40 % of full scale: 25 degrees and 40 percent.
+  uint8_t bytes[6] = {0x66, 0x66, 0, 0x66, 0x66, 0};
+  bytes[2] = shtc3::crc(bytes, 2);
+  bytes[5] = shtc3::crc(bytes + 3, 2);
+  float t = 0, h = 0;
+  TEST_ASSERT_TRUE(shtc3::decode(bytes, t, h));
+  TEST_ASSERT_FLOAT_WITHIN(0.01f, 25.0f, t);
+  TEST_ASSERT_FLOAT_WITHIN(0.01f, 40.0f, h);
+}
+
+static void test_shtc3_refuses_a_damaged_measurement() {
+  uint8_t bytes[6] = {0x66, 0x66, 0, 0x66, 0x66, 0};
+  bytes[2] = shtc3::crc(bytes, 2);
+  bytes[5] = shtc3::crc(bytes + 3, 2);
+  bytes[4] ^= 0x01; // one bit flipped on the wire
+  float t = 1, h = 2;
+  TEST_ASSERT_FALSE(shtc3::decode(bytes, t, h));
+  TEST_ASSERT_EQUAL_FLOAT(1, t);
+}
+
+static void test_shtc3_recognises_its_id() {
+  TEST_ASSERT_TRUE(shtc3::isShtc3(0x0887));  // a typical SHTC3 ID
+  TEST_ASSERT_TRUE(shtc3::isShtc3(0x0807));
+  TEST_ASSERT_FALSE(shtc3::isShtc3(0x0000));
+  TEST_ASSERT_FALSE(shtc3::isShtc3(0xFFFF));
+}
+
 static int runTests() {
   UNITY_BEGIN();
   RUN_TEST(test_gif_pad_grows_a_small_gif);
@@ -1075,6 +1111,11 @@ static int runTests() {
   RUN_TEST(test_night_blend_goes_from_day_to_night);
   RUN_TEST(test_night_next_switch);
   RUN_TEST(test_night_actions_and_limits);
+
+  RUN_TEST(test_shtc3_checksum_matches_the_datasheet);
+  RUN_TEST(test_shtc3_decodes_a_measurement);
+  RUN_TEST(test_shtc3_refuses_a_damaged_measurement);
+  RUN_TEST(test_shtc3_recognises_its_id);
   return UNITY_END();
 }
 

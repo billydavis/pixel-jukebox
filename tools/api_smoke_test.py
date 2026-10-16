@@ -108,6 +108,12 @@ try:
     clock = body.get("clock", {})
     check("diagnostics say where the time came from",
           clock.get("source") in ("network", "clock chip", "not set") and "present" in clock.get("chip", {}), clock)
+    code, body = call("GET", "/diagnostics")
+    case = body.get("case", {})
+    check("diagnostics report the temperature inside the case",
+          case.get("present") is False
+          or (isinstance(case.get("temperatureC"), (int, float)) and 0 < case["temperatureC"] < 85
+              and 0 <= case.get("humidityPercent", -1) <= 100), case)
     code, crash = call("GET", "/crash")
     check("the crash record says whether there is one", code == 200 and isinstance(crash.get("present"), bool), crash)
     if not crash.get("present"):

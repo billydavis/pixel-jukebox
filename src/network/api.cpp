@@ -11,6 +11,7 @@
 #include "app/crash_report.h"
 #include "config.h"
 #include "display/display.h"
+#include "input/case_climate.h"
 #include "app/mode.h"
 #include "app/night.h"
 #include "app/rotation.h"
@@ -138,6 +139,7 @@ static void handleDiagnostics() {
   JsonDocument doc;
   telemetryReport(doc.to<JsonObject>());
   clockReport(doc["clock"].to<JsonObject>());
+  caseClimateReport(doc["case"].to<JsonObject>());
   crashBrief(doc["crash"].to<JsonObject>());
   cardReport(doc["card"].to<JsonObject>());
   artCacheReport(doc["cache"].to<JsonObject>());

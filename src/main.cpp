@@ -12,6 +12,7 @@
 #include "app/crash_report.h"
 #include "app/diagnostics.h"
 #include "display/display.h"
+#include "input/case_climate.h"
 #include "app/mode.h"
 #include "app/night.h"
 #include "network/connection.h"
@@ -218,6 +219,7 @@ void setup() {
   runDiagnostics();
   clockChipBegin(); // the time, before Wi-Fi
   crashBegin();     // after the clock, to note when a crash record was found
+  caseClimateBegin();
   cardBegin();
   artCacheBegin();
 
