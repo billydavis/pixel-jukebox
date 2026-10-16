@@ -13,6 +13,7 @@
 #include "html_escape.h"
 #include "rotation_rules.h"
 #include "spectrum_math.h"
+#include "tap_detector.h"
 #include "transitions.h"
 
 #ifdef ARDUINO
@@ -461,6 +462,97 @@ static void test_cache_owner_names_cannot_break_a_line() {
 
 // ---------------------------------------------------------------------------
 
+// --- taps --------------------------------------------------------------------
+
+// Feeds the detector 4 ms samples (250 Hz, as on the board) of the panel lying
+// still, with `extra` g added straight down from `from` to `to` ms. Returns how
+// many single and double taps it reported up to `until`.
+struct TapRun {
+  tap::Detector detector;
+  uint32_t ms = 0;
+  int singles = 0, doubles = 0;
+
+  void run(uint32_t until, uint32_t from = 0, uint32_t to = 0, float extra = 0) {
+    for (; ms < until; ms += 4) {
+      float z = 1.0f + (ms >= from && ms < to ? extra : 0.0f);
+      tap::Gesture g = detector.feed(ms, 0.0f, 0.0f, z);
+      if (g == tap::Gesture::Single) singles++;
+      if (g == tap::Gesture::Double) doubles++;
+    }
+  }
+};
+
+static void test_taps_threshold_follows_sensitivity() {
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 2.5f, tap::Detector::thresholdFor(1));
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 1.5f, tap::Detector::thresholdFor(5));
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.25f, tap::Detector::thresholdFor(10));
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 2.5f, tap::Detector::thresholdFor(-3));
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.25f, tap::Detector::thresholdFor(40));
+}
+
+static void test_taps_stillness_is_not_a_tap() {
+  TapRun r;
+  r.run(3000);
+  TEST_ASSERT_EQUAL(0, r.singles + r.doubles);
+}
+
+static void test_taps_one_knock_is_a_single_tap() {
+  TapRun r;
+  r.run(500);
+  r.run(1500, 500, 512, 2.0f);
+  TEST_ASSERT_EQUAL(1, r.singles);
+  TEST_ASSERT_EQUAL(0, r.doubles);
+  TEST_ASSERT_TRUE(r.detector.lastTapPeak() > 1.5f);
+}
+
+static void test_taps_two_knocks_are_a_double_tap() {
+  TapRun r;
+  r.run(500);
+  r.run(700, 500, 512, 2.0f);
+  r.run(2000, 700, 712, 2.0f);
+  TEST_ASSERT_EQUAL(0, r.singles);
+  TEST_ASSERT_EQUAL(1, r.doubles);
+}
+
+static void test_taps_a_soft_knock_needs_a_higher_sensitivity() {
+  TapRun soft;
+  soft.run(500);
+  soft.run(1500, 500, 512, 0.8f);
+  TEST_ASSERT_EQUAL(0, soft.singles + soft.doubles);
+
+  TapRun sensitive;
+  sensitive.detector.setSensitivity(8); // 0.75 g
+  sensitive.run(500);
+  sensitive.run(1500, 500, 512, 0.8f);
+  TEST_ASSERT_EQUAL(1, sensitive.singles);
+}
+
+static void test_taps_moving_the_panel_is_not_a_tap() {
+  TapRun r;
+  r.run(500);
+  r.run(2500, 500, 700, 2.0f); // 200 ms of push, far longer than a knock
+  TEST_ASSERT_EQUAL(0, r.singles + r.doubles);
+}
+
+static void test_taps_knocks_far_apart_are_two_singles() {
+  TapRun r;
+  r.run(500);
+  r.run(2000, 500, 512, 2.0f);
+  r.run(3500, 2000, 2012, 2.0f); // after the lockout has ended
+  TEST_ASSERT_EQUAL(2, r.singles);
+  TEST_ASSERT_EQUAL(0, r.doubles);
+}
+
+static void test_taps_lockout_swallows_a_quick_third_knock() {
+  TapRun r;
+  r.run(500);
+  r.run(700, 500, 512, 2.0f);
+  r.run(900, 700, 712, 2.0f);   // double tap reported here
+  r.run(2500, 900, 912, 2.0f);  // inside the lockout
+  TEST_ASSERT_EQUAL(1, r.doubles);
+  TEST_ASSERT_EQUAL(0, r.singles);
+}
+
 static int runTests() {
   UNITY_BEGIN();
   RUN_TEST(test_gif_pad_grows_a_small_gif);
@@ -505,6 +597,15 @@ static int runTests() {
   RUN_TEST(test_cache_oldest_is_the_lowest_sequence);
   RUN_TEST(test_cache_stops_at_capacity_but_still_updates);
   RUN_TEST(test_cache_owner_names_cannot_break_a_line);
+
+  RUN_TEST(test_taps_threshold_follows_sensitivity);
+  RUN_TEST(test_taps_stillness_is_not_a_tap);
+  RUN_TEST(test_taps_one_knock_is_a_single_tap);
+  RUN_TEST(test_taps_two_knocks_are_a_double_tap);
+  RUN_TEST(test_taps_a_soft_knock_needs_a_higher_sensitivity);
+  RUN_TEST(test_taps_moving_the_panel_is_not_a_tap);
+  RUN_TEST(test_taps_knocks_far_apart_are_two_singles);
+  RUN_TEST(test_taps_lockout_swallows_a_quick_third_knock);
   return UNITY_END();
 }
 

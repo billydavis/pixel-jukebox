@@ -131,7 +131,7 @@ There is no authentication: anyone on the same network can call it.
 
 ## Diagnostic builds
 
-Three extra PlatformIO environments run a check at boot and then carry on as normal. Upload the regular firmware again afterwards.
+Four extra PlatformIO environments run a check at boot and then carry on as normal. Upload the regular firmware again afterwards.
 
 ```sh
 pio run -e colour-check -t upload
@@ -150,6 +150,12 @@ pio run -e mic-test -t upload
 ```
 
 Plays a short tone and checks both microphones hear it, then shows each microphone's level as a bar for a minute.
+
+```sh
+pio run -e motion-test -t upload
+```
+
+Finds the motion sensor, then for two minutes shows the pull of gravity on each axis, a bar for how hard the last knock was (the amber mark is the default tap threshold, 1.5 g), and how many single and double taps were detected. The border flashes green for a single tap and blue for a double. Each knock is also logged on the serial monitor.
 
 ## Makapix API script
 
