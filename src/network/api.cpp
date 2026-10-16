@@ -6,6 +6,7 @@
 #include <WiFi.h>
 #include <uri/UriBraces.h>
 
+#include "app/clock_chip.h"
 #include "app/commands.h"
 #include "config.h"
 #include "display/display.h"
@@ -120,6 +121,7 @@ static void handleStatus() {
 static void handleDiagnostics() {
   JsonDocument doc;
   telemetryReport(doc.to<JsonObject>());
+  clockReport(doc["clock"].to<JsonObject>());
   cardReport(doc["card"].to<JsonObject>());
   artCacheReport(doc["cache"].to<JsonObject>());
   reporterReportViews(doc["views"].to<JsonObject>());

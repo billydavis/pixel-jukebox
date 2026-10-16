@@ -13,6 +13,7 @@
 #include "html_escape.h"
 #include "likes_book.h"
 #include "rotation_rules.h"
+#include "rtc_time.h"
 #include "spectrum_math.h"
 #include "tap_detector.h"
 #include "transitions.h"
@@ -705,6 +706,73 @@ static void test_views_times_are_iso_utc() {
   TEST_ASSERT_EQUAL_STRING("2106-02-07T06:28:15Z", views::isoTime(0xFFFFFFFFu).c_str());
 }
 
+// --- the clock chip ------------------------------------------------------------
+
+static void test_rtc_encodes_a_known_time() {
+  uint8_t regs[rtc::REGISTERS];
+  rtc::encode(1792159500, regs); // Friday 2026-10-16 14:05:00 UTC
+  const uint8_t expected[rtc::REGISTERS] = {0x00, 0x05, 0x14, 0x16, 5, 0x10, 0x26};
+  TEST_ASSERT_EQUAL_HEX8_ARRAY(expected, regs, rtc::REGISTERS);
+}
+
+static void test_rtc_round_trips() {
+  const uint32_t times[] = {946684800, 951827696, 1709251199, 1792159500, 4102444799u};
+  for (uint32_t t : times) {
+    uint8_t regs[rtc::REGISTERS];
+    uint32_t back = 0;
+    rtc::encode(t, regs);
+    TEST_ASSERT_TRUE(rtc::decode(regs, back));
+    TEST_ASSERT_EQUAL_UINT32(t, back);
+  }
+}
+
+static void test_rtc_refuses_a_stopped_oscillator() {
+  uint8_t regs[rtc::REGISTERS];
+  rtc::encode(1792159500, regs);
+  regs[0] |= 0x80;
+  uint32_t t = 123;
+  TEST_ASSERT_FALSE(rtc::decode(regs, t));
+  TEST_ASSERT_EQUAL_UINT32(123, t);
+}
+
+static void test_rtc_refuses_impossible_values() {
+  uint8_t regs[rtc::REGISTERS];
+  uint32_t t;
+  rtc::encode(1792159500, regs);
+  regs[0] = 0x1A; // not BCD
+  TEST_ASSERT_FALSE(rtc::decode(regs, t));
+  rtc::encode(1792159500, regs);
+  regs[5] = 0x13; // month 13
+  TEST_ASSERT_FALSE(rtc::decode(regs, t));
+  rtc::encode(1792159500, regs);
+  regs[3] = 0x30; // 30 February
+  regs[5] = 0x02;
+  TEST_ASSERT_FALSE(rtc::decode(regs, t));
+  regs[3] = 0x29; // 29 February 2026 is not a leap day either
+  TEST_ASSERT_FALSE(rtc::decode(regs, t));
+  regs[6] = 0x24; // but in 2024 it is
+  TEST_ASSERT_TRUE(rtc::decode(regs, t));
+}
+
+static void test_rtc_clamps_to_the_chips_century() {
+  uint8_t regs[rtc::REGISTERS];
+  uint32_t t;
+  rtc::encode(0, regs);
+  TEST_ASSERT_TRUE(rtc::decode(regs, t));
+  TEST_ASSERT_EQUAL_UINT32(946684800, t); // 2000-01-01
+  TEST_ASSERT_EQUAL_UINT8(6, regs[4]);    // a Saturday
+}
+
+static void test_rtc_dates_and_days_agree() {
+  TEST_ASSERT_EQUAL_INT32(0, rtc::daysFromCivil(1970, 1, 1));
+  TEST_ASSERT_EQUAL_INT32(10957, rtc::daysFromCivil(2000, 1, 1));
+  int y, m, d;
+  for (int32_t days = 10957; days < 10957 + 366 * 8; days += 13) {
+    rtc::civilFromDays(days, y, m, d);
+    TEST_ASSERT_EQUAL_INT32(days, rtc::daysFromCivil(y, m, d));
+  }
+}
+
 static int runTests() {
   UNITY_BEGIN();
   RUN_TEST(test_gif_pad_grows_a_small_gif);
@@ -772,6 +840,13 @@ static int runTests() {
   RUN_TEST(test_views_lines_round_trip);
   RUN_TEST(test_views_damaged_lines_are_refused);
   RUN_TEST(test_views_times_are_iso_utc);
+
+  RUN_TEST(test_rtc_encodes_a_known_time);
+  RUN_TEST(test_rtc_round_trips);
+  RUN_TEST(test_rtc_refuses_a_stopped_oscillator);
+  RUN_TEST(test_rtc_refuses_impossible_values);
+  RUN_TEST(test_rtc_clamps_to_the_chips_century);
+  RUN_TEST(test_rtc_dates_and_days_agree);
   return UNITY_END();
 }
 

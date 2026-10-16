@@ -7,6 +7,7 @@
 
 #include <Arduino.h>
 
+#include "app/clock_chip.h"
 #include "app/commands.h"
 #include "app/diagnostics.h"
 #include "display/display.h"
@@ -146,6 +147,7 @@ void setup() {
   drawTestPattern();
   delay(1500);
   runDiagnostics();
+  clockChipBegin(); // the time, before Wi-Fi
   cardBegin();
   artCacheBegin();
 
@@ -168,6 +170,7 @@ void loop() {
   }
 
   connectionMaintain();
+  clockChipMaintain();
 
   // Sound mode shows one visualizer until the mode changes; otherwise the
   // rotation decides.

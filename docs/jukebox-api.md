@@ -144,6 +144,9 @@ sizes are in bytes.
     { "name": "api", "stack": 8192, "lowestFree": 5816 }
   ],
   "artwork": { "downloaded": 42, "largestBytes": 187850 },
+  "clock": { "source": "network", "utc": "2026-10-16T15:55:14Z",
+             "chip": { "present": true, "keptTimeAtStart": true, "lastSetUtc": "2026-10-16T15:54:59Z",
+                       "driftSecondsAtLastSet": -1 } },
   "card": { "present": true, "mounted": true, "ready": true, "type": "SD", "capacityBytes": 2032664576,
             "fileSystem": "FAT32", "totalBytes": 2027028480, "freeBytes": 2026909696 },
   "cache": { "enabled": true, "artworks": 11, "bytes": 66985, "budgetBytes": 1073741824,
@@ -157,6 +160,8 @@ sizes are in bytes.
 | `heap`, `psram` | Internal and external memory. `lowestFree` is the least that has been free since startup; `largestBlock` is the biggest single allocation possible now |
 | `tasks` | `lowestFree` is the least stack each task has had spare. `loader` is short-lived and appears once it has run |
 | `artwork` | Artworks downloaded since startup and the size of the largest |
+| `clock.source` | Where the time came from: `network` (internet time, checked about hourly), `clock chip` (the board's PCF85063, read at start-up, until the network answers) or `not set`. `utc` is `null` until the time is known |
+| `clock.chip` | The clock chip. `keptTimeAtStart` is `false` after the power was off, unless a backup battery is fitted. It is set from the network each time that answers; `driftSecondsAtLastSet` is how far it had wandered by then (a second either way is rounding: it counts whole seconds) |
 | `card` | The microSD card. `present` means a card answered; `mounted` that it has a FAT file system the board can read; `ready` that it also passed a write test. When it cannot be used, `problem` says why. The card is never formatted by the board |
 | `cache` | Artworks saved on the card. `budgetBytes` is the most the cache will use (at most 1 GB, always leaving 64 MB of the card free); beyond that, or past `maxArtworks`, the artwork that has gone longest unplayed is removed. `playedSinceStart` counts artworks played from the card, offline or asked for from the gallery |
 
@@ -205,8 +210,9 @@ lists. Art asked for from the gallery is reported as chosen (`intent:
 "artwork"`), everything else as part of the shuffle (`intent: "channel"`).
 Makapix takes at most one report every 5 seconds, so they are sent at that pace.
 Views played without a connection wait on the card (in memory without one, up
-to 1,000) and are sent when it returns; if the board's clock had not been set
-yet, Makapix records them at the time they arrive.
+to 1,000) and are sent when it returns. They carry the time they were shown,
+from the clock chip when the network has not answered yet; with no time at all
+(power lost, no battery, no network), Makapix records them when they arrive.
 
 | Field | Meaning |
 |---|---|

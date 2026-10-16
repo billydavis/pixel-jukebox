@@ -21,7 +21,7 @@ Priority is a suggestion until it has been agreed.
 |---|---|---|---|---|
 | 7 | **Tap to like** | S | Blocked | Waiting for the case. Run the `motion-test` build again once mounted, then pick the threshold. Plan: double tap = like, a heart on the panel, a tap to undo |
 | 8 | Auto-rotation from the motion sensor | M | Blocked | Also needs the case, to know how the panel stands |
-| 9 | **Keep time with the onboard clock chip** | S | 2 | The clock slot and offline play work without NTP after a restart |
+| 9 | ~~Keep time with the onboard clock chip~~ | S | Done (0.15.0) | Keeps time through restarts. Through power cuts only with a backup battery on J4 (CR2032 ordered; test by unplugging the panel, then check `keptTimeAtStart`) |
 | 10 | Day and night brightness schedule | S-M | 3 | Dim or off overnight |
 | 11 | Room temperature and humidity slot | S | 3 | Onboard SHTC3 sensor (found at 0x70) |
 | 12 | Weather slot | M | 4 | Needs a weather service |

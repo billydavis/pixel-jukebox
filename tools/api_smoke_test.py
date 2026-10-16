@@ -99,6 +99,10 @@ try:
     check("diagnostics shows no crash since startup",
           body.get("lastReset") not in ("crash", "watchdog", "brownout"), body.get("lastReset"))
 
+    code, body = call("GET", "/diagnostics")
+    clock = body.get("clock", {})
+    check("diagnostics say where the time came from",
+          clock.get("source") in ("network", "clock chip", "not set") and "present" in clock.get("chip", {}), clock)
     code, body = call("GET", "/card")
     check("card status reports the card and the cache",
           code == 200 and "present" in body.get("card", {}) and "enabled" in body.get("cache", {}), body)
