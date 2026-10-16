@@ -19,6 +19,7 @@
 #include "network/makapix.h"
 #include "network/reporter.h"
 #include "network/web_assets.h"
+#include "slots/slot_makapix.h"
 #include "storage/art_cache.h"
 #include "storage/card.h"
 #include "transitions.h"
@@ -109,6 +110,11 @@ static void handleStatus() {
     artwork["gifUrl"] = status.gifUrl;
     artwork["source"] = status.fromCache ? "card" : "makapix";
     artwork["liked"] = reporterLiked(status.postId);
+    if (status.channel.isEmpty()) {
+      artwork["channel"] = nullptr;
+    } else {
+      artwork["channel"] = status.channel;
+    }
   } else {
     doc["artwork"] = nullptr;
   }
@@ -506,6 +512,30 @@ static void sendSlots() {
     JsonObject item = rotation.add<JsonObject>();
     item["slot"] = entry.slot;
     item["turns"] = entry.turns;
+    if (entry.slot == "makapix") {
+      item["channel"] = entry.channel;
+      channels::Channel channel;
+      std::string error;
+      channels::parse(entry.channel.c_str(), channel, error);
+      item["channelLabel"] = channels::label(channel);
+      String problem = makapixChannelProblem(entry.channel);
+      if (!problem.isEmpty()) {
+        item["problem"] = problem;
+      }
+    }
+  }
+  // What an artwork slot's channel can be; `needs` is what has to follow the colon.
+  JsonArray channelTypes = doc["channels"].to<JsonArray>();
+  const char *const TYPES[][3] = {{"all", "Everything", ""},          {"promoted", "Promoted", ""},
+                                  {"mine", "My art", ""},             {"likedby", "Liked by", "name"},
+                                  {"artist", "An artist", "name"},    {"hashtag", "A hashtag", "hashtag"}};
+  for (const auto &type : TYPES) {
+    JsonObject item = channelTypes.add<JsonObject>();
+    item["type"] = type[0];
+    item["label"] = type[1];
+    if (type[2][0]) {
+      item["needs"] = type[2];
+    }
   }
   doc["maxEntries"] = ROTATION_MAX_ENTRIES;
   doc["maxTurns"] = ROTATION_MAX_TURNS;
@@ -532,12 +562,20 @@ static void handlePutSlots() {
       sendError(400, "each entry needs a slot name and a whole number of turns");
       return;
     }
+    if (!item["channel"].isNull() && !item["channel"].is<const char *>()) {
+      sendError(400, "channel must be a string, such as \"promoted\" or \"artist:Fab\"");
+      return;
+    }
     int turns = item["turns"];
     if (turns < 1 || turns > ROTATION_MAX_TURNS) {
       sendError(400, "turns is out of range");
       return;
     }
-    entries.push_back({item["slot"].as<String>(), (uint8_t)turns});
+    String channel = item["channel"] | "";
+    if (channel.isEmpty() && item["slot"].as<String>() == "makapix") {
+      channel = "all";
+    }
+    entries.push_back({item["slot"].as<String>(), (uint8_t)turns, channel});
   }
 
   String error;

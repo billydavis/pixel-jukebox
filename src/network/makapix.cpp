@@ -154,20 +154,26 @@ static String gifUrlFor(const String &artUrl) {
   return url;
 }
 
-QueryStatus nextPage(std::vector<Artwork> &artworks) {
+QueryStatus nextPage(const channels::Channel &channel, PageState &page, std::vector<Artwork> &artworks,
+                     String &problem) {
   artworks.clear();
-  if (cursor.isEmpty()) {
-    shuffleSeed = esp_random() & 0x7fffffff; // new shuffle for each pass
+  if (page.cursor.isEmpty()) {
+    page.seed = esp_random() & 0x7fffffff; // new shuffle for each pass
   }
 
   JsonDocument body;
   body["request_type"] = "query_posts";
-  body["channel"] = "all";
+  body["channel"] = channels::makapixName(channel.kind);
+  if (channel.kind == channels::Kind::Artist || channel.kind == channels::Kind::LikedBy) {
+    body["user_handle"] = channel.value.c_str();
+  } else if (channel.kind == channels::Kind::Hashtag) {
+    body["hashtag"] = channel.value.c_str();
+  }
   body["sort"] = "random";
-  body["random_seed"] = shuffleSeed;
+  body["random_seed"] = page.seed;
   body["limit"] = PAGE_SIZE;
-  if (!cursor.isEmpty()) {
-    body["cursor"] = cursor;
+  if (!page.cursor.isEmpty()) {
+    body["cursor"] = page.cursor;
   }
   JsonArray criteria = body["criteria"].to<JsonArray>();
   JsonObject fits = criteria.add<JsonObject>();
@@ -189,6 +195,13 @@ QueryStatus nextPage(std::vector<Artwork> &artworks) {
   if (status == 401) {
     return QueryStatus::Unauthorized;
   }
+  if (status == 400 || status == 404) {
+    JsonDocument error;
+    deserializeJson(error, response);
+    problem = error["error"] | "Makapix refused the request";
+    Serial.printf("Query refused: HTTP %d %s\n", status, problem.c_str());
+    return QueryStatus::Refused;
+  }
 
   JsonDocument doc;
   if (status != 200 || deserializeJson(doc, response) || !doc["success"].as<bool>()) {
@@ -206,7 +219,7 @@ QueryStatus nextPage(std::vector<Artwork> &artworks) {
   }
 
   // An empty cursor makes the next call start a fresh pass.
-  cursor = doc["has_more"].as<bool>() ? doc["next_cursor"].as<String>() : String();
+  page.cursor = doc["has_more"].as<bool>() ? doc["next_cursor"].as<String>() : String();
   return QueryStatus::Ok;
 }
 
@@ -232,14 +245,18 @@ static SendStatus sendStatusFor(int status, const String &response) {
   return SendStatus::Failed;
 }
 
-SendStatus reportView(uint32_t postId, const String &isoTime, bool requested) {
+SendStatus reportView(uint32_t postId, const String &isoTime, bool requested, const String &channel,
+                      const String &hashtag) {
   JsonDocument body;
   body["post_id"] = postId;
   body["timestamp"] = isoTime;
   body["timezone"] = "";
   body["intent"] = requested ? "artwork" : "channel";
   body["play_order"] = 2; // random
-  body["channel"] = "all";
+  body["channel"] = channel.isEmpty() ? "all" : channel;
+  if (!hashtag.isEmpty()) {
+    body["channel_hashtag"] = hashtag;
+  }
   String payload;
   serializeJson(body, payload);
   String response;

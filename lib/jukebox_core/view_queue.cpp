@@ -17,10 +17,29 @@ bool Queue::push(const View &view) {
 }
 
 std::string toLine(const View &view) {
-  char line[40];
-  snprintf(line, sizeof(line), "V %lu %lu %c\n", (unsigned long)view.postId, (unsigned long)view.unixSeconds,
+  char head[40];
+  snprintf(head, sizeof(head), "V %lu %lu %c ", (unsigned long)view.postId, (unsigned long)view.unixSeconds,
            view.requested ? 'a' : 'c');
-  return line;
+  std::string line = head;
+  line += view.channel.empty() ? "all" : view.channel;
+  if (!view.hashtag.empty()) {
+    line += " " + view.hashtag;
+  }
+  return line + "\n";
+}
+
+// One word up to a space or the end of the line. False if empty or too long.
+static bool word(const char *&at, std::string &out, size_t limit) {
+  const char *start = at;
+  while (*at && *at != ' ' && *at != '\n' && *at != '\r') {
+    at++;
+  }
+  size_t length = (size_t)(at - start);
+  if (length == 0 || length > limit) {
+    return false;
+  }
+  out.assign(start, length);
+  return true;
 }
 
 bool fromLine(const char *line, View &view) {
@@ -41,10 +60,35 @@ bool fromLine(const char *line, View &view) {
     return false;
   }
   char kind = end[1];
-  if ((kind != 'a' && kind != 'c') || (end[2] != '\n' && end[2] != '\0' && end[2] != '\r')) {
-    return false; // includes a line cut short before its end
+  if (kind != 'a' && kind != 'c') {
+    return false;
   }
-  view = {(uint32_t)postId, (uint32_t)seconds, kind == 'a'};
+  View parsed = {(uint32_t)postId, (uint32_t)seconds, kind == 'a', "", ""};
+  const char *at = end + 2;
+  if (*at == ' ') {
+    at++;
+    if (!word(at, parsed.channel, 16)) {
+      return false;
+    }
+    for (char c : parsed.channel) {
+      if (!(c >= 'a' && c <= 'z') && c != '_') {
+        return false;
+      }
+    }
+    if (*at == ' ') {
+      at++;
+      if (!word(at, parsed.hashtag, 256)) {
+        return false;
+      }
+    }
+    if (parsed.channel == "all") {
+      parsed.channel.clear();
+    }
+  }
+  if (*at != '\n' && *at != '\0' && *at != '\r') {
+    return false; // more than expected, or a word cut short
+  }
+  view = parsed;
   return true;
 }
 

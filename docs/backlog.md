@@ -10,7 +10,7 @@ Priority is a suggestion until it has been agreed.
 |---|---|---|---|---|
 | 1 | ~~Like button on the control page~~ | S | Done (0.14.0) | The board passes the like to Makapix (the token never reaches the page) and remembers what has been liked, so the heart shows filled when an artwork comes round again |
 | 2 | ~~View reports~~ | S | Done (0.14.0) | One call per artwork shown; feeds artists' view counts and trending. Views from offline play saved and sent later |
-| 3 | **Channels** | S-M | 2 | Promoted, your own art, one artist, a hashtag; picked on the control page |
+| 3 | ~~Channels~~ | S-M | Done (0.18.0) | One per artwork slot in the rotation: everything, promoted, mine, an artist, a hashtag, liked by a name |
 | 4 | **Playsets** | M | 4 | Weighted mixes of channels set up on makapix.club; can include the card |
 | 5 | **Live presence and remote commands (MQTT)** | L | 3 | "Online" on Makapix with the artwork showing, and next / previous / show this / switch channel from the website |
 | 6 | Comments on the control page | S | 5 | Low value on a 64x64 panel |
@@ -40,7 +40,7 @@ Priority is a suggestion until it has been agreed.
 | 17 | Upload your own art to the card ("My art") | M | 4 | Needs 18 first: anyone on the Wi-Fi could fill the card |
 | 18 | A PIN for the control page and API | M | 3 | No authentication today. p64 has one to learn from |
 | 19 | Updates over Wi-Fi (OTA) | M | 3 | No USB cable needed for new firmware. p64 installs from GitHub releases |
-| 20 | A "Liked" channel from the card | S | after 1 | Plays only art you have liked |
+| 20 | ~~A "Liked" channel~~ | S | Done (0.18.0) | `likedby:<your name>` plays everything you have reacted to, from Makapix itself (website likes included) |
 | 21 | A unique name per panel, for a second unit | S | 5 | Every board is `pixel-jukebox.local` today |
 | 22 | Companion app (Flutter) | L | 5 | The REST API is ready for it |
 | 30 | Explore Bluetooth (BLE) | M | Later | A learning project. Ideas: Wi-Fi setup from a phone instead of the hotspot, or the companion app finding and controlling the panel without Wi-Fi |

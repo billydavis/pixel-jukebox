@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include <Preferences.h>
 
+#include "channels.h"
 #include "rotation_rules.h"
 #include "slots/slot_clock.h"
 #include "slots/slot_makapix.h"
@@ -45,6 +46,28 @@ static Slot *findSlot(const String &name) {
   return nullptr;
 }
 
+// Checks each artwork slot's channel and writes it in canonical form; other
+// slots may not have one.
+static bool tidyChannels(std::vector<RotationEntry> &entries, String &error) {
+  for (RotationEntry &entry : entries) {
+    if (entry.slot != "makapix") {
+      if (!entry.channel.isEmpty()) {
+        error = "only Makapix artwork slots have a channel";
+        return false;
+      }
+      continue;
+    }
+    channels::Channel channel;
+    std::string problem;
+    if (!channels::parse(entry.channel.c_str(), channel, problem)) {
+      error = problem.c_str();
+      return false;
+    }
+    entry.channel = channels::format(channel).c_str();
+  }
+  return true;
+}
+
 static bool validate(const std::vector<RotationEntry> &entries, String &error) {
   std::vector<RotationItem> items;
   for (const RotationEntry &entry : entries) {
@@ -62,9 +85,9 @@ static bool validate(const std::vector<RotationEntry> &entries, String &error) {
   return false;
 }
 
-static std::vector<RotationEntry> defaultRotation() { return {{"makapix", 3}, {"clock", 1}}; }
+static std::vector<RotationEntry> defaultRotation() { return {{"makapix", 3, "all"}, {"clock", 1, ""}}; }
 
-// Stored as JSON: [{"slot":"makapix","turns":3}, ...]
+// Stored as JSON: [{"slot":"makapix","turns":3,"channel":"promoted"}, ...]
 static void save(const std::vector<RotationEntry> &entries) {
   JsonDocument doc;
   JsonArray array = doc.to<JsonArray>();
@@ -72,6 +95,9 @@ static void save(const std::vector<RotationEntry> &entries) {
     JsonObject item = array.add<JsonObject>();
     item["slot"] = entry.slot;
     item["turns"] = entry.turns;
+    if (!entry.channel.isEmpty()) {
+      item["channel"] = entry.channel;
+    }
   }
   String json;
   serializeJson(doc, json);
@@ -86,10 +112,10 @@ static std::vector<RotationEntry> load() {
   }
   std::vector<RotationEntry> entries;
   for (JsonObject item : doc.as<JsonArray>()) {
-    entries.push_back({item["slot"] | "", (uint8_t)(item["turns"] | 0)});
+    entries.push_back({item["slot"] | "", (uint8_t)(item["turns"] | 0), item["channel"] | ""});
   }
   String error;
-  return validate(entries, error) ? entries : defaultRotation();
+  return tidyChannels(entries, error) && validate(entries, error) ? entries : defaultRotation();
 }
 
 void rotationBegin() {
@@ -115,8 +141,9 @@ std::vector<RotationEntry> rotationGet() {
   return rotation;
 }
 
-bool rotationSet(const std::vector<RotationEntry> &entries, String &error) {
-  if (!validate(entries, error)) {
+bool rotationSet(const std::vector<RotationEntry> &requested, String &error) {
+  std::vector<RotationEntry> entries = requested;
+  if (!validate(entries, error) || !tidyChannels(entries, error)) {
     return false;
   }
   Guard guard;
@@ -130,7 +157,11 @@ bool rotationSet(const std::vector<RotationEntry> &entries, String &error) {
 
 Slot *rotationCurrent() {
   Guard guard;
-  return findSlot(rotation[position].slot);
+  Slot *slot = findSlot(rotation[position].slot);
+  if (slot == &makapixSlot) {
+    makapixSlot.useChannel(rotation[position].channel);
+  }
+  return slot;
 }
 
 void rotationAdvance() {

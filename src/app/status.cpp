@@ -22,13 +22,15 @@ void statusSetHeld(bool held) {
   current.held = held;
 }
 
-void statusSetArtwork(uint32_t postId, const String &owner, const String &gifUrl, bool fromCache) {
+void statusSetArtwork(uint32_t postId, const String &owner, const String &gifUrl, bool fromCache,
+                      const String &channel) {
   Guard guard;
   current.hasArtwork = true;
   current.postId = postId;
   current.owner = owner;
   current.gifUrl = gifUrl;
   current.fromCache = fromCache;
+  current.channel = channel;
 }
 
 void statusClearArtwork() {

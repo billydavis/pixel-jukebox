@@ -11,8 +11,9 @@ class MakapixSlot;
 // API; every call is safe from any task.
 
 struct RotationEntry {
-  String slot;   // a name from rotationAvailable()
-  uint8_t turns; // times in a row the slot is shown before moving on
+  String slot;    // a name from rotationAvailable()
+  uint8_t turns;  // times in a row the slot is shown before moving on
+  String channel; // for "makapix" slots, which art (channels.h); empty for the others
 };
 
 struct SlotInfo {
@@ -31,7 +32,8 @@ const std::vector<SlotInfo> &rotationAvailable();
 std::vector<RotationEntry> rotationGet();
 
 // Validates, saves and restarts the rotation from the top once the slot on
-// screen finishes. On failure nothing changes and `error` says why.
+// screen finishes. On failure nothing changes and `error` says why. Channels
+// are stored in their canonical form ("artist:@Fab" becomes "artist:Fab").
 bool rotationSet(const std::vector<RotationEntry> &entries, String &error);
 
 // The slot whose turn it is, then move on to the next turn.

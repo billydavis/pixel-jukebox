@@ -76,6 +76,13 @@ FOLDERS = [
          {"rotation": DEFAULT_ROTATION}, 200),
         ("Set Rotation (art only)", "PUT", "slots", "Artwork only, no clock.",
          {"rotation": [{"slot": "makapix", "turns": 1}]}, 200),
+        ("Set Rotation (channels)", "PUT", "slots",
+         "Two featured artworks, one tagged #cat, one by @Fab, then the clock. Channels: all, promoted, mine, "
+         "artist:<name>, hashtag:<tag>, likedby:<name> (your own name for your likes).",
+         {"rotation": [{"slot": "makapix", "turns": 2, "channel": "promoted"},
+                       {"slot": "makapix", "turns": 1, "channel": "hashtag:cat"},
+                       {"slot": "makapix", "turns": 1, "channel": "artist:Fab"},
+                       {"slot": "clock", "turns": 1}]}, 200),
     ]),
     ("Transitions", [
         ("Get Transition", "GET", "transition",
@@ -130,6 +137,8 @@ FOLDERS = [
         ("Hold With Wrong Type", "POST", "hold", "Expects 400; held must be a JSON boolean.", {"held": "yes"}, 400),
         ("Unknown Slot", "PUT", "slots", "Expects 400; the rotation is left unchanged.",
          {"rotation": [{"slot": "nope", "turns": 1}]}, 400),
+        ("Unknown Channel", "PUT", "slots", "Expects 400; the rotation is left unchanged.",
+         {"rotation": [{"slot": "makapix", "turns": 1, "channel": "nope"}]}, 400),
         ("Unknown Endpoint", "GET", "nope", "Expects 404.", None, 404),
         ("Unknown Panel Mode", "PUT", "panel", "Expects 400; nothing changes and the board does not restart.",
          {"mode": "nope"}, 400),

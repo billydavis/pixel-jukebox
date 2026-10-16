@@ -16,7 +16,9 @@ void reporterBegin();
 
 // An artwork has been on the panel long enough to count as seen. `requested`:
 // asked for by the user (the gallery) rather than picked by the rotation.
-void reporterNoteView(uint32_t postId, bool requested);
+// `channel` is the Makapix channel name it came from, `hashtag` its tag for a
+// hashtag channel.
+void reporterNoteView(uint32_t postId, bool requested, const char *channel = "all", const char *hashtag = "");
 
 bool reporterViewsEnabled();
 // Turning reports off also drops any views still waiting.

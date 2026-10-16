@@ -9,7 +9,12 @@
 // network so they can be tested. Views played offline wait here, and on the
 // card as one line each, until the connection returns:
 //
-//   V <postId> <unixSeconds> <a|c>    a = asked for (gallery), c = the rotation's pick
+//   V <postId> <unixSeconds> <a|c> <channel> [<hashtag>]
+//
+// a = asked for (gallery), c = the rotation's pick. <channel> is the Makapix
+// channel it came from (all, promoted, by_user...), with the tag for a hashtag
+// channel. Lines written before channels were recorded have neither; they
+// read back as "all".
 //
 // `unixSeconds` is 0 when the clock was not set; Makapix then records the view
 // at the time it arrives.
@@ -19,7 +24,9 @@ namespace views {
 struct View {
   uint32_t postId;
   uint32_t unixSeconds;
-  bool requested; // asked for by the user rather than picked by the rotation
+  bool requested;      // asked for by the user rather than picked by the rotation
+  std::string channel; // the Makapix channel name; empty means "all"
+  std::string hashtag; // for the hashtag channel
 };
 
 class Queue {

@@ -109,7 +109,8 @@ the reply is `503` and nothing is queued.
     "owner": "Odio",
     "gifUrl": "https://vault.makapix.club/21/32/abc123.gif",
     "source": "makapix",
-    "liked": false
+    "liked": false,
+    "channel": "Promoted"
   },
   "mode": "rotation",
   "visualizer": "spectrum",
@@ -130,6 +131,7 @@ the reply is `503` and nothing is queued.
 | `artwork.gifUrl` | HTTPS address of the GIF being played, for clients that want to show it. Empty when the artwork is playing from the card |
 | `artwork.source` | `makapix` when downloaded for this turn, `card` when played from the board's offline copy, because Makapix or the Wi-Fi could not be reached or because it was asked for from the gallery |
 | `artwork.liked` | Whether the artwork has been liked from this panel; see `PUT /likes/{postId}` |
+| `artwork.channel` | The channel it came from, as `channelLabel` in `GET /slots`; `null` when from the card |
 | `mode` | `rotation` or `sound` |
 | `visualizer` | The visualizer sound mode uses, whether or not it is showing now |
 | `brightness` | 0-255 |
@@ -466,8 +468,19 @@ It is a `400`, and nothing changes, if `mode` is not one of the two values or
     { "name": "clock", "label": "Clock", "turn": "10 seconds" }
   ],
   "rotation": [
-    { "slot": "makapix", "turns": 3 },
+    { "slot": "makapix", "turns": 2, "channel": "promoted", "channelLabel": "Promoted" },
+    { "slot": "makapix", "turns": 1, "channel": "likedby:billy", "channelLabel": "Liked by @billy" },
+    { "slot": "makapix", "turns": 1, "channel": "artist:nobody", "channelLabel": "@nobody",
+      "problem": "User 'nobody' not found" },
     { "slot": "clock", "turns": 1 }
+  ],
+  "channels": [
+    { "type": "all", "label": "Everything" },
+    { "type": "promoted", "label": "Promoted" },
+    { "type": "mine", "label": "My art" },
+    { "type": "likedby", "label": "Liked by", "needs": "name" },
+    { "type": "artist", "label": "An artist", "needs": "name" },
+    { "type": "hashtag", "label": "A hashtag", "needs": "hashtag" }
   ],
   "maxEntries": 8,
   "maxTurns": 20
@@ -478,21 +491,47 @@ It is a `400`, and nothing changes, if `mode` is not one of the two values or
 |---|---|
 | `available` | Slot types this firmware has. `turn` says what one turn of that slot is, for showing to people |
 | `rotation` | The order slots are shown in. Each entry is shown `turns` times in a row, then the next entry, looping |
+| `rotation[].channel` | For `makapix` slots: which Makapix art it plays; see Channels below. `channelLabel` is the same for people |
+| `rotation[].problem` | Present while the channel cannot play, in Makapix's words or the board's. Its turns are skipped meanwhile, and Makapix is asked again after 5 minutes |
+| `channels` | The channel types, and what each needs after the colon |
 | `maxEntries`, `maxTurns` | Limits that `PUT /slots` enforces |
 
-The example plays three artworks, then the clock for 10 seconds, and repeats.
-The same slot type may appear more than once.
+The example plays two featured artworks, one the owner has liked, one by an
+artist (skipped: there is no such user), then the clock for 10 seconds, and
+repeats. The same slot type may appear more than once, with different channels.
+
+#### Channels
+
+| Channel | Plays |
+|---|---|
+| `all` | Everything public on Makapix. The default |
+| `promoted` | Art featured on Makapix |
+| `mine` | Art by the account the panel is linked to |
+| `artist:<name>` | One artist's art, by their Makapix name |
+| `hashtag:<tag>` | Posts carrying a hashtag |
+| `likedby:<name>` | Art someone has reacted to, newest reactions included; with your own name, your likes from the website and the panel |
+
+Every channel is limited, as before, to art that fits the panel and has a GIF,
+shuffled. A name or tag may be written with its `@` or `#`; it is stored
+without, and hashtags in lower case. Each channel keeps its own place in its
+feed and an artwork ready, so taking turns between channels loses nothing. A
+channel with little art loops through it. Without a connection, every artwork
+slot plays from the card, whatever its channel. View reports say which channel
+an artwork came from.
 
 ### `PUT /slots`
 
 ```json
 {
   "rotation": [
-    { "slot": "makapix", "turns": 5 },
+    { "slot": "makapix", "turns": 3, "channel": "promoted" },
+    { "slot": "makapix", "turns": 1, "channel": "hashtag:cat" },
     { "slot": "clock", "turns": 2 }
   ]
 }
 ```
+
+A `makapix` entry without `channel` plays `all`.
 
 Replaces the whole rotation. Unlike the commands above it is applied directly,
 not queued: the reply is `200` with the same body as `GET /slots`. The slot on
@@ -500,8 +539,10 @@ screen finishes its turn, then the new rotation starts from its first entry.
 The rotation is saved on the board and restored after a restart.
 
 It is a `400`, and nothing changes, if `rotation` is not an array of 1 to
-`maxEntries` entries, a `slot` is not one of the `available` names, or `turns`
-is not a whole number from 1 to `maxTurns`.
+`maxEntries` entries, a `slot` is not one of the `available` names, `turns`
+is not a whole number from 1 to `maxTurns`, a `channel` is not one of the
+forms above, or a slot other than `makapix` has one. Whether a name exists is
+for Makapix to say: an unknown one is accepted and then shows a `problem`.
 
 ### `GET /transition`
 

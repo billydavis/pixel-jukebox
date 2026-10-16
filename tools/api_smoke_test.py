@@ -65,6 +65,11 @@ def section(title):
     print(f"\n{title}")
 
 
+def plan(rotation):
+    """A rotation as (slot, turns, channel), leaving out what the board adds for people."""
+    return [(r.get("slot"), r.get("turns"), r.get("channel")) for r in rotation or []]
+
+
 print(f"Testing {BASE}")
 try:
     code, first = call("GET", "/status")
@@ -126,6 +131,22 @@ try:
     check("showing an artwork that is not on the card is refused", code == 404, body)
     code, body = call("DELETE", "/card/art/abc")
     check("removing with a postId that is not a number is refused", code == 404, body)
+
+    section("Channels")
+    code, slots = call("GET", "/slots")
+    check("slots list the channel types",
+          code == 200 and [c.get("type") for c in slots.get("channels", [])]
+          == ["all", "promoted", "mine", "likedby", "artist", "hashtag"], slots.get("channels"))
+    check("every artwork slot has a channel",
+          all(r.get("channel") for r in slots.get("rotation", []) if r.get("slot") == "makapix"), slots.get("rotation"))
+    for bad in ({"slot": "makapix", "turns": 1, "channel": "nope"},
+                {"slot": "makapix", "turns": 1, "channel": "artist:"},
+                {"slot": "makapix", "turns": 1, "channel": "hashtag:two words"},
+                {"slot": "clock", "turns": 1, "channel": "promoted"}):
+        code, body = call("PUT", "/slots", {"rotation": [bad]})
+        check(f"rotation rejects channel {bad['channel']!r} on {bad['slot']}", code == 400, body)
+    code, after = call("GET", "/slots")
+    check("rejected channels changed nothing", after.get("rotation") == slots.get("rotation"), after.get("rotation"))
 
     section("Panel")
     code, panel = call("GET", "/panel")
@@ -206,10 +227,11 @@ try:
     code, body = call("GET", "/slots")
     available = [slot["name"] for slot in body.get("available", [])]
     check("slots lists what can go in the rotation", code == 200 and available == ["makapix", "clock"], available)
-    trial = [{"slot": "clock", "turns": 2}, {"slot": "makapix", "turns": 1}]
+    trial = [{"slot": "clock", "turns": 2}, {"slot": "makapix", "turns": 1, "channel": "hashtag:#Cat"}]
+    expected = [("clock", 2, None), ("makapix", 1, "hashtag:cat")]  # the channel is stored tidied
     code, body = call("PUT", "/slots", {"rotation": trial})
-    check("rotation can be replaced", code == 200 and body.get("rotation") == trial, body)
-    check("GET /slots returns the new rotation", call("GET", "/slots")[1]["rotation"] == trial)
+    check("rotation can be replaced", code == 200 and plan(body.get("rotation")) == expected, body)
+    check("GET /slots returns the new rotation", plan(call("GET", "/slots")[1]["rotation"]) == expected)
     too_many = [{"slot": "clock", "turns": 1}] * (body.get("maxEntries", 8) + 1)
     for label, bad in (
         ("an empty list", {"rotation": []}),
@@ -223,7 +245,7 @@ try:
     ):
         code, body = call("PUT", "/slots", bad)
         check(f"rotation rejects {label}", code == 400 and "error" in body, body)
-    check("rejected rotations changed nothing", call("GET", "/slots")[1]["rotation"] == trial)
+    check("rejected rotations changed nothing", plan(call("GET", "/slots")[1]["rotation"]) == expected)
 
     section("Transitions")
     code, body = call("GET", "/transition")
@@ -247,7 +269,7 @@ finally:
     call("POST", "/hold", {"held": False})
     call("PUT", "/transition", {"transition": original_transition})
     time.sleep(SETTLE_S)
-    restored = (call("GET", "/slots")[1]["rotation"] == original_rotation
+    restored = (plan(call("GET", "/slots")[1]["rotation"]) == plan(original_rotation)
                 and call("GET", "/brightness")[1]["value"] == original_brightness
                 and call("GET", "/mode")[1]["mode"] == original_mode["mode"]
                 and call("GET", "/transition")[1]["transition"] == original_transition)

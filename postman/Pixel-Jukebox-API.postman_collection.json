@@ -1078,6 +1078,54 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Set Rotation (channels)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/slots",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "slots"
+              ]
+            },
+            "description": "Two featured artworks, one tagged #cat, one by @Fab, then the clock. Channels: all, promoted, mine, artist:<name>, hashtag:<tag>, likedby:<name> (your own name for your likes).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rotation\": [\n    {\n      \"slot\": \"makapix\",\n      \"turns\": 2,\n      \"channel\": \"promoted\"\n    },\n    {\n      \"slot\": \"makapix\",\n      \"turns\": 1,\n      \"channel\": \"hashtag:cat\"\n    },\n    {\n      \"slot\": \"makapix\",\n      \"turns\": 1,\n      \"channel\": \"artist:Fab\"\n    },\n    {\n      \"slot\": \"clock\",\n      \"turns\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
         }
       ]
     },
@@ -1933,6 +1981,54 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"rotation\": [\n    {\n      \"slot\": \"nope\",\n      \"turns\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Unknown Channel",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/slots",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "slots"
+              ]
+            },
+            "description": "Expects 400; the rotation is left unchanged.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rotation\": [\n    {\n      \"slot\": \"makapix\",\n      \"turns\": 1,\n      \"channel\": \"nope\"\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"

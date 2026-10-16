@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "cache_index.h"
+#include "channels.h"
 #include "crash_cause.h"
 #include "gif_pad.h"
 #include "html_escape.h"
@@ -679,21 +680,37 @@ static void test_views_queue_drops_the_oldest_when_full() {
 }
 
 static void test_views_lines_round_trip() {
-  views::View view = {2486, 1792160700, true}, back = {0, 0, false};
+  views::View view = {2486, 1792160700, true, "", ""}, back = {0, 0, false, "x", "y"};
   std::string line = views::toLine(view);
-  TEST_ASSERT_EQUAL_STRING("V 2486 1792160700 a\n", line.c_str());
+  TEST_ASSERT_EQUAL_STRING("V 2486 1792160700 a all\n", line.c_str());
   TEST_ASSERT_TRUE(views::fromLine(line.c_str(), back));
   TEST_ASSERT_EQUAL_UINT32(2486, back.postId);
   TEST_ASSERT_EQUAL_UINT32(1792160700, back.unixSeconds);
   TEST_ASSERT_TRUE(back.requested);
-  TEST_ASSERT_TRUE(views::fromLine("V 7 0 c", back));
+  TEST_ASSERT_TRUE(back.channel.empty());
+  TEST_ASSERT_TRUE(views::fromLine("V 7 0 c", back)); // written before channels were recorded
   TEST_ASSERT_FALSE(back.requested);
+  TEST_ASSERT_TRUE(back.channel.empty());
+}
+
+static void test_views_remember_their_channel() {
+  views::View view = {12, 34, false, "hashtag", "cat"}, back;
+  std::string line = views::toLine(view);
+  TEST_ASSERT_EQUAL_STRING("V 12 34 c hashtag cat\n", line.c_str());
+  TEST_ASSERT_TRUE(views::fromLine(line.c_str(), back));
+  TEST_ASSERT_EQUAL_STRING("hashtag", back.channel.c_str());
+  TEST_ASSERT_EQUAL_STRING("cat", back.hashtag.c_str());
+  TEST_ASSERT_TRUE(views::fromLine("V 12 34 c promoted\n", back));
+  TEST_ASSERT_EQUAL_STRING("promoted", back.channel.c_str());
+  TEST_ASSERT_TRUE(back.hashtag.empty());
+  TEST_ASSERT_FALSE(views::fromLine("V 12 34 c Promoted\n", back)); // not a channel name
+  TEST_ASSERT_FALSE(views::fromLine("V 12 34 c hashtag cat extra\n", back));
 }
 
 static void test_views_damaged_lines_are_refused() {
   views::View view = {1, 2, false};
   const char *bad[] = {"", "V", "V 12", "V 12 34", "V 12 34 x\n", "X 12 34 c\n", "V 0 34 c\n",
-                       "V -5 34 c\n", "V 12 -1 c\n", "V 12 34 cc\n", "V 12 3a c\n"};
+                       "V -5 34 c\n", "V 12 -1 c\n", "V 12 34 cc\n", "V 12 3a c\n", "V 12 34 c \n"};
   for (const char *line : bad) {
     TEST_ASSERT_FALSE_MESSAGE(views::fromLine(line, view), line);
   }
@@ -797,6 +814,72 @@ static void test_crash_hints_cover_the_common_causes() {
   TEST_ASSERT_NULL(crash::causeHint(4));
 }
 
+// --- channels ------------------------------------------------------------------
+
+static void test_channels_simple_ones_parse() {
+  channels::Channel c;
+  std::string error;
+  TEST_ASSERT_TRUE(channels::parse("all", c, error));
+  TEST_ASSERT_TRUE(c.kind == channels::Kind::All);
+  TEST_ASSERT_TRUE(channels::parse("", c, error)); // no channel: everything
+  TEST_ASSERT_TRUE(c.kind == channels::Kind::All);
+  TEST_ASSERT_TRUE(channels::parse("promoted", c, error));
+  TEST_ASSERT_EQUAL_STRING("promoted", channels::makapixName(c.kind));
+  TEST_ASSERT_TRUE(channels::parse("mine", c, error));
+  TEST_ASSERT_EQUAL_STRING("user", channels::makapixName(c.kind));
+  TEST_ASSERT_EQUAL_STRING("My art", channels::label(c).c_str());
+}
+
+static void test_channels_names_and_tags_parse_and_tidy() {
+  channels::Channel c;
+  std::string error;
+  TEST_ASSERT_TRUE(channels::parse("artist:@Fab", c, error));
+  TEST_ASSERT_TRUE(c.kind == channels::Kind::Artist);
+  TEST_ASSERT_EQUAL_STRING("Fab", c.value.c_str()); // @ dropped, case kept
+  TEST_ASSERT_EQUAL_STRING("artist:Fab", channels::format(c).c_str());
+  TEST_ASSERT_EQUAL_STRING("by_user", channels::makapixName(c.kind));
+  TEST_ASSERT_EQUAL_STRING("@Fab", channels::label(c).c_str());
+
+  TEST_ASSERT_TRUE(channels::parse("hashtag:#Cat", c, error));
+  TEST_ASSERT_EQUAL_STRING("cat", c.value.c_str()); // hashtags are lower case on Makapix
+  TEST_ASSERT_EQUAL_STRING("#cat", channels::label(c).c_str());
+
+  TEST_ASSERT_TRUE(channels::parse("likedby:Odio", c, error));
+  TEST_ASSERT_EQUAL_STRING("reactions", channels::makapixName(c.kind));
+  TEST_ASSERT_EQUAL_STRING("Liked by @Odio", channels::label(c).c_str());
+}
+
+static void test_channels_names_in_any_script_are_counted_in_characters() {
+  channels::Channel c;
+  std::string error;
+  // 32 three-byte characters is 96 bytes but still 32 characters.
+  std::string name;
+  for (int i = 0; i < 32; i++) name += "\xE3\x81\x82"; // あ
+  TEST_ASSERT_TRUE(channels::parse("artist:" + name, c, error));
+  TEST_ASSERT_FALSE(channels::parse("artist:" + name + "x", c, error));
+}
+
+static void test_channels_reject_what_is_not_a_channel() {
+  channels::Channel c;
+  std::string error;
+  const char *bad[] = {"everything", "artist", "artist:", "artist:@", "hashtag:#", "likedby:",
+                       "artist:two words", "hashtag:a:b", "artist:a/b", "ARTIST:Fab",
+                       "artist:abcdefghijklmnopqrstuvwxyz0123456"};
+  for (const char *spec : bad) {
+    error.clear();
+    TEST_ASSERT_FALSE_MESSAGE(channels::parse(spec, c, error), spec);
+    TEST_ASSERT_FALSE_MESSAGE(error.empty(), spec);
+  }
+}
+
+static void test_channels_a_refused_parse_changes_nothing() {
+  channels::Channel c;
+  std::string error;
+  channels::parse("hashtag:cat", c, error);
+  TEST_ASSERT_FALSE(channels::parse("hashtag:", c, error));
+  TEST_ASSERT_EQUAL_STRING("cat", c.value.c_str());
+}
+
 static int runTests() {
   UNITY_BEGIN();
   RUN_TEST(test_gif_pad_grows_a_small_gif);
@@ -862,6 +945,7 @@ static int runTests() {
 
   RUN_TEST(test_views_queue_drops_the_oldest_when_full);
   RUN_TEST(test_views_lines_round_trip);
+  RUN_TEST(test_views_remember_their_channel);
   RUN_TEST(test_views_damaged_lines_are_refused);
   RUN_TEST(test_views_times_are_iso_utc);
 
@@ -875,6 +959,12 @@ static int runTests() {
   RUN_TEST(test_crash_causes_have_their_idf_names);
   RUN_TEST(test_crash_unknown_causes_are_named_so);
   RUN_TEST(test_crash_hints_cover_the_common_causes);
+
+  RUN_TEST(test_channels_simple_ones_parse);
+  RUN_TEST(test_channels_names_and_tags_parse_and_tidy);
+  RUN_TEST(test_channels_names_in_any_script_are_counted_in_characters);
+  RUN_TEST(test_channels_reject_what_is_not_a_channel);
+  RUN_TEST(test_channels_a_refused_parse_changes_nothing);
   return UNITY_END();
 }
 

@@ -80,8 +80,11 @@ a.btn{display:inline-flex;align-items:center;min-height:44px;padding:0 10px;colo
   font:700 17px/1 var(--mono);text-transform:uppercase;text-decoration:none;box-shadow:3px 3px 0 var(--edge)}
 a.btn:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--edge)}
 .add{display:flex;gap:10px}
-select{flex:1;min-width:0;min-height:44px;padding:0 10px;border:0;border-radius:0;
+select,input[type=text]{flex:1;min-width:0;min-height:44px;padding:0 10px;border:0;border-radius:0;
   font:15px system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--panel)}
+input[type=text]::placeholder{color:var(--dim)}
+.add.wrap{flex-wrap:wrap}.add.wrap select{flex-basis:100%}
+.rot .nm small.bad{color:var(--held)}
 .field{display:block;margin:20px 0 8px;font:13px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
 .facts{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0 0 12px;font:13px/1.4 var(--mono)}
 .facts dt{color:var(--dim)}
@@ -144,8 +147,9 @@ kbd{font:inherit;color:var(--ink)}
     <details class="rot" id="rot">
       <summary>Rotation</summary>
       <ol id="rows"></ol>
-      <div class="add">
+      <div class="add wrap">
         <select id="kind" aria-label="Slot to add"></select>
+        <input id="chval" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" hidden>
         <button id="add" class="sm">Add</button>
       </div>
       <label class="field" for="trans">Between slots</label>
@@ -186,7 +190,11 @@ let st=null,timer=0,dragging=false,sendTimer=0;
 
 async function call(method,path,body){
   const r=await fetch(API+path,{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
-  if(!r.ok)throw new Error(r.status);
+  if(!r.ok){
+    const e=new Error(r.status);
+    try{e.reason=(await r.json()).error;}catch(x){}
+    throw e;
+  }
   return r.json();
 }
 
@@ -210,7 +218,7 @@ function render(online){
     img.alt='Artwork by '+art.owner;
     img.hidden=false;msg.hidden=true;
     $('who').textContent=art.owner?'@'+art.owner:'Unknown artist';
-    $('sub').textContent='Makapix post '+art.postId+(card?', from the card':'');
+    $('sub').textContent='Makapix post '+art.postId+(card?', from the card':art.channel&&art.channel!='Everything'?' · '+art.channel:'');
   }else{
     img.hidden=true;img.removeAttribute('src');delete img.dataset.post;msg.hidden=false;
     const clock=slot=='clock';
@@ -414,7 +422,7 @@ $('restart').onclick=()=>{
 };
 
 let rot=null;
-const copy=()=>rot.rotation.map(r=>({...r}));
+const copy=()=>rot.rotation.map(r=>r.slot=='makapix'?{slot:r.slot,turns:r.turns,channel:r.channel}:{slot:r.slot,turns:r.turns});
 
 async function loadRot(){
   try{rot=await call('GET','/slots');drawRot();}catch(e){$('rotnote').textContent='Could not load the rotation.';}
@@ -426,8 +434,10 @@ function drawRot(){
   rot.rotation.forEach((r,i)=>{
     const a=rot.available.find(x=>x.name==r.slot)||{label:r.slot,turn:'turn'};
     const li=document.createElement('li'),nm=document.createElement('span'),sm=document.createElement('small');
-    nm.className='nm';nm.textContent=a.label;
-    sm.textContent=r.turns+' × '+a.turn;nm.appendChild(sm);li.appendChild(nm);
+    nm.className='nm';nm.textContent=r.slot=='makapix'?'Art: '+r.channelLabel:a.label;
+    sm.textContent=r.turns+' × '+a.turn;nm.appendChild(sm);
+    if(r.problem){const bad=document.createElement('small');bad.className='bad';bad.textContent='Skipped: '+r.problem;nm.appendChild(bad);}
+    li.appendChild(nm);
     const btn=(j,text,label,off,fn)=>{
       const b=document.createElement('button');
       b.className='sm';b.textContent=text;b.dataset.k=i+':'+j;b.disabled=off;b.onclick=fn;
@@ -440,7 +450,16 @@ function drawRot(){
     rows.appendChild(li);
   });
   const kind=$('kind');
-  if(!kind.options.length)rot.available.forEach(a=>kind.add(new Option(a.label,a.name)));
+  if(!kind.options.length){
+    rot.available.forEach(a=>{
+      if(a.name!='makapix'){kind.add(new Option(a.label,a.name));return;}
+      rot.channels.forEach(c=>{
+        const o=new Option('Art: '+(c.type=='all'?'everything':c.label.toLowerCase())+(c.needs?'…':''),'makapix');
+        o.dataset.type=c.type;if(c.needs)o.dataset.needs=c.needs;kind.add(o);
+      });
+    });
+    kind.onchange=showChannelBox;showChannelBox();
+  }
   $('add').disabled=rot.rotation.length>=rot.maxEntries;
   const again=focus&&rows.querySelector('[data-k="'+focus+'"]');
   if(again&&!again.disabled)again.focus();
@@ -452,12 +471,33 @@ async function saveRot(list){
     $('rotnote').textContent='Saved. Starts after the current piece.';
     drawRot();
   }catch(e){
-    $('rotnote').textContent='Could not save. Try again.';
+    $('rotnote').textContent=e.reason?'Not saved: '+e.reason+'.':'Could not save. Try again.';
     loadRot();
   }
 }
 
-$('add').onclick=()=>{const l=copy();l.push({slot:$('kind').value,turns:1});saveRot(l);};
+function picked(){return $('kind').selectedOptions[0]||{dataset:{}};}
+function showChannelBox(){
+  const o=picked(),box=$('chval'),needs=o.dataset.needs;
+  box.hidden=!needs;
+  if(!needs)return;
+  box.placeholder=needs=='hashtag'?'Hashtag, such as cat':o.dataset.type=='likedby'?'Your Makapix name':'Artist\'s Makapix name';
+  box.setAttribute('aria-label',box.placeholder);
+  box.value=o.dataset.type=='likedby'?remembered():'';
+}
+function remembered(){try{return localStorage.getItem('jukebox.name')||'';}catch(e){return '';}}
+$('add').onclick=()=>{
+  const o=picked(),l=copy();
+  if(o.value!='makapix'){l.push({slot:o.value,turns:1});saveRot(l);return;}
+  let channel=o.dataset.type;
+  if(o.dataset.needs){
+    const v=$('chval').value.trim().replace(/^[@#]/,'');
+    if(!v){$('rotnote').textContent=o.dataset.needs=='hashtag'?'Type a hashtag first.':'Type a Makapix name first.';$('chval').focus();return;}
+    if(channel=='likedby'){try{localStorage.setItem('jukebox.name',v);}catch(e){}}
+    channel+=':'+v;
+  }
+  l.push({slot:'makapix',turns:1,channel});saveRot(l);
+};
 async function loadTrans(){
   try{
     const t=await call('GET','/transition'),sel=$('trans');

@@ -4,6 +4,10 @@
 #include "slots/slot.h"
 
 struct LoadedArtwork;
+struct Feed;
+
+// Why the channel `spec` cannot play right now, or empty. Safe from any task.
+String makapixChannelProblem(const String &spec);
 
 // Plays one Makapix artwork per turn, preloading the next in the background.
 // While the device is not registered it shows the registration code instead.
@@ -13,6 +17,9 @@ class MakapixSlot : public Slot {
 
   // The next start() shows this artwork from the card instead, once.
   void request(uint32_t postId) { requestedPost = postId; }
+
+  // The channel the next start() plays from, as a channels.h string.
+  void useChannel(const String &spec);
 
   const char *name() const override { return "makapix"; }
   bool start() override;
@@ -33,6 +40,7 @@ class MakapixSlot : public Slot {
   uint32_t updatePlaying();
 
   Mode mode = Mode::Idle;
+  Feed *feed = nullptr; // the channel in use
   uint32_t requestedPost = 0;
   uint32_t startedAt = 0;
 
@@ -49,6 +57,7 @@ class MakapixSlot : public Slot {
   uint32_t postId = 0;
   bool requested = false; // asked for from the gallery
   bool viewNoted = false;
+  const channels::Channel *playingChannel = nullptr; // where the artwork came from; null from the card
   uint32_t dwellMs = 0;
   int framesThisLoop = 0;
   bool loopEnded = false;

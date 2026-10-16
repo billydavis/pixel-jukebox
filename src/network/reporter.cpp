@@ -63,7 +63,7 @@ static void loadBacklog() {
   if (!file) {
     return;
   }
-  char line[48];
+  char line[320];
   int damaged = 0;
   Guard guard;
   while (fgets(line, sizeof(line), file)) {
@@ -197,7 +197,8 @@ static void sendNextView() {
     view = backlog.front();
   }
   lastViewAt = millis();
-  makapix::SendStatus status = makapix::reportView(view.postId, views::isoTime(view.unixSeconds).c_str(), view.requested);
+  makapix::SendStatus status = makapix::reportView(view.postId, views::isoTime(view.unixSeconds).c_str(),
+                                                   view.requested, view.channel.c_str(), view.hashtag.c_str());
   if (status == makapix::SendStatus::RateLimited) {
     Guard guard;
     viewsRateLimited++;
@@ -260,14 +261,15 @@ void reporterBegin() {
   telemetryRegisterTask("reporter", task, STACK_BYTES);
 }
 
-void reporterNoteView(uint32_t postId, bool requested) {
+void reporterNoteView(uint32_t postId, bool requested, const char *channel, const char *hashtag) {
   {
     Guard guard;
     if (!viewsEnabled) {
       return;
     }
     time_t now = time(nullptr);
-    if (!backlog.push({postId, now > CLOCK_SET_AFTER ? (uint32_t)now : 0, requested})) {
+    std::string name = strcmp(channel, "all") == 0 ? "" : channel;
+    if (!backlog.push({postId, now > CLOCK_SET_AFTER ? (uint32_t)now : 0, requested, name, hashtag})) {
       viewsDropped++;
     }
     unsaved = min(unsaved + 1, backlog.size());
