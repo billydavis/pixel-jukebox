@@ -14,6 +14,8 @@
 #include "app/status.h"
 #include "app/telemetry.h"
 #include "app/transition.h"
+#include "network/makapix.h"
+#include "network/reporter.h"
 #include "network/web_assets.h"
 #include "storage/art_cache.h"
 #include "storage/card.h"
@@ -104,6 +106,7 @@ static void handleStatus() {
     artwork["owner"] = status.owner;
     artwork["gifUrl"] = status.gifUrl;
     artwork["source"] = status.fromCache ? "card" : "makapix";
+    artwork["liked"] = reporterLiked(status.postId);
   } else {
     doc["artwork"] = nullptr;
   }
@@ -119,6 +122,8 @@ static void handleDiagnostics() {
   telemetryReport(doc.to<JsonObject>());
   cardReport(doc["card"].to<JsonObject>());
   artCacheReport(doc["cache"].to<JsonObject>());
+  reporterReportViews(doc["views"].to<JsonObject>());
+  reporterReportLikes(doc["likes"].to<JsonObject>());
   sendJson(200, doc);
 }
 
@@ -324,6 +329,60 @@ static void handleClearArt() {
   sendJson(200, doc);
 }
 
+// --- likes and view reports ------------------------------------------------------
+
+static void handleGetLikes() {
+  JsonDocument doc;
+  reporterReportLikes(doc.to<JsonObject>());
+  JsonArray liked = doc["liked"].to<JsonArray>();
+  for (uint32_t postId : reporterLikes()) {
+    liked.add(postId);
+  }
+  sendJson(200, doc);
+}
+
+static void setLike(bool liked) {
+  uint32_t postId = pathPostId();
+  if (!postId) {
+    sendError(404, "Not a postId");
+    return;
+  }
+  if (!makapix::isRegistered()) {
+    sendError(409, "The panel is not linked to a Makapix account yet");
+    return;
+  }
+  reporterSetLiked(postId, liked);
+  JsonDocument doc;
+  doc["postId"] = postId;
+  doc["liked"] = liked;
+  sendJson(200, doc);
+}
+
+static void handleLike() { setLike(true); }
+static void handleUnlike() { setLike(false); }
+
+static void sendViews() {
+  JsonDocument doc;
+  reporterReportViews(doc.to<JsonObject>());
+  sendJson(200, doc);
+}
+
+static void handleGetViews() { sendViews(); }
+
+// {"report": true|false}. Turning reports off also drops views still waiting.
+static void handlePutViews() {
+  JsonDocument body;
+  if (!readBody(body)) {
+    return;
+  }
+  if (!body["report"].is<bool>()) {
+    sendError(400, "report must be true or false");
+    return;
+  }
+  reporterSetViewsEnabled(body["report"].as<bool>());
+  sendViews();
+}
+
 static void handleRestart() { sendQueued(commandSend(CommandType::Restart), "restart"); }
 
 static void handleWifiSetup() { sendQueued(commandSend(CommandType::WifiSetup), "wifiSetup"); }
@@ -419,6 +478,11 @@ void apiBegin() {
   server.on(UriBraces(API_BASE "/card/art/{}/show"), HTTP_POST, handleShowArt);
   server.on(UriBraces(API_BASE "/card/art/{}"), HTTP_DELETE, handleRemoveArt);
   server.on(API_BASE "/restart", HTTP_POST, handleRestart);
+  server.on(API_BASE "/likes", HTTP_GET, handleGetLikes);
+  server.on(UriBraces(API_BASE "/likes/{}"), HTTP_PUT, handleLike);
+  server.on(UriBraces(API_BASE "/likes/{}"), HTTP_DELETE, handleUnlike);
+  server.on(API_BASE "/views", HTTP_GET, handleGetViews);
+  server.on(API_BASE "/views", HTTP_PUT, handlePutViews);
   server.on(API_BASE "/wifi/setup", HTTP_POST, handleWifiSetup);
   server.on(API_BASE "/slots", HTTP_GET, handleGetSlots);
   server.on(API_BASE "/slots", HTTP_PUT, handlePutSlots);

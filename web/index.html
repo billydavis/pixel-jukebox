@@ -36,6 +36,12 @@ h1{margin:0;font:700 14px/1 var(--mono);letter-spacing:.28em;text-transform:uppe
 .pause i{width:calc(var(--c)*2);height:calc(var(--c)*5);background:var(--ink)}
 .held .pause{display:flex}
 .side{display:grid;gap:22px;width:100%;max-width:calc(var(--c)*64 + 20px)}
+.head{display:flex;gap:14px;align-items:flex-start;justify-content:space-between}
+.head>div{min-width:0}
+button.heart{flex:none;width:56px;min-height:56px;padding:0;font-size:28px;letter-spacing:0;line-height:1}
+button.heart[aria-pressed=true]{background:var(--held)}
+button.toggle[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);transform:none;box-shadow:3px 3px 0 var(--edge)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:4px 0 0}
 .who{margin:0;font-size:24px;font-weight:700;line-height:1.15;overflow-wrap:anywhere}
 .sub{margin:4px 0 0;font:13px/1.3 var(--mono);color:var(--dim)}
 .keys{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -108,9 +114,12 @@ kbd{font:inherit;color:var(--ink)}
     </div>
   </div>
   <div class="side">
-    <div>
-      <p class="who" id="who">&nbsp;</p>
-      <p class="sub" id="sub">&nbsp;</p>
+    <div class="head">
+      <div>
+        <p class="who" id="who">&nbsp;</p>
+        <p class="sub" id="sub">&nbsp;</p>
+      </div>
+      <button id="like" class="heart" aria-pressed="false" aria-label="Like on Makapix" hidden>&#9825;</button>
     </div>
     <div class="keys" role="group" aria-label="Mode">
       <button id="mrot" class="pick" aria-pressed="true" disabled>Jukebox</button>
@@ -137,6 +146,15 @@ kbd{font:inherit;color:var(--ink)}
         <select id="trans"></select>
       </div>
       <p class="note" id="rotnote" role="status"></p>
+    </details>
+    <details class="rot" id="mkbox">
+      <summary>Makapix</summary>
+      <div class="row">
+        <span class="nm">Report views</span>
+        <button id="views" class="sm toggle" aria-pressed="true">On</button>
+      </div>
+      <p class="note wifi" id="viewsnote">&nbsp;</p>
+      <dl class="facts" id="mkfacts"></dl>
     </details>
     <details class="rot" id="cardbox">
       <summary>Card</summary>
@@ -173,7 +191,7 @@ function uptime(s){
 function render(online){
   document.body.classList.toggle('off',!online);
   $('link').textContent=online?'Live':st?'Lost contact, retrying':'Connecting';
-  for(const id of['hold','next','bri','mrot','msnd'])$(id).disabled=!online;
+  for(const id of['hold','next','bri','mrot','msnd','like'])$(id).disabled=!online;
   $('viz').querySelectorAll('button').forEach(b=>b.disabled=!online);
   if(!online||!st)return;
 
@@ -194,6 +212,15 @@ function render(online){
       slot=='makapix'?'Code is on the panel':'Nothing showing';
     $('who').textContent=clock?'Clock':slot=='makapix'?'Waiting to be linked':'Between pieces';
     $('sub').textContent=clock?'Back to the art in a moment':slot=='makapix'?'Enter the code at makapix.club':' ';
+  }
+
+  const like=$('like');
+  like.hidden=!art;
+  if(art){
+    like.disabled=!online;
+    like.setAttribute('aria-pressed',!!art.liked);
+    like.innerHTML=art.liked?'&#9829;':'&#9825;';
+    like.setAttribute('aria-label',(art.liked?'Unlike':'Like')+' on Makapix');
   }
 
   const snd=st.mode=='sound';
@@ -280,6 +307,47 @@ $('wifi').onclick=()=>{
   $('wifi').disabled=true;$('wifi').textContent='Restarting';
   $('wifinote').textContent='Join the Pixel-Jukebox network on your phone to choose a new network.';
   call('POST','/wifi/setup').catch(()=>{});
+};
+
+$('like').onclick=async()=>{
+  const art=st&&st.artwork;
+  if(!art)return;
+  const liked=!art.liked;
+  art.liked=liked;render(true);
+  try{await call(liked?'PUT':'DELETE','/likes/'+art.postId);}
+  catch(e){
+    art.liked=!liked;render(true);
+    $('sub').textContent=e.message=='409'?'Link the panel to Makapix to like art':'Could not reach the panel. Try again.';
+  }
+};
+
+async function loadMk(){
+  try{
+    const [v,l]=await Promise.all([call('GET','/views'),call('GET','/likes')]);
+    const b=$('views');
+    b.setAttribute('aria-pressed',v.report);b.textContent=v.report?'On':'Off';
+    $('viewsnote').textContent=v.report?
+      'Tells Makapix each artwork the panel shows, so artists see how often their work is seen. Views played offline are sent when the connection returns.':
+      'Off: Makapix is not told what the panel shows.';
+    const rows=[['Views sent',v.sentSinceStart+' since the panel started']];
+    if(v.waiting)rows.push(['Views waiting',v.waiting+'']);
+    rows.push(['Liked',l.count+' artwork'+(l.count==1?'':'s')]);
+    if(l.waiting)rows.push(['Likes waiting',l.waiting+'']);
+    const problem=v.problem||l.problem;
+    if(problem)rows.push(['Problem',problem]);
+    const facts=$('mkfacts');
+    facts.textContent='';
+    rows.forEach(([k2,val])=>{
+      const dt=document.createElement('dt'),dd=document.createElement('dd');
+      dt.textContent=k2;dd.textContent=val;facts.append(dt,dd);
+    });
+  }catch(e){$('viewsnote').textContent='Could not read the Makapix settings.';}
+}
+$('mkbox').ontoggle=()=>{if($('mkbox').open)loadMk();};
+$('views').onclick=async()=>{
+  const on=$('views').getAttribute('aria-pressed')!='true';
+  try{await call('PUT','/views',{report:on});}catch(e){}
+  loadMk();
 };
 
 function size(bytes){

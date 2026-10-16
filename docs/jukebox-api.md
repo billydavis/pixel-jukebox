@@ -61,6 +61,11 @@ the reply is `503` and nothing is queued.
 | `GET` | (the base path, `/api/v1`) | Device name and API base path |
 | `GET` | `/status` | What the panel is showing, plus device information |
 | `GET` | `/diagnostics` | Memory and task headroom |
+| `GET` | `/likes` | The artworks liked from this panel |
+| `PUT` | `/likes/{postId}` | Like an artwork on Makapix |
+| `DELETE` | `/likes/{postId}` | Take the like back |
+| `GET` | `/views` | Whether views are reported to Makapix |
+| `PUT` | `/views` | Turn view reports on or off |
 | `GET` | `/card` | The microSD card and the offline artwork on it |
 | `GET` | `/card/art` | The artworks saved on the card, a page at a time |
 | `GET` | `/card/art/{postId}.gif` | One saved artwork's GIF |
@@ -98,7 +103,8 @@ the reply is `503` and nothing is queued.
     "postId": 647,
     "owner": "Odio",
     "gifUrl": "https://vault.makapix.club/21/32/abc123.gif",
-    "source": "makapix"
+    "source": "makapix",
+    "liked": false
   },
   "mode": "rotation",
   "visualizer": "spectrum",
@@ -116,7 +122,8 @@ the reply is `503` and nothing is queued.
 | `artwork` | The Makapix post on screen; `null` when the slot is not showing artwork (clock, registration code) |
 | `artwork.owner` | The artist's Makapix handle |
 | `artwork.gifUrl` | HTTPS address of the GIF being played, for clients that want to show it. Empty when the artwork is playing from the card |
-| `artwork.source` | `makapix` when downloaded for this turn, `card` when played from the board's offline copy because Makapix or the Wi-Fi could not be reached |
+| `artwork.source` | `makapix` when downloaded for this turn, `card` when played from the board's offline copy, because Makapix or the Wi-Fi could not be reached or because it was asked for from the gallery |
+| `artwork.liked` | Whether the artwork has been liked from this panel; see `PUT /likes/{postId}` |
 | `mode` | `rotation` or `sound` |
 | `visualizer` | The visualizer sound mode uses, whether or not it is showing now |
 | `brightness` | 0-255 |
@@ -152,6 +159,69 @@ sizes are in bytes.
 | `artwork` | Artworks downloaded since startup and the size of the largest |
 | `card` | The microSD card. `present` means a card answered; `mounted` that it has a FAT file system the board can read; `ready` that it also passed a write test. When it cannot be used, `problem` says why. The card is never formatted by the board |
 | `cache` | Artworks saved on the card. `budgetBytes` is the most the cache will use (at most 1 GB, always leaving 64 MB of the card free); beyond that, or past `maxArtworks`, the artwork that has gone longest unplayed is removed. `playedSinceStart` counts artworks played from the card, offline or asked for from the gallery |
+
+### `GET /likes`
+
+The artworks liked from this panel, the most recent first, with what is still
+to be sent to Makapix.
+
+```json
+{ "count": 2, "waiting": 0, "sentSinceStart": 3, "refusedSinceStart": 0, "liked": [2486, 647] }
+```
+
+| Field | Meaning |
+|---|---|
+| `count` | Artworks liked |
+| `waiting` | Likes and unlikes not yet sent: offline, or Makapix unreachable |
+| `refusedSinceStart` | Changes Makapix turned down for good, usually because the post was deleted |
+| `problem` | Present while sending is failing, for example `could not reach Makapix` |
+
+Makapix does not tell a player what its owner has already liked, so a like
+made on the website shows here only once it has also been liked from the panel.
+
+### `PUT /likes/{postId}`
+
+Likes an artwork on Makapix as the panel's owner, with the ❤️ reaction. No
+body. Reply: `200 {"postId":2486,"liked":true}`. The like is remembered on the
+board at once and sent in the background, within seconds when online and once
+the connection returns otherwise. `409` until the panel is linked to an account.
+`GET /status` shows `artwork.liked` for the artwork on screen.
+
+### `DELETE /likes/{postId}`
+
+Takes the like back. Reply: `200 {"postId":2486,"liked":false}`. A like taken
+back before it was sent is never sent at all.
+
+### `GET /views`
+
+```json
+{ "report": true, "waiting": 0, "sentSinceStart": 41, "refusedSinceStart": 0,
+  "rateLimitedSinceStart": 0, "droppedSinceStart": 0 }
+```
+
+Each artwork that stays on the panel for 2 seconds is reported to Makapix as a
+view, which counts towards the artist's view numbers and the site's trending
+lists. Art asked for from the gallery is reported as chosen (`intent:
+"artwork"`), everything else as part of the shuffle (`intent: "channel"`).
+Makapix takes at most one report every 5 seconds, so they are sent at that pace.
+Views played without a connection wait on the card (in memory without one, up
+to 1,000) and are sent when it returns; if the board's clock had not been set
+yet, Makapix records them at the time they arrive.
+
+| Field | Meaning |
+|---|---|
+| `report` | Whether views are reported. On by default |
+| `waiting` | Views not yet sent |
+| `refusedSinceStart` | Views Makapix turned down for good (a deleted post, say) |
+| `rateLimitedSinceStart` | Views sent too soon after the last and retried |
+| `droppedSinceStart` | Views lost because 1,000 were already waiting |
+| `problem` | Present while sending is failing |
+
+### `PUT /views`
+
+`{"report": false}` stops reporting views and drops any still waiting;
+`{"report": true}` starts again. Saved on the board. Reply: the same document
+as `GET /views`. `400` unless `report` is `true` or `false`.
 
 ### `GET /card`
 

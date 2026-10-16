@@ -11,10 +11,12 @@
 #include "cache_index.h"
 #include "gif_pad.h"
 #include "html_escape.h"
+#include "likes_book.h"
 #include "rotation_rules.h"
 #include "spectrum_math.h"
 #include "tap_detector.h"
 #include "transitions.h"
+#include "view_queue.h"
 
 #ifdef ARDUINO
 #include <Arduino.h>
@@ -553,6 +555,156 @@ static void test_taps_lockout_swallows_a_quick_third_knock() {
   TEST_ASSERT_EQUAL(0, r.singles);
 }
 
+// --- likes -------------------------------------------------------------------
+
+static void test_likes_a_like_waits_to_be_sent() {
+  likes::Book book;
+  book.set(10, true);
+  TEST_ASSERT_TRUE(book.liked(10));
+  uint32_t post;
+  bool wanted;
+  TEST_ASSERT_TRUE(book.nextPending(post, wanted));
+  TEST_ASSERT_EQUAL_UINT32(10, post);
+  TEST_ASSERT_TRUE(wanted);
+  book.confirmed(10, true);
+  TEST_ASSERT_FALSE(book.nextPending(post, wanted));
+  TEST_ASSERT_TRUE(book.liked(10));
+  TEST_ASSERT_EQUAL(1, book.count());
+}
+
+static void test_likes_taken_back_before_sending_is_never_sent() {
+  likes::Book book;
+  book.set(10, true);
+  book.set(10, false);
+  uint32_t post;
+  bool wanted;
+  TEST_ASSERT_FALSE(book.nextPending(post, wanted));
+  TEST_ASSERT_FALSE(book.liked(10));
+  TEST_ASSERT_EQUAL(0, (int)book.save().size());
+}
+
+static void test_likes_unlike_after_sending_sends_a_revoke() {
+  likes::Book book;
+  book.set(10, true);
+  book.confirmed(10, true);
+  book.set(10, false);
+  uint32_t post;
+  bool wanted;
+  TEST_ASSERT_TRUE(book.nextPending(post, wanted));
+  TEST_ASSERT_FALSE(wanted);
+  book.confirmed(10, false);
+  TEST_ASSERT_FALSE(book.nextPending(post, wanted));
+  TEST_ASSERT_EQUAL(0, (int)book.save().size()); // nothing left to remember
+}
+
+static void test_likes_oldest_change_is_sent_first() {
+  likes::Book book;
+  book.set(1, true);
+  book.set(2, true);
+  book.set(3, true);
+  uint32_t post;
+  bool wanted;
+  book.nextPending(post, wanted);
+  TEST_ASSERT_EQUAL_UINT32(1, post);
+  book.drop(1); // deleted on Makapix
+  book.nextPending(post, wanted);
+  TEST_ASSERT_EQUAL_UINT32(2, post);
+  TEST_ASSERT_EQUAL(2, book.pending());
+}
+
+static void test_likes_list_is_most_recent_first() {
+  likes::Book book;
+  book.set(1, true);
+  book.set(2, true);
+  book.set(3, true);
+  book.set(1, true); // liked again: now the most recent
+  std::vector<uint32_t> ids = book.list();
+  TEST_ASSERT_EQUAL(3, (int)ids.size());
+  TEST_ASSERT_EQUAL_UINT32(1, ids[0]);
+  TEST_ASSERT_EQUAL_UINT32(3, ids[1]);
+  TEST_ASSERT_EQUAL_UINT32(2, ids[2]);
+}
+
+static void test_likes_capacity_forgets_only_sent_entries() {
+  likes::Book book;
+  for (uint32_t i = 1; i <= (uint32_t)likes::Book::CAPACITY; i++) {
+    book.set(i, true);
+    book.confirmed(i, true);
+  }
+  book.set(100000, true); // unsent, over capacity
+  TEST_ASSERT_EQUAL(likes::Book::CAPACITY, book.count());
+  TEST_ASSERT_FALSE(book.liked(1)); // the oldest sent one made room
+  TEST_ASSERT_TRUE(book.liked(100000));
+  TEST_ASSERT_EQUAL(1, book.pending());
+}
+
+static void test_likes_survive_saving_and_loading() {
+  likes::Book book;
+  book.set(7, true);
+  book.confirmed(7, true);
+  book.set(4000000000u, true);
+  book.set(9, true);
+  book.confirmed(9, true);
+  book.set(9, false); // a revoke still to send
+
+  likes::Book copy;
+  TEST_ASSERT_TRUE(copy.load(book.save()));
+  TEST_ASSERT_TRUE(copy.liked(7));
+  TEST_ASSERT_TRUE(copy.liked(4000000000u));
+  TEST_ASSERT_FALSE(copy.liked(9));
+  TEST_ASSERT_EQUAL(2, copy.pending());
+}
+
+static void test_likes_refuse_damaged_data() {
+  likes::Book book;
+  book.set(5, true);
+  TEST_ASSERT_FALSE(book.load(std::string("\x01\x02\x03", 3)));                 // not whole entries
+  TEST_ASSERT_FALSE(book.load(std::string("\x00\x00\x00\x00\x01", 5)));         // post 0
+  TEST_ASSERT_FALSE(book.load(std::string("\x05\x00\x00\x00\x09", 5)));         // unknown flags
+  TEST_ASSERT_TRUE(book.liked(5)); // a refused load changes nothing
+}
+
+// --- views -------------------------------------------------------------------
+
+static void test_views_queue_drops_the_oldest_when_full() {
+  views::Queue queue;
+  for (uint32_t i = 1; i <= views::Queue::CAPACITY; i++) {
+    TEST_ASSERT_TRUE(queue.push({i, 0, false}));
+  }
+  TEST_ASSERT_FALSE(queue.push({5000, 0, false}));
+  TEST_ASSERT_EQUAL((int)views::Queue::CAPACITY, (int)queue.size());
+  TEST_ASSERT_EQUAL_UINT32(2, queue.front().postId);
+}
+
+static void test_views_lines_round_trip() {
+  views::View view = {2486, 1792160700, true}, back = {0, 0, false};
+  std::string line = views::toLine(view);
+  TEST_ASSERT_EQUAL_STRING("V 2486 1792160700 a\n", line.c_str());
+  TEST_ASSERT_TRUE(views::fromLine(line.c_str(), back));
+  TEST_ASSERT_EQUAL_UINT32(2486, back.postId);
+  TEST_ASSERT_EQUAL_UINT32(1792160700, back.unixSeconds);
+  TEST_ASSERT_TRUE(back.requested);
+  TEST_ASSERT_TRUE(views::fromLine("V 7 0 c", back));
+  TEST_ASSERT_FALSE(back.requested);
+}
+
+static void test_views_damaged_lines_are_refused() {
+  views::View view = {1, 2, false};
+  const char *bad[] = {"", "V", "V 12", "V 12 34", "V 12 34 x\n", "X 12 34 c\n", "V 0 34 c\n",
+                       "V -5 34 c\n", "V 12 -1 c\n", "V 12 34 cc\n", "V 12 3a c\n"};
+  for (const char *line : bad) {
+    TEST_ASSERT_FALSE_MESSAGE(views::fromLine(line, view), line);
+  }
+  TEST_ASSERT_EQUAL_UINT32(1, view.postId); // untouched
+}
+
+static void test_views_times_are_iso_utc() {
+  TEST_ASSERT_EQUAL_STRING("1970-01-01T00:00:00Z", views::isoTime(0).c_str());
+  TEST_ASSERT_EQUAL_STRING("2000-02-29T12:34:56Z", views::isoTime(951827696).c_str());
+  TEST_ASSERT_EQUAL_STRING("2026-10-16T14:05:00Z", views::isoTime(1792159500).c_str());
+  TEST_ASSERT_EQUAL_STRING("2106-02-07T06:28:15Z", views::isoTime(0xFFFFFFFFu).c_str());
+}
+
 static int runTests() {
   UNITY_BEGIN();
   RUN_TEST(test_gif_pad_grows_a_small_gif);
@@ -606,6 +758,20 @@ static int runTests() {
   RUN_TEST(test_taps_moving_the_panel_is_not_a_tap);
   RUN_TEST(test_taps_knocks_far_apart_are_two_singles);
   RUN_TEST(test_taps_lockout_swallows_a_quick_third_knock);
+
+  RUN_TEST(test_likes_a_like_waits_to_be_sent);
+  RUN_TEST(test_likes_taken_back_before_sending_is_never_sent);
+  RUN_TEST(test_likes_unlike_after_sending_sends_a_revoke);
+  RUN_TEST(test_likes_oldest_change_is_sent_first);
+  RUN_TEST(test_likes_list_is_most_recent_first);
+  RUN_TEST(test_likes_capacity_forgets_only_sent_entries);
+  RUN_TEST(test_likes_survive_saving_and_loading);
+  RUN_TEST(test_likes_refuse_damaged_data);
+
+  RUN_TEST(test_views_queue_drops_the_oldest_when_full);
+  RUN_TEST(test_views_lines_round_trip);
+  RUN_TEST(test_views_damaged_lines_are_refused);
+  RUN_TEST(test_views_times_are_iso_utc);
   return UNITY_END();
 }
 

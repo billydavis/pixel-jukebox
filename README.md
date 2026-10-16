@@ -33,6 +33,7 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 | Area | What's included |
 |---|---|
 | **Slots** | Rotates through screens: by default three artworks, then a clock for 10 seconds. The rotation is editable from the control page and saved on the board |
+| **Likes and views** | A heart on the control page likes the artwork on Makapix as the panel's owner, and every artwork shown is reported as a view so artists see how often their work is seen. Both wait for the connection when offline; view reports can be turned off |
 | **Offline play** | With a microSD card in the slot, every artwork played is saved to it (up to 1,500 pieces or 1 GB). When Makapix or the Wi-Fi is unreachable, the board shuffles through those copies instead, and goes back to fresh art when the connection returns. No card, no cache; the card is never formatted by the board |
 | **Transitions** | Thirteen effects between slots, such as mosaic, melt, dissolve and slide. Random by default, or pick one, or turn them off. They never eat into a slot's time on screen |
 | **Button** | BOOT button: short press skips to the next slot, long press holds the current one, a 5-second hold starts Wi-Fi setup |
@@ -264,7 +265,7 @@ Working today: registration, shuffled playback with preloading, a slot rotation 
 Ideas for later:
 
 - Power the panel from the dedicated 5V input for full brightness
-- Report views, and MQTT for "send to device" commands from the Makapix site
+- MQTT for "send to device" commands from the Makapix site
 - A brightness schedule for day and night
 - Use the speaker and the onboard sensors
 - More of the API: show a specific post, sensors, per-slot settings

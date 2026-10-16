@@ -46,6 +46,9 @@ class MakapixSlot : public Slot {
 
   // Playback
   uint8_t *data = nullptr;
+  uint32_t postId = 0;
+  bool requested = false; // asked for from the gallery
+  bool viewNoted = false;
   uint32_t dwellMs = 0;
   int framesThisLoop = 0;
   bool loopEnded = false;

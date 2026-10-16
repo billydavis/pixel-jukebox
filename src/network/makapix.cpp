@@ -15,6 +15,7 @@ static const int PAGE_SIZE = 25;
 static const uint16_t HTTP_TIMEOUT_MS = 15000;
 
 static Preferences prefs;
+static SemaphoreHandle_t lock; // one TLS session at a time: two at once can run internal RAM out
 static String playerKey;
 static String apiToken;
 
@@ -22,7 +23,7 @@ static String apiToken;
 static String cursor;
 static uint32_t shuffleSeed = 0;
 
-static int request(const char *method, const String &path, const String &body, String &response) {
+static int requestLocked(const char *method, const String &path, const String &body, String &response) {
   WiFiClientSecure client;
   client.setCACert(MAKAPIX_ROOT_CAS);
 
@@ -50,12 +51,22 @@ static int request(const char *method, const String &path, const String &body, S
   return status;
 }
 
+// Every call to Makapix goes through here, from the loader, the reporter and
+// the display loop (registration), so they take turns.
+static int request(const char *method, const String &path, const String &body, String &response) {
+  xSemaphoreTake(lock, portMAX_DELAY);
+  int status = requestLocked(method, path, body, response);
+  xSemaphoreGive(lock);
+  return status;
+}
+
 static void storeToken(const String &token) {
   apiToken = token;
   prefs.putString("api_token", apiToken);
 }
 
 void begin() {
+  lock = xSemaphoreCreateMutex();
   prefs.begin("makapix", false);
   playerKey = prefs.getString("player_key", "");
   apiToken = prefs.getString("api_token", "");
@@ -197,6 +208,62 @@ QueryStatus nextPage(std::vector<Artwork> &artworks) {
   // An empty cursor makes the next call start a fresh pass.
   cursor = doc["has_more"].as<bool>() ? doc["next_cursor"].as<String>() : String();
   return QueryStatus::Ok;
+}
+
+// The emoji Makapix's own like button uses.
+static const char *HEART = "\xE2\x9D\xA4\xEF\xB8\x8F"; // U+2764 U+FE0F
+
+static SendStatus sendStatusFor(int status, const String &response) {
+  if (status == 200 || status == 201 || status == 202) {
+    return SendStatus::Ok;
+  }
+  if (status == 401) {
+    return SendStatus::Unauthorized;
+  }
+  if (status == 429) {
+    return SendStatus::RateLimited;
+  }
+  // A missing or deleted post, or a request Makapix will never accept as it
+  // stands (too many reactions on one post, say): retrying cannot help.
+  if (status == 400 || status == 404 || status == 410) {
+    Serial.printf("Makapix refused: HTTP %d %s\n", status, response.c_str());
+    return SendStatus::Gone;
+  }
+  return SendStatus::Failed;
+}
+
+SendStatus reportView(uint32_t postId, const String &isoTime, bool requested) {
+  JsonDocument body;
+  body["post_id"] = postId;
+  body["timestamp"] = isoTime;
+  body["timezone"] = "";
+  body["intent"] = requested ? "artwork" : "channel";
+  body["play_order"] = 2; // random
+  body["channel"] = "all";
+  String payload;
+  serializeJson(body, payload);
+  String response;
+  return sendStatusFor(request("POST", "/player/events/view", payload, response), response);
+}
+
+SendStatus setLiked(uint32_t postId, bool liked) {
+  JsonDocument body;
+  body["request_type"] = liked ? "submit_reaction" : "revoke_reaction";
+  body["post_id"] = postId;
+  body["emoji"] = HEART;
+  String payload;
+  serializeJson(body, payload);
+  String response;
+  int status = request("POST", "/player/rpc", payload, response);
+  SendStatus result = sendStatusFor(status, response);
+  if (result == SendStatus::Ok) {
+    JsonDocument doc;
+    if (deserializeJson(doc, response) || !doc["success"].as<bool>()) {
+      Serial.printf("Reaction refused: %s\n", response.c_str());
+      return SendStatus::Gone;
+    }
+  }
+  return result;
 }
 
 void forget() {

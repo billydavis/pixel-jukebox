@@ -12,6 +12,7 @@
 #include "display/display.h"
 #include "app/mode.h"
 #include "network/connection.h"
+#include "network/reporter.h"
 #include "pins.h"
 #include "app/rotation.h"
 #include "app/status.h"
@@ -154,6 +155,7 @@ void setup() {
   statusBegin();
   commandsBegin();
   rotationBegin();
+  reporterBegin(); // after rotationBegin(), which starts the Makapix client
   modeBegin();
   transitionBegin();
   outgoing = (uint16_t *)ps_malloc(PANEL_RES_X * PANEL_RES_Y * sizeof(uint16_t));

@@ -7,6 +7,7 @@
 #include "display/gif_player.h"
 #include "app/status.h"
 #include "app/telemetry.h"
+#include "network/reporter.h"
 #include "storage/art_cache.h"
 
 static const uint32_t CODE_VALID_MS = 15 * 60 * 1000;
@@ -16,6 +17,7 @@ static const uint32_t RATE_LIMIT_WAIT_MS = 60000;
 static const uint32_t LINKED_SHOW_MS = 1500;
 static const uint32_t LOAD_WAIT_MS = 15000;
 static const uint32_t IDLE_UPDATE_MS = 100;
+static const uint32_t VIEW_AFTER_MS = 2000; // shown this long, an artwork counts as seen
 static const int MAX_LOAD_ATTEMPTS = 5;
 static const uint32_t LOADER_STACK_BYTES = 16384; // TLS handshake plus JSON parsing
 static const BaseType_t LOADER_CORE = 0;          // away from the display loop on core 1
@@ -191,7 +193,11 @@ bool MakapixSlot::showFromCard(uint32_t postId) {
   requested.artwork.fromCache = true;
   requested.data = cached.data;
   requested.size = cached.size;
-  return play(requested);
+  if (!play(requested)) {
+    return false;
+  }
+  this->requested = true;
+  return true;
 }
 
 bool MakapixSlot::play(const LoadedArtwork &current) {
@@ -210,6 +216,9 @@ bool MakapixSlot::play(const LoadedArtwork &current) {
   statusSetArtwork(current.artwork.postId, current.artwork.ownerHandle, shareUrl, current.artwork.fromCache);
   mode = Mode::Playing;
   startedAt = millis();
+  postId = current.artwork.postId;
+  requested = false;
+  viewNoted = false;
   data = current.data;
   dwellMs = current.artwork.dwellMs;
   framesThisLoop = 0;
@@ -252,6 +261,10 @@ uint32_t MakapixSlot::updateRegistration() {
 }
 
 uint32_t MakapixSlot::updatePlaying() {
+  if (!viewNoted && !failed && millis() - startedAt >= VIEW_AFTER_MS) {
+    viewNoted = true;
+    reporterNoteView(postId, requested);
+  }
   if (failed || (still && framesThisLoop > 0)) {
     return IDLE_UPDATE_MS; // nothing left to draw
   }

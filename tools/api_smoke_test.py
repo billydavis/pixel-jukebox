@@ -116,6 +116,23 @@ try:
     code, body = call("DELETE", "/card/art/abc")
     check("removing with a postId that is not a number is refused", code == 404, body)
 
+    section("Makapix")
+    code, body = call("GET", "/likes")
+    check("likes list the liked artworks",
+          code == 200 and isinstance(body.get("liked"), list) and isinstance(body.get("waiting"), int), body)
+    code, body = call("PUT", "/likes/abc")
+    check("liking with a postId that is not a number is refused", code == 404, body)
+    code, views = call("GET", "/views")
+    check("view reports show whether they are on", code == 200 and isinstance(views.get("report"), bool), views)
+    code, body = call("PUT", "/views", {"report": "yes"})
+    check("view reports reject a value that is not true or false", code == 400, body)
+    code, body = call("PUT", "/views", {"report": views.get("report", True)})
+    check("view reports accept their current value", code == 200 and body.get("report") == views.get("report"), body)
+    code, now = call("GET", "/status")
+    if now.get("artwork"):
+        check("the artwork on screen says whether it is liked", isinstance(now["artwork"].get("liked"), bool),
+              now["artwork"])
+
     section("Mode")
     call("PUT", "/mode", {"mode": "rotation"})
     check("starts from rotation mode", wait_for(lambda s: s["mode"] == "rotation" and s["slot"]["name"], 25))
