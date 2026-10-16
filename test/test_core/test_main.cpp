@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "cache_index.h"
+#include "crash_cause.h"
 #include "gif_pad.h"
 #include "html_escape.h"
 #include "likes_book.h"
@@ -773,6 +774,29 @@ static void test_rtc_dates_and_days_agree() {
   }
 }
 
+// --- crash records ----------------------------------------------------------------
+
+static void test_crash_causes_have_their_idf_names() {
+  TEST_ASSERT_EQUAL_STRING("IllegalInstruction", crash::causeName(0));
+  TEST_ASSERT_EQUAL_STRING("IntegerDivideByZero", crash::causeName(6));
+  TEST_ASSERT_EQUAL_STRING("LoadStoreAlignment", crash::causeName(9));
+  TEST_ASSERT_EQUAL_STRING("InstFetchProhibited", crash::causeName(20));
+  TEST_ASSERT_EQUAL_STRING("LoadProhibited", crash::causeName(28));
+  TEST_ASSERT_EQUAL_STRING("StoreProhibited", crash::causeName(29));
+}
+
+static void test_crash_unknown_causes_are_named_so() {
+  TEST_ASSERT_EQUAL_STRING("Unknown", crash::causeName(10));
+  TEST_ASSERT_EQUAL_STRING("Unknown", crash::causeName(30));
+  TEST_ASSERT_EQUAL_STRING("Unknown", crash::causeName(0xFFFFFFFFu));
+}
+
+static void test_crash_hints_cover_the_common_causes() {
+  TEST_ASSERT_NOT_NULL(crash::causeHint(28));
+  TEST_ASSERT_NOT_NULL(crash::causeHint(29));
+  TEST_ASSERT_NULL(crash::causeHint(4));
+}
+
 static int runTests() {
   UNITY_BEGIN();
   RUN_TEST(test_gif_pad_grows_a_small_gif);
@@ -847,6 +871,10 @@ static int runTests() {
   RUN_TEST(test_rtc_refuses_impossible_values);
   RUN_TEST(test_rtc_clamps_to_the_chips_century);
   RUN_TEST(test_rtc_dates_and_days_agree);
+
+  RUN_TEST(test_crash_causes_have_their_idf_names);
+  RUN_TEST(test_crash_unknown_causes_are_named_so);
+  RUN_TEST(test_crash_hints_cover_the_common_causes);
   return UNITY_END();
 }
 

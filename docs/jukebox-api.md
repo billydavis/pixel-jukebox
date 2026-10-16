@@ -61,6 +61,9 @@ the reply is `503` and nothing is queued.
 | `GET` | (the base path, `/api/v1`) | Device name and API base path |
 | `GET` | `/status` | What the panel is showing, plus device information |
 | `GET` | `/diagnostics` | Memory and task headroom |
+| `GET` | `/crash` | The last crash, if one is stored |
+| `GET` | `/crash/dump` | The raw crash record, for espcoredump.py |
+| `DELETE` | `/crash` | Erase the crash record |
 | `GET` | `/likes` | The artworks liked from this panel |
 | `PUT` | `/likes/{postId}` | Like an artwork on Makapix |
 | `DELETE` | `/likes/{postId}` | Take the like back |
@@ -144,6 +147,7 @@ sizes are in bytes.
     { "name": "api", "stack": 8192, "lowestFree": 5816 }
   ],
   "artwork": { "downloaded": 42, "largestBytes": 187850 },
+  "crash": { "present": true, "task": "loader", "cause": "StoreProhibited" },
   "clock": { "source": "network", "utc": "2026-10-16T15:55:14Z",
              "chip": { "present": true, "keptTimeAtStart": true, "lastSetUtc": "2026-10-16T15:54:59Z",
                        "driftSecondsAtLastSet": -1 } },
@@ -160,10 +164,61 @@ sizes are in bytes.
 | `heap`, `psram` | Internal and external memory. `lowestFree` is the least that has been free since startup; `largestBlock` is the biggest single allocation possible now |
 | `tasks` | `lowestFree` is the least stack each task has had spare. `loader` is short-lived and appears once it has run |
 | `artwork` | Artworks downloaded since startup and the size of the largest |
+| `crash` | Whether a crash record is stored, and if so which task crashed and why. Details from `GET /crash` |
 | `clock.source` | Where the time came from: `network` (internet time, checked about hourly), `clock chip` (the board's PCF85063, read at start-up, until the network answers) or `not set`. `utc` is `null` until the time is known |
 | `clock.chip` | The clock chip. `keptTimeAtStart` is `false` after the power was off, unless a backup battery is fitted. It is set from the network each time that answers; `driftSecondsAtLastSet` is how far it had wandered by then (a second either way is rounding: it counts whole seconds) |
 | `card` | The microSD card. `present` means a card answered; `mounted` that it has a FAT file system the board can read; `ready` that it also passed a write test. When it cannot be used, `problem` says why. The card is never formatted by the board |
 | `cache` | Artworks saved on the card. `budgetBytes` is the most the cache will use (at most 1 GB, always leaving 64 MB of the card free); beyond that, or past `maxArtworks`, the artwork that has gone longest unplayed is removed. `playedSinceStart` counts artworks played from the card, offline or asked for from the gallery |
+
+### `GET /crash`
+
+When the board crashes, or a watchdog fires because something stopped
+responding, ESP-IDF writes a record to the flash before restarting. It stays
+there, through any number of restarts, until erased or replaced by the next
+crash, so a crash that happened overnight can still be looked at.
+
+```json
+{
+  "present": true,
+  "task": "loader",
+  "cause": "StoreProhibited",
+  "causeCode": 29,
+  "hint": "wrote to an address that is not memory, often a null or freed pointer",
+  "pc": "0x40378182",
+  "address": "0x00000000",
+  "backtrace": ["0x40378182", "0x4037d529", "0x42020060"],
+  "backtraceCorrupted": false,
+  "elfSha256": "d6a5f9bb1360638b",
+  "matchesRunningFirmware": false,
+  "foundUtc": "2026-10-16T17:18:20Z",
+  "firmware": "0.15.0",
+  "resetReason": "crash",
+  "dumpBytes": 20004
+}
+```
+
+With no record the reply is `{"present": false}`.
+
+| Field | Meaning |
+|---|---|
+| `task` | The task that crashed: `display`, `api`, `loader`, `reporter` and so on |
+| `cause` | The CPU's exception, as the ESP-IDF panic handler names it. `hint` explains the common ones |
+| `pc`, `backtrace` | Where it happened. Only meaningful with the build that crashed: `python tools/decode_crash.py` turns them into function names and source lines |
+| `address` | The memory address the failing instruction used; `0x00000000` usually means a null pointer |
+| `backtraceCorrupted` | The stack was damaged, so the backtrace may stop early |
+| `elfSha256` | Identifies the build that crashed. `matchesRunningFirmware` is `false` once a different firmware has been installed |
+| `foundUtc`, `firmware`, `resetReason` | When the board first found the record after restarting, what it was running then, and why it had restarted (`crash` or `watchdog`; something else means the record predates that start-up) |
+
+### `GET /crash/dump`
+
+The raw record as stored in flash (`application/octet-stream`), with every
+task's stack, for decoding in full with ESP-IDF's `espcoredump.py`; see
+`tools/decode_crash.py`. `404` when there is no record.
+
+### `DELETE /crash`
+
+Erases the record. Reply: `200 {"erased":true}`, or `{"erased":false}` when
+there was none.
 
 ### `GET /likes`
 

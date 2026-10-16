@@ -103,6 +103,13 @@ try:
     clock = body.get("clock", {})
     check("diagnostics say where the time came from",
           clock.get("source") in ("network", "clock chip", "not set") and "present" in clock.get("chip", {}), clock)
+    code, crash = call("GET", "/crash")
+    check("the crash record says whether there is one", code == 200 and isinstance(crash.get("present"), bool), crash)
+    if not crash.get("present"):
+        code, body = call("GET", "/crash/dump")
+        check("with no crash record there is no dump to download", code == 404, body)
+        code, body = call("DELETE", "/crash")
+        check("clearing an empty crash record is harmless", code == 200 and body.get("erased") is False, body)
     code, body = call("GET", "/card")
     check("card status reports the card and the cache",
           code == 200 and "present" in body.get("card", {}) and "enabled" in body.get("cache", {}), body)

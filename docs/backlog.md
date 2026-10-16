@@ -58,4 +58,4 @@ Priority is a suggestion until it has been agreed.
 |---|---|---|---|---|
 | 26 | Refresh the README roadmap | S | with the next commit | Lists done items as ideas (full brightness, show a specific post) |
 | 27 | CI build on GitHub | S | Deferred | Deferred by choice in the architecture plan |
-| 31 | **Crash records in diagnostics** | S | 2 | Turn on the 64 KB crash-record area so `/diagnostics` can say what failed after an unexpected restart |
+| 31 | ~~Crash records in diagnostics~~ | S | Done (0.16.0) | `GET /crash`, `tools/decode_crash.py`. One record from an earlier, unarchived build was found: the loader, a null-pointer write while freeing memory. Watch for it again |

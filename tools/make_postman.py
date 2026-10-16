@@ -25,6 +25,12 @@ FOLDERS = [
         ("Get Diagnostics", "GET", "diagnostics",
          "Memory and task-stack headroom since startup, and why the board last restarted.", None, 200),
         ("Get API Pointer", "GET", "", "Returns the device name and the API base path.", None, 200),
+        ("Get Crash Record", "GET", "crash",
+         "The last crash or watchdog reset, if one is stored: task, cause, addresses and backtrace. "
+         "tools/decode_crash.py turns the addresses into function names.", None, 200),
+        ("Download Crash Dump", "GET", "crash/dump",
+         "The raw crash record, for espcoredump.py. 404 when there is none.", None, 200),
+        ("Clear Crash Record", "DELETE", "crash", "Erases the stored crash record.", None, 200),
     ]),
     ("Control", [
         ("Next", "POST", "next",

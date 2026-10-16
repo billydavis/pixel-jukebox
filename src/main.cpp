@@ -9,6 +9,7 @@
 
 #include "app/clock_chip.h"
 #include "app/commands.h"
+#include "app/crash_report.h"
 #include "app/diagnostics.h"
 #include "display/display.h"
 #include "app/mode.h"
@@ -148,6 +149,7 @@ void setup() {
   delay(1500);
   runDiagnostics();
   clockChipBegin(); // the time, before Wi-Fi
+  crashBegin();     // after the clock, to note when a crash record was found
   cardBegin();
   artCacheBegin();
 

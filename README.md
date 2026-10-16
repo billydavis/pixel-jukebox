@@ -159,6 +159,16 @@ pio run -e motion-test -t upload
 
 Finds the motion sensor, then for two minutes shows the pull of gravity on each axis, a bar for how hard the last knock was (the amber mark is the default tap threshold, 1.5 g), and how many single and double taps were detected. The border flashes green for a single tap and blue for a double. Each knock is also logged on the serial monitor.
 
+## Crash records
+
+If the board crashes, or a watchdog restarts it, it keeps a record of what happened in flash until it is cleared. `GET /api/v1/crash` shows it, and from a PC:
+
+```sh
+python tools/decode_crash.py
+```
+
+prints the task, the cause and the backtrace as function names and source lines. Every build keeps a copy of its ELF in `.pio/elf-archive/` for this, so a crash can be decoded even after newer firmware has been built. `--dump FILE` also saves the full record for ESP-IDF's `espcoredump.py`. Clear it with `curl -X DELETE http://pixel-jukebox.local/api/v1/crash`.
+
 ## Makapix API script
 
 [`tools/makapix_player.py`](tools/makapix_player.py) walks the same player API from a PC, using only the Python standard library. It is useful for trying queries before changing the firmware.

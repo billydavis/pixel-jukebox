@@ -122,6 +122,109 @@
             "description": "Returns the device name and the API base path."
           },
           "response": []
+        },
+        {
+          "name": "Get Crash Record",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/crash",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "crash"
+              ]
+            },
+            "description": "The last crash or watchdog reset, if one is stored: task, cause, addresses and backtrace. tools/decode_crash.py turns the addresses into function names."
+          },
+          "response": []
+        },
+        {
+          "name": "Download Crash Dump",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/crash/dump",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "crash",
+                "dump"
+              ]
+            },
+            "description": "The raw crash record, for espcoredump.py. 404 when there is none."
+          },
+          "response": []
+        },
+        {
+          "name": "Clear Crash Record",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/crash",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "crash"
+              ]
+            },
+            "description": "Erases the stored crash record."
+          },
+          "response": []
         }
       ]
     },

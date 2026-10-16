@@ -8,6 +8,7 @@
 
 #include "app/clock_chip.h"
 #include "app/commands.h"
+#include "app/crash_report.h"
 #include "config.h"
 #include "display/display.h"
 #include "app/mode.h"
@@ -122,6 +123,7 @@ static void handleDiagnostics() {
   JsonDocument doc;
   telemetryReport(doc.to<JsonObject>());
   clockReport(doc["clock"].to<JsonObject>());
+  crashBrief(doc["crash"].to<JsonObject>());
   cardReport(doc["card"].to<JsonObject>());
   artCacheReport(doc["cache"].to<JsonObject>());
   reporterReportViews(doc["views"].to<JsonObject>());
@@ -385,6 +387,59 @@ static void handlePutViews() {
   sendViews();
 }
 
+// --- crash records ----------------------------------------------------------------
+
+static void handleGetCrash() {
+  JsonDocument doc;
+  crashReport(doc.to<JsonObject>());
+  sendJson(200, doc);
+}
+
+// The raw record from flash, for espcoredump.py. Sent in pieces: it can be
+// up to 64 KB and internal RAM is short.
+static void handleCrashDump() {
+  size_t size = crashDumpSize();
+  if (!size) {
+    sendError(404, "No crash record");
+    return;
+  }
+  static const size_t PIECE = 1024;
+  uint8_t *buffer = (uint8_t *)malloc(PIECE);
+  if (!buffer) {
+    sendError(503, "Out of memory, try again");
+    return;
+  }
+  server.sendHeader("Content-Disposition", "attachment; filename=\"pixel-jukebox-crash.bin\"");
+  server.setContentLength(size);
+  server.send(200, "application/octet-stream", "");
+  for (size_t offset = 0; offset < size; offset += PIECE) {
+    size_t length = min(PIECE, size - offset);
+    if (!crashDumpRead(offset, buffer, length)) {
+      break;
+    }
+    server.sendContent((const char *)buffer, length);
+  }
+  free(buffer);
+}
+
+static void handleDeleteCrash() {
+  bool had = crashPresent();
+  crashErase();
+  JsonDocument doc;
+  doc["erased"] = had;
+  sendJson(200, doc);
+}
+
+#ifdef CRASH_TEST
+// Only in a build made with -DCRASH_TEST, to check the crash record works.
+static void handleCrashTest() {
+  sendQueued(true, "crash");
+  delay(200);
+  volatile uint32_t *nowhere = nullptr;
+  *nowhere = 1; // StoreProhibited
+}
+#endif
+
 static void handleRestart() { sendQueued(commandSend(CommandType::Restart), "restart"); }
 
 static void handleWifiSetup() { sendQueued(commandSend(CommandType::WifiSetup), "wifiSetup"); }
@@ -480,6 +535,12 @@ void apiBegin() {
   server.on(UriBraces(API_BASE "/card/art/{}/show"), HTTP_POST, handleShowArt);
   server.on(UriBraces(API_BASE "/card/art/{}"), HTTP_DELETE, handleRemoveArt);
   server.on(API_BASE "/restart", HTTP_POST, handleRestart);
+  server.on(API_BASE "/crash", HTTP_GET, handleGetCrash);
+  server.on(API_BASE "/crash", HTTP_DELETE, handleDeleteCrash);
+  server.on(API_BASE "/crash/dump", HTTP_GET, handleCrashDump);
+#ifdef CRASH_TEST
+  server.on("/crash-test", HTTP_POST, handleCrashTest);
+#endif
   server.on(API_BASE "/likes", HTTP_GET, handleGetLikes);
   server.on(UriBraces(API_BASE "/likes/{}"), HTTP_PUT, handleLike);
   server.on(UriBraces(API_BASE "/likes/{}"), HTTP_DELETE, handleUnlike);
