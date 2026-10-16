@@ -90,6 +90,8 @@ void Screen::drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t
 
 void Screen::setBrightness8(uint8_t value) { panel->setBrightness8(value); }
 
+int Screen::refreshHz() const { return panel->calculated_refresh_rate; }
+
 void Screen::setLive(bool nowLive) {
   if (!nowLive) {
     memset(hidden, 0, FRAME_BYTES);
@@ -111,17 +113,30 @@ void Screen::present(const uint16_t *frame) {
   }
 }
 
+static PanelMode mode = PanelMode::Normal;
+
 bool setupDisplay() {
+  prefs.begin("jukebox", false);
+  mode = prefs.getBool("photo", false) ? PanelMode::Photo : PanelMode::Normal;
+
   HUB75_I2S_CFG::i2s_pins pins = {R1_PIN, G1_PIN, B1_PIN, R2_PIN, G2_PIN, B2_PIN, A_PIN,
                                   B_PIN,  C_PIN,  D_PIN,  E_PIN,  LAT_PIN, OE_PIN, CLK_PIN};
   HUB75_I2S_CFG config(PANEL_RES_X, PANEL_RES_Y, PANEL_CHAIN, pins);
   config.clkphase = false; // this panel shifts one pixel sideways with the default
+  if (mode == PanelMode::Photo) {
+    // Twice the clock, and the driver gives the five dimmest bits of each
+    // colour the same short time instead of three, for about 520 Hz instead
+    // of about 100. The driver blanks longer around each latch at this speed.
+    config.i2sspeed = HUB75_I2S_CFG::HZ_16M;
+    config.latch_blanking = 8;
+    config.min_refresh_rate = 480;
+  }
 
   display = new Screen(new MatrixPanel_I2S_DMA(config));
   if (!display->begin()) {
     return false;
   }
-  prefs.begin("jukebox", false);
+  Serial.printf("Panel: %s mode, %d Hz\n", displayModeName(mode), display->refreshHz());
   brightness = prefs.getUChar("brightness", DEFAULT_BRIGHTNESS);
   display->setBrightness8(brightness);
   display->clearScreen();
@@ -129,6 +144,20 @@ bool setupDisplay() {
 }
 
 uint8_t displayBrightness() { return brightness; }
+
+PanelMode displayMode() { return mode; }
+
+const char *displayModeName(PanelMode value) { return value == PanelMode::Photo ? "photo" : "normal"; }
+
+bool displayModeFromName(const String &name, PanelMode &value) {
+  if (name == "normal" || name == "photo") {
+    value = name == "photo" ? PanelMode::Photo : PanelMode::Normal;
+    return true;
+  }
+  return false;
+}
+
+void displaySaveMode(PanelMode value) { prefs.putBool("photo", value == PanelMode::Photo); }
 
 void displaySetBrightness(uint8_t value) {
   if (value == brightness) {

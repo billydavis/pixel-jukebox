@@ -127,6 +127,17 @@ try:
     code, body = call("DELETE", "/card/art/abc")
     check("removing with a postId that is not a number is refused", code == 404, body)
 
+    section("Panel")
+    code, panel = call("GET", "/panel")
+    check("the panel says its mode and refresh rate",
+          code == 200 and panel.get("mode") in ("normal", "photo") and panel.get("refreshHz", 0) > 0, panel)
+    code, body = call("PUT", "/panel", {"mode": "nope"})
+    check("an unknown panel mode is refused", code == 400, body)
+    code, body = call("PUT", "/panel", {"mode": panel.get("mode", "normal")})
+    check("asking for the current mode changes nothing", code == 200 and not body.get("restarting"), body)
+    code, now = call("GET", "/status")
+    check("status shows the panel mode", now.get("panel", {}).get("mode") == panel.get("mode"), now.get("panel"))
+
     section("Makapix")
     code, body = call("GET", "/likes")
     check("likes list the liked artworks",

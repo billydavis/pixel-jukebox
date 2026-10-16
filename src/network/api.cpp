@@ -116,6 +116,9 @@ static void handleStatus() {
   doc["mode"] = modeIsSound() ? "sound" : "rotation";
   doc["visualizer"] = modeVisualizer();
   doc["brightness"] = displayBrightness();
+  JsonObject panel = doc["panel"].to<JsonObject>();
+  panel["mode"] = displayModeName(displayMode());
+  panel["refreshHz"] = display->refreshHz();
   sendJson(200, doc);
 }
 
@@ -440,6 +443,51 @@ static void handleCrashTest() {
 }
 #endif
 
+// --- panel mode ---------------------------------------------------------------------
+
+static void sendPanel(int status, bool restarting) {
+  JsonDocument doc;
+  doc["mode"] = displayModeName(displayMode());
+  doc["refreshHz"] = display->refreshHz();
+  JsonArray modes = doc["modes"].to<JsonArray>();
+  modes.add("normal");
+  modes.add("photo");
+  if (restarting) {
+    doc["restarting"] = true;
+  }
+  sendJson(status, doc);
+}
+
+static void handleGetPanel() { sendPanel(200, false); }
+
+// {"mode": "photo"}. The mode is used from the next start-up, so a change
+// restarts the board.
+static void handlePutPanel() {
+  JsonDocument body;
+  if (!readBody(body)) {
+    return;
+  }
+  PanelMode mode;
+  if (!body["mode"].is<const char *>() || !displayModeFromName(body["mode"].as<String>(), mode)) {
+    sendError(400, "mode must be \"normal\" or \"photo\"");
+    return;
+  }
+  if (mode == displayMode()) {
+    sendPanel(200, false);
+    return;
+  }
+  displaySaveMode(mode);
+  if (!commandSend(CommandType::Restart)) {
+    displaySaveMode(displayMode());
+    sendError(503, "Command queue is full, try again");
+    return;
+  }
+  JsonDocument doc;
+  doc["mode"] = displayModeName(mode);
+  doc["restarting"] = true;
+  sendJson(202, doc);
+}
+
 static void handleRestart() { sendQueued(commandSend(CommandType::Restart), "restart"); }
 
 static void handleWifiSetup() { sendQueued(commandSend(CommandType::WifiSetup), "wifiSetup"); }
@@ -524,6 +572,8 @@ void apiBegin() {
   server.on(API_BASE "/hold", HTTP_POST, handleHold);
   server.on(API_BASE "/brightness", HTTP_GET, handleGetBrightness);
   server.on(API_BASE "/brightness", HTTP_PUT, handlePutBrightness);
+  server.on(API_BASE "/panel", HTTP_GET, handleGetPanel);
+  server.on(API_BASE "/panel", HTTP_PUT, handlePutPanel);
   server.on(API_BASE "/mode", HTTP_GET, handleGetMode);
   server.on(API_BASE "/mode", HTTP_PUT, handlePutMode);
   server.on(API_BASE "/transition", HTTP_GET, handleGetTransition);

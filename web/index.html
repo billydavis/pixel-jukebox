@@ -58,6 +58,8 @@ button:disabled{opacity:.45;cursor:default;transform:none;box-shadow:5px 5px 0 v
 .dim{display:grid;gap:10px}
 .dim label{display:flex;justify-content:space-between;font:13px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
 .dim output{color:var(--ink)}
+.dim .row{margin:0}
+.dim .nm small{display:inline;margin-left:6px;font:400 12px/1 var(--mono);color:var(--dim)}
 input[type=range]{appearance:none;-webkit-appearance:none;width:100%;height:44px;margin:0;background:none;cursor:pointer}
 input[type=range]::-webkit-slider-runnable-track{height:12px;background:linear-gradient(to right,var(--accent) var(--v,12%),var(--edge) 0)}
 input[type=range]::-moz-range-track{height:12px;background:var(--edge)}
@@ -133,6 +135,11 @@ kbd{font:inherit;color:var(--ink)}
     <div class="dim">
       <label for="bri"><span>Brightness</span><output id="briv">--</output></label>
       <input id="bri" type="range" min="0" max="255" step="1" value="32" disabled>
+      <div class="row">
+        <span class="nm">Photo mode <small id="hz"></small></span>
+        <button id="photo" class="sm toggle" aria-pressed="false" disabled>Off</button>
+      </div>
+      <p class="note" id="photonote" role="status"></p>
     </div>
     <details class="rot" id="rot">
       <summary>Rotation</summary>
@@ -191,7 +198,7 @@ function uptime(s){
 function render(online){
   document.body.classList.toggle('off',!online);
   $('link').textContent=online?'Live':st?'Lost contact, retrying':'Connecting';
-  for(const id of['hold','next','bri','mrot','msnd','like'])$(id).disabled=!online;
+  for(const id of['hold','next','bri','mrot','msnd','like','photo'])$(id).disabled=!online||photoBusy;
   $('viz').querySelectorAll('button').forEach(b=>b.disabled=!online);
   if(!online||!st)return;
 
@@ -240,6 +247,12 @@ function render(online){
   $('hold').textContent=held?'Held':'Hold';
 
   if(!dragging)showBrightness(st.brightness);
+  if(st.panel&&!photoBusy){
+    const on=st.panel.mode=='photo';
+    $('photo').setAttribute('aria-pressed',on);$('photo').textContent=on?'On':'Off';
+    $('hz').textContent=st.panel.refreshHz+' Hz';
+    $('photonote').textContent=on?'Redraws fast enough to film without dark bands. Dark shades are less smooth.':'';
+  }
   const d=st.device;
   if(!wifiArmed)$('wifinote').textContent='Connected to '+d.ssid+'.';
   $('info').textContent=d.name+'.local · v'+d.firmware+' · '+d.ip+' · '+d.rssi+' dBm · up '+uptime(d.uptimeSeconds);
@@ -307,6 +320,16 @@ $('wifi').onclick=()=>{
   $('wifi').disabled=true;$('wifi').textContent='Restarting';
   $('wifinote').textContent='Join the Pixel-Jukebox network on your phone to choose a new network.';
   call('POST','/wifi/setup').catch(()=>{});
+};
+
+let photoBusy=false;
+$('photo').onclick=async()=>{
+  const on=$('photo').getAttribute('aria-pressed')!='true';
+  photoBusy=true;$('photo').disabled=true;
+  $('photonote').textContent='Restarting the panel in '+(on?'photo':'normal')+' mode. This page reconnects by itself.';
+  try{await call('PUT','/panel',{mode:on?'photo':'normal'});}
+  catch(e){$('photonote').textContent='Could not switch. Try again.';}
+  setTimeout(()=>{photoBusy=false;poll();},12000);
 };
 
 $('like').onclick=async()=>{

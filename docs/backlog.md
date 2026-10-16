@@ -26,10 +26,11 @@ Priority is a suggestion until it has been agreed.
 | 11 | Room temperature and humidity slot | S | 3 | Onboard SHTC3 sensor (found at 0x70) |
 | 12 | Weather slot | M | 4 | Needs a weather service |
 | 13 | Use the speaker | S | 5 | For example a chime on a like or on the hour |
-| 14 | Raise the default brightness | S | ? | 32 out of 255 today; the tint at higher brightness turned out to be the wiring |
+| 14 | ~~Raise the default brightness~~ | S | Closed | Not wanted: the panel looks better dim (the owner runs it at about 51 of 255), and lower brightness means less heat and slower LED ageing. Below about 20 the darkest shades start to vanish |
 | 15 | Shorten the 40 s wait before playing offline at boot | S | 4 | Two 20 s attempts to join Wi-Fi when the router is down |
 | 28 | **Starter art in the spare flash** | M | 3 | The firmware reserves a 23 MB storage area it never uses. A few dozen built-in pieces would give a new panel something to play before it is on Wi-Fi or registered, and offline without a card |
 | 29 | Auto-dim at night | S | 3 | Dim when the room goes dark and quiet, from the microphones, or by the schedule in #10 |
+| 32 | ~~Photo mode~~ | S | Done (0.17.0) | About 520 Hz instead of 100 so cameras film without bands; restarts to switch. Open: check the picture at the faster clock, and whether normal mode should run at 16 MHz too (200 Hz, same colours) |
 
 ## Control page, API and apps
 

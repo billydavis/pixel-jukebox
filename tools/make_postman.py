@@ -60,6 +60,15 @@ FOLDERS = [
          "Sets the brightness (0-255). Saved on the board.",
          {"value": 32}, 202),
     ]),
+    ("Panel", [
+        ("Get Panel Mode", "GET", "panel",
+         "The panel mode and its refresh rate.", None, 200),
+        ("Photo Mode", "PUT", "panel",
+         "Redraws about five times as often, so cameras film the panel without dark bands. "
+         "Saved; the board restarts to switch.", {"mode": "photo"}, 202),
+        ("Normal Mode", "PUT", "panel",
+         "Back to the most accurate colours. Saved; the board restarts to switch.", {"mode": "normal"}, 202),
+    ]),
     ("Rotation", [
         ("Get Slots", "GET", "slots", "The rotation and the slot types available.", None, 200),
         ("Set Rotation (default)", "PUT", "slots",
@@ -122,6 +131,8 @@ FOLDERS = [
         ("Unknown Slot", "PUT", "slots", "Expects 400; the rotation is left unchanged.",
          {"rotation": [{"slot": "nope", "turns": 1}]}, 400),
         ("Unknown Endpoint", "GET", "nope", "Expects 404.", None, 404),
+        ("Unknown Panel Mode", "PUT", "panel", "Expects 400; nothing changes and the board does not restart.",
+         {"mode": "nope"}, 400),
         ("Artwork Not On The Card", "POST", "card/art/999999999/show", "Expects 404; nothing is shown.", None, 404),
         ("View Reports With Wrong Type", "PUT", "views", "Expects 400; reporting is left as it was.",
          {"report": "yes"}, 400),

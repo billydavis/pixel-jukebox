@@ -69,6 +69,8 @@ the reply is `503` and nothing is queued.
 | `DELETE` | `/likes/{postId}` | Take the like back |
 | `GET` | `/views` | Whether views are reported to Makapix |
 | `PUT` | `/views` | Turn view reports on or off |
+| `GET` | `/panel` | The panel mode and refresh rate |
+| `PUT` | `/panel` | Switch between normal and photo mode |
 | `GET` | `/card` | The microSD card and the offline artwork on it |
 | `GET` | `/card/art` | The artworks saved on the card, a page at a time |
 | `GET` | `/card/art/{postId}.gif` | One saved artwork's GIF |
@@ -111,7 +113,8 @@ the reply is `503` and nothing is queued.
   },
   "mode": "rotation",
   "visualizer": "spectrum",
-  "brightness": 32
+  "brightness": 32,
+  "panel": { "mode": "normal", "refreshHz": 100 }
 }
 ```
 
@@ -130,6 +133,7 @@ the reply is `503` and nothing is queued.
 | `mode` | `rotation` or `sound` |
 | `visualizer` | The visualizer sound mode uses, whether or not it is showing now |
 | `brightness` | 0-255 |
+| `panel` | The panel mode and how often the panel redraws; see `GET /panel` |
 
 ### `GET /diagnostics`
 
@@ -283,6 +287,31 @@ from the clock chip when the network has not answered yet; with no time at all
 `{"report": false}` stops reporting views and drops any still waiting;
 `{"report": true}` starts again. Saved on the board. Reply: the same document
 as `GET /views`. `400` unless `report` is `true` or `false`.
+
+### `GET /panel`
+
+```json
+{ "mode": "normal", "refreshHz": 100, "modes": ["normal", "photo"] }
+```
+
+The panel draws each colour as a sequence of on and off times, many times a
+second. Eyes see a steady picture, but a camera's short exposure catches part
+of a cycle and shows dark bands rolling through the picture.
+
+| Mode | Refresh | Use |
+|---|---|---|
+| `normal` | about 100 Hz | The most accurate colours |
+| `photo` | about 500 Hz | Filming and photographing: cameras see a steady picture. The five dimmest steps of each colour get equal time, so dark shades are less smooth |
+
+`refreshHz` is the rate the display driver worked out at start-up.
+
+### `PUT /panel`
+
+`{"mode": "photo"}` or `{"mode": "normal"}`. The driver lays out its memory for
+one mode when it starts, so the mode is saved and the board restarts to use it
+(about 5 s, the API included). Reply: `202 {"mode":"photo","restarting":true}`.
+Asking for the mode already in use changes nothing: `200` with the `GET /panel`
+document. `400` for anything else.
 
 ### `GET /card`
 

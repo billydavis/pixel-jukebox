@@ -23,6 +23,7 @@ class Screen : public Adafruit_GFX {
   void clearScreen();
   void drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b);
   void setBrightness8(uint8_t brightness);
+  int refreshHz() const; // how often the panel redraws, as the driver worked it out
 
   static uint16_t color565(uint8_t r, uint8_t g, uint8_t b) {
     return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
@@ -61,6 +62,17 @@ bool setupDisplay();
 // displaySetBrightness() from the display loop only.
 uint8_t displayBrightness();
 void displaySetBrightness(uint8_t value);
+
+// Normal shows colours most accurately. Photo redraws the panel about five
+// times as often, so cameras and phones film it without dark bands rolling
+// through, at the cost of smooth dark shades. The driver's memory is laid out
+// for one mode when it starts, so the mode is saved and used from the next
+// start-up: change it with displaySaveMode(), then restart.
+enum class PanelMode : uint8_t { Normal, Photo };
+PanelMode displayMode();
+const char *displayModeName(PanelMode mode);
+bool displayModeFromName(const String &name, PanelMode &mode);
+void displaySaveMode(PanelMode mode);
 
 void drawTestPattern();
 void runColourCheck();
