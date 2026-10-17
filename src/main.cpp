@@ -217,11 +217,21 @@ void setup() {
     return;
   }
   MEMORY_AT("display");
-  drawTestPattern();
-  delay(1500);
+  // The time and the night schedule come before anything is drawn, so a
+  // restart at night does not flash the room: the panel starts at the night
+  // level (dark when it is off) and skips the test pattern.
+  clockChipBegin();
+  nightBegin();
+  nightTick();
+  NightNow night = nightNow();
+  if (night.night && !night.overridden) {
+    Serial.printf("Night: starting at brightness %u, no test pattern\n", night.brightness);
+  } else {
+    drawTestPattern();
+    delay(1500);
+  }
   runDiagnostics();
-  clockChipBegin(); // the time, before Wi-Fi
-  crashBegin();     // after the clock, to note when a crash record was found
+  crashBegin(); // after the clock, to note when a crash record was found
   caseClimateBegin();
   MEMORY_AT("clock, crash, sensor");
   cardBegin();
@@ -242,7 +252,6 @@ void setup() {
   modeBegin();
   MEMORY_AT("mode");
   transitionBegin();
-  nightBegin();
   MEMORY_AT("setup done");
   outgoing = (uint16_t *)ps_malloc(PANEL_RES_X * PANEL_RES_Y * sizeof(uint16_t));
 }

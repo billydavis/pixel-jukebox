@@ -61,4 +61,4 @@ Priority is a suggestion until it has been agreed.
 | 27 | CI build on GitHub | S | Deferred | Deferred by choice in the architecture plan |
 | 31 | ~~Crash records in diagnostics~~ | S | Done (0.16.0) | `GET /crash`, `tools/decode_crash.py`. One record from an earlier, unarchived build was found: the loader, a null-pointer write while freeing memory. Watch for it again |
 | 33 | Memory headroom review | S-M | 3 | Internal RAM is about 108 KB free at rest but dips to about 42-50 KB during each Makapix TLS session (0.20.0). p64 keeps 48 KB as a floor. Look at what sits in internal RAM (task stacks, feed queues of Strings, JSON) and move what can go to PSRAM |
-| 34 | Start dark at night | S | 3 | A restart at night shows the colour test pattern at the saved day brightness before the night schedule takes over, flashing a dark room. At night, skip the pattern or show it at the night level |
+| 34 | ~~Start dark at night~~ | S | Done (0.20.2) | At night the panel starts at the night level (dark when off) and skips the test pattern; Wi-Fi setup still shows at day brightness |

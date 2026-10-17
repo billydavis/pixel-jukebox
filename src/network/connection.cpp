@@ -16,10 +16,17 @@ static const uint32_t MESSAGE_MS = 1500;
 
 static uint32_t lastAttempt = 0;
 
+// Someone is at the panel setting up Wi-Fi: show the instructions at the day
+// brightness even if the night schedule has it dark.
+static void runSetup(bool fallback) {
+  displayApplyBrightness(displayBrightness());
+  wifiSetupRun(fallback);
+}
+
 void connectionStart() {
   wifiBegin();
   if (wifiSetupRequested() || !wifiHasCredentials()) {
-    wifiSetupRun(false);
+    runSetup(false);
   }
 
   showMessage("WiFi", "joining...", colour::amber());
@@ -40,7 +47,7 @@ void connectionStart() {
     return;
   }
   Serial.println("Could not join the saved network");
-  wifiSetupRun(true);
+  runSetup(true);
 }
 
 void connectionEnterSetup() {
