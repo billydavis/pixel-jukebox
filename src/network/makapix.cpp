@@ -7,6 +7,7 @@
 
 #include "ca_certs.h"
 #include "config.h"
+#include "app/memory_trace.h"
 #include "pins.h"
 
 namespace makapix {
@@ -47,6 +48,7 @@ static int requestLocked(const char *method, const String &path, const String &b
   if (status > 0) {
     response = http.getString();
   }
+  MEMORY_AT("TLS session open");
   http.end();
   return status;
 }

@@ -10,6 +10,7 @@
 #include "app/clock_chip.h"
 #include "app/commands.h"
 #include "app/crash_report.h"
+#include "app/memory_trace.h"
 #include "app/diagnostics.h"
 #include "display/display.h"
 #include "input/case_climate.h"
@@ -209,30 +210,40 @@ static void nightDark() {
 
 void setup() {
   Serial.begin(115200);
+  MEMORY_AT("start");
 
   if (!setupDisplay()) {
     Serial.println("Display init failed (DMA buffer allocation)");
     return;
   }
+  MEMORY_AT("display");
   drawTestPattern();
   delay(1500);
   runDiagnostics();
   clockChipBegin(); // the time, before Wi-Fi
   crashBegin();     // after the clock, to note when a crash record was found
   caseClimateBegin();
+  MEMORY_AT("clock, crash, sensor");
   cardBegin();
+  MEMORY_AT("card");
   artCacheBegin();
+  MEMORY_AT("cache");
 
   telemetryRegisterTask("display", xTaskGetCurrentTaskHandle(), getArduinoLoopTaskStackSize());
   connectionStart();
+  MEMORY_AT("wifi, api");
 
   statusBegin();
   commandsBegin();
   rotationBegin();
+  MEMORY_AT("rotation");
   reporterBegin(); // after rotationBegin(), which starts the Makapix client
+  MEMORY_AT("reporter");
   modeBegin();
+  MEMORY_AT("mode");
   transitionBegin();
   nightBegin();
+  MEMORY_AT("setup done");
   outgoing = (uint16_t *)ps_malloc(PANEL_RES_X * PANEL_RES_Y * sizeof(uint16_t));
 }
 

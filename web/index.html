@@ -439,11 +439,12 @@ async function saveNight(change){
 }
 $('nightbox').ontoggle=()=>{if($('nightbox').open)loadNight();};
 $('nighton').onclick=()=>saveNight({enabled:$('nighton').getAttribute('aria-pressed')!='true'});
-$('nstart').onchange=()=>{if($('nstart').value)saveNight({start:$('nstart').value});};
-$('nend').onchange=()=>{if($('nend').value)saveNight({end:$('nend').value});};
-$('naction').onchange=()=>saveNight({action:$('naction').value});
+$('nstart').onchange=()=>{if($('nstart').value)saveNight({enabled:true,start:$('nstart').value});};
+$('nend').onchange=()=>{if($('nend').value)saveNight({enabled:true,end:$('nend').value});};
+// Changing a night setting means wanting the schedule, so it switches on too.
+$('naction').onchange=()=>saveNight({enabled:true,action:$('naction').value});
 $('nlevel').oninput=e=>{$('nlevelv').textContent=e.target.value;};
-$('nlevel').onchange=e=>saveNight({brightness:+e.target.value});
+$('nlevel').onchange=e=>saveNight({enabled:true,brightness:+e.target.value});
 
 $('mkbox').ontoggle=()=>{if($('mkbox').open)loadMk();};
 $('views').onclick=async()=>{

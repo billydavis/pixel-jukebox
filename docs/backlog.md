@@ -36,7 +36,7 @@ Priority is a suggestion until it has been agreed.
 
 | # | Item | Size | Priority | Notes |
 |---|---|---|---|---|
-| 16 | **Split the control page into pages** | M | 3 | Decide the layout as features arrive; includes where Restart lives |
+| 16 | **Split the control page into pages** | M | 3 | Decide the layout as features arrive; includes where Restart lives. Lessons so far: the Night schedule's On/Off switch was easy to miss next to "Turn the panel off" (now any night change switches it on, but the layout should make on/off obvious); settings that need a restart (photo mode) or a confirm (clear all, restart) want a consistent pattern |
 | 17 | Upload your own art to the card ("My art") | M | 4 | Needs 18 first: anyone on the Wi-Fi could fill the card |
 | 18 | A PIN for the control page and API | M | 3 | No authentication today. p64 has one to learn from |
 | 19 | Updates over Wi-Fi (OTA) | M | 3 | No USB cable needed for new firmware. p64 installs from GitHub releases |
@@ -61,3 +61,4 @@ Priority is a suggestion until it has been agreed.
 | 27 | CI build on GitHub | S | Deferred | Deferred by choice in the architecture plan |
 | 31 | ~~Crash records in diagnostics~~ | S | Done (0.16.0) | `GET /crash`, `tools/decode_crash.py`. One record from an earlier, unarchived build was found: the loader, a null-pointer write while freeing memory. Watch for it again |
 | 33 | Memory headroom review | S-M | 3 | Internal RAM is about 108 KB free at rest but dips to about 42-50 KB during each Makapix TLS session (0.20.0). p64 keeps 48 KB as a floor. Look at what sits in internal RAM (task stacks, feed queues of Strings, JSON) and move what can go to PSRAM |
+| 34 | Start dark at night | S | 3 | A restart at night shows the colour test pattern at the saved day brightness before the night schedule takes over, flashing a dark room. At night, skip the pattern or show it at the night level |
