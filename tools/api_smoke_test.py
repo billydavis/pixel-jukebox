@@ -188,6 +188,9 @@ try:
     code, now = call("GET", "/status")
     check("status shows the panel mode", now.get("panel", {}).get("mode") == panel.get("mode"), now.get("panel"))
 
+    code, body = call("GET", "/gallery", base=f"http://{HOST}")
+    check("the old gallery address still works", code == 200, body)
+
     section("Makapix")
     code, body = call("GET", "/likes")
     check("likes list the liked artworks",

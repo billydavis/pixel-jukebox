@@ -19,7 +19,6 @@ static const uint64_t MAX_BYTES = 1024ULL << 20;   // never more than 1 GB
 static const uint64_t KEEP_FREE_BYTES = 64ULL << 20; // and always leave this much of the card
 static const int MAX_LINE = 96;
 
-static SemaphoreHandle_t lock;
 static cache::Entry *storage = nullptr;
 static cache::Index *catalogue = nullptr;
 static uint64_t budget = 0;

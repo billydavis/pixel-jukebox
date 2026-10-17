@@ -281,7 +281,6 @@ Ideas for later:
 
 - Power the panel from the dedicated 5V input for full brightness
 - MQTT for "send to device" commands from the Makapix site
-- A brightness schedule for day and night
 - Use the speaker and the onboard sensors
 - More of the API: show a specific post, sensors, per-slot settings
 - A companion app (Flutter)
@@ -289,7 +288,6 @@ Ideas for later:
 Ideas borrowed from [Pixelix](https://github.com/BlueAndi/Pixelix), using parts already on the board:
 
 - More slot types
-- Keep time across restarts with the onboard clock chip
 - A weather screen
 - More visualizers (waterfall, pulse ring, artwork that moves to the beat)
 - Built-in effects such as falling code, rainbow and Game of Life

@@ -76,7 +76,11 @@ static bool readBody(JsonDocument &doc) {
 
 static void handlePage() { server.send_P(200, "text/html", WEB_INDEX_HTML); }
 
-static void handleGalleryPage() { server.send_P(200, "text/html", WEB_GALLERY_HTML); }
+// The gallery became the control page's Art tab; old links still land there.
+static void handleGalleryPage() {
+  server.sendHeader("Location", "/#art");
+  server.send(302, "text/plain", "");
+}
 
 static void handleApiRoot() {
   JsonDocument doc;

@@ -23,9 +23,6 @@ static SemaphoreHandle_t lock; // one TLS session at a time: two at once can run
 static String playerKey;
 static String apiToken;
 
-// Paging state for the current pass through the feed.
-static String cursor;
-static uint32_t shuffleSeed = 0;
 
 static int requestLocked(const char *method, const String &path, const String &body, String &response) {
   WiFiClientSecure client;
@@ -310,7 +307,6 @@ void forget() {
   prefs.remove("api_token");
   playerKey = "";
   apiToken = "";
-  cursor = "";
 }
 
 } // namespace makapix
