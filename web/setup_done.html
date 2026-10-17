@@ -2,16 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#141a2e">
 <title>Pixel Jukebox setup</title>
 <link rel="stylesheet" href="setup.css">
 </head>
 <body>
 <main>
 <h1>Pixel Jukebox</h1>
+<div class="ok" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="M5 12l5 5 9-10"/></svg></div>
 <h2>Connected</h2>
-<p>The panel joined <strong>{{SSID}}</strong> and saved the details. It is restarting now.</p>
-<p>This setup network is about to disappear. Put your phone back on your own Wi-Fi.</p>
+<p class="lead">The panel joined <strong>{{SSID}}</strong> and saved the details. It is restarting now.</p>
+<ol class="steps">
+  <li>Put your phone back on your own Wi-Fi. This setup network is about to disappear.</li>
+  <li>Open <strong>pixel-jukebox.local</strong> to use the panel.</li>
+</ol>
 </main>
 </body>
 </html>

@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#141a2e">
 <title>Pixel Jukebox setup</title>
 <link rel="stylesheet" href="setup.css">
 </head>
@@ -10,7 +11,8 @@
 <main>
 <h1>Pixel Jukebox</h1>
 <h2>Checking the password</h2>
-<p>The panel is trying to join <strong>{{SSID}}</strong>. This takes up to 15 seconds.</p>
+<div class="wait" role="img" aria-label="Working"><i></i><i></i><i></i></div>
+<p class="lead">The panel is trying to join <strong>{{SSID}}</strong>. This takes up to 15 seconds.</p>
 <p class="note">This page updates by itself. If your phone leaves this network, rejoin Pixel-Jukebox to see the result. <a href="/result">Check now</a></p>
 </main>
 <script>setTimeout(function(){location.replace('/result')},2500);</script>

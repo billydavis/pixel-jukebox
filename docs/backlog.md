@@ -36,7 +36,7 @@ Priority is a suggestion until it has been agreed.
 
 | # | Item | Size | Priority | Notes |
 |---|---|---|---|---|
-| 16 | **Split the control page into pages** | M | 3 | Decide the layout as features arrive; includes where Restart lives. Lessons so far: the Night schedule's On/Off switch was easy to miss next to "Turn the panel off" (now any night change switches it on, but the layout should make on/off obvious); settings that need a restart (photo mode) or a confirm (clear all, restart) want a consistent pattern |
+| 16 | ~~Split the control page into pages~~ | M | Done (0.25.0) | Done as a redesign: one page with a now-playing header and tabs (Now, Rotation, Art, Night, Settings), the gallery folded in as the Art tab, two columns on wide screens, and the Wi-Fi setup pages restyled to match. Original note: decide the layout as features arrive; includes where Restart lives. Lessons so far: the Night schedule's On/Off switch was easy to miss next to "Turn the panel off" (now any night change switches it on, but the layout should make on/off obvious); settings that need a restart (photo mode) or a confirm (clear all, restart) want a consistent pattern |
 | 17 | Upload your own art to the card ("My art") | M | 4 | Needs 18 first: anyone on the Wi-Fi could fill the card |
 | 18 | A PIN for the control page and API | M | 3 | No authentication today. p64 has one to learn from |
 | 19 | Updates over Wi-Fi (OTA) | M | 3 | No USB cable needed for new firmware. p64 installs from GitHub releases |

@@ -134,10 +134,12 @@ static String networkList() {
   String html;
   for (const Network &network : networks) {
     String name = escapeHtml(network.ssid);
-    const char *signal = network.rssi > -60 ? "Strong" : network.rssi > -72 ? "Good" : "Weak";
-    html += "<button type=\"button\" class=\"net\" data-ssid=\"" + name + "\"><span>" + name +
-            "</span><small>" + signal + (network.secured ? ", password" : ", open") +
-            "</small></button>";
+    int bars = network.rssi > -60 ? 3 : network.rssi > -72 ? 2 : 1;
+    const char *signal = bars == 3 ? "Strong" : bars == 2 ? "Good" : "Weak";
+    html += "<button type=\"button\" class=\"net\" aria-pressed=\"false\" data-ssid=\"" + name +
+            "\"><span class=\"nm\">" + name + "</span><small>" + signal +
+            (network.secured ? ", password" : ", open") + "</small><span class=\"bars b" +
+            String(bars) + "\" aria-hidden=\"true\"><i></i><i></i><i></i></span></button>";
   }
   return html;
 }
