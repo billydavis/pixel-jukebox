@@ -14,6 +14,7 @@ struct RotationEntry {
   String slot;    // a name from rotationAvailable()
   uint8_t turns;  // times in a row the slot is shown before moving on
   String channel; // for "makapix" slots, which art (channels.h); empty for the others
+  bool enabled;   // false: paused, kept in its place but skipped
 };
 
 struct SlotInfo {
@@ -22,7 +23,7 @@ struct SlotInfo {
   const char *turnMeaning; // what one turn is, for people editing the rotation
 };
 
-static const size_t ROTATION_MAX_ENTRIES = 8;
+static const size_t ROTATION_MAX_ENTRIES = 12;
 static const uint8_t ROTATION_MAX_TURNS = 20;
 
 // Starts every slot type and loads the saved rotation.
@@ -40,7 +41,7 @@ bool rotationSet(const std::vector<RotationEntry> &entries, String &error);
 Slot *rotationCurrent();
 void rotationAdvance();
 
-// Turns in one full pass.
+// Turns in one full pass, counting only slots that are on.
 size_t rotationTurns();
 
 // The artwork slot, for showing one artwork outside the rotation.

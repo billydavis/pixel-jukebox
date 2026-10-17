@@ -73,7 +73,7 @@ static bool tidyChannels(std::vector<RotationEntry> &entries, String &error) {
 static bool validate(const std::vector<RotationEntry> &entries, String &error) {
   std::vector<RotationItem> items;
   for (const RotationEntry &entry : entries) {
-    items.push_back({entry.slot.c_str(), entry.turns});
+    items.push_back({entry.slot.c_str(), entry.turns, entry.enabled});
   }
   std::vector<std::string> known;
   for (const SlotType &type : SLOT_TYPES) {
@@ -87,9 +87,12 @@ static bool validate(const std::vector<RotationEntry> &entries, String &error) {
   return false;
 }
 
-static std::vector<RotationEntry> defaultRotation() { return {{"makapix", 3, "all"}, {"clock", 1, ""}}; }
+static std::vector<RotationEntry> defaultRotation() {
+  return {{"makapix", 3, "all", true}, {"clock", 1, "", true}};
+}
 
-// Stored as JSON: [{"slot":"makapix","turns":3,"channel":"promoted"}, ...]
+// Stored as JSON: [{"slot":"makapix","turns":3,"channel":"promoted"}, ...],
+// with "enabled":false on paused entries only.
 static void save(const std::vector<RotationEntry> &entries) {
   JsonDocument doc;
   JsonArray array = doc.to<JsonArray>();
@@ -99,6 +102,9 @@ static void save(const std::vector<RotationEntry> &entries) {
     item["turns"] = entry.turns;
     if (!entry.channel.isEmpty()) {
       item["channel"] = entry.channel;
+    }
+    if (!entry.enabled) {
+      item["enabled"] = false;
     }
   }
   String json;
@@ -114,7 +120,7 @@ static std::vector<RotationEntry> load() {
   }
   std::vector<RotationEntry> entries;
   for (JsonObject item : doc.as<JsonArray>()) {
-    entries.push_back({item["slot"] | "", (uint8_t)(item["turns"] | 0), item["channel"] | ""});
+    entries.push_back({item["slot"] | "", (uint8_t)(item["turns"] | 0), item["channel"] | "", item["enabled"] | true});
   }
   String error;
   return tidyChannels(entries, error) && validate(entries, error) ? entries : defaultRotation();
@@ -157,8 +163,18 @@ bool rotationSet(const std::vector<RotationEntry> &requested, String &error) {
   return true;
 }
 
+// Moves on from a paused entry to the next one that is on. There is always
+// one: the rules refuse a rotation with every entry paused.
+static void skipPaused() {
+  for (size_t i = 0; i < rotation.size() && !rotation[position].enabled; i++) {
+    position = (position + 1) % rotation.size();
+    turnsTaken = 0;
+  }
+}
+
 Slot *rotationCurrent() {
   Guard guard;
+  skipPaused();
   Slot *slot = findSlot(rotation[position].slot);
   if (slot == &makapixSlot) {
     makapixSlot.useChannel(rotation[position].channel);
@@ -172,13 +188,14 @@ void rotationAdvance() {
     turnsTaken = 0;
     position = (position + 1) % rotation.size();
   }
+  skipPaused();
 }
 
 size_t rotationTurns() {
   Guard guard;
   size_t turns = 0;
   for (const RotationEntry &entry : rotation) {
-    turns += entry.turns;
+    turns += entry.enabled ? entry.turns : 0;
   }
   return turns;
 }

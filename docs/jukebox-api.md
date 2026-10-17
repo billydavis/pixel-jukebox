@@ -527,7 +527,7 @@ It is a `400`, and nothing changes, if `mode` is not one of the two values or
     { "slot": "makapix", "turns": 1, "channel": "likedby:billy", "channelLabel": "Liked by @billy" },
     { "slot": "makapix", "turns": 1, "channel": "artist:nobody", "channelLabel": "@nobody",
       "problem": "User 'nobody' not found" },
-    { "slot": "clock", "turns": 1 }
+    { "slot": "clock", "turns": 1, "enabled": false }
   ],
   "channels": [
     { "type": "all", "label": "Everything" },
@@ -537,7 +537,7 @@ It is a `400`, and nothing changes, if `mode` is not one of the two values or
     { "type": "artist", "label": "An artist", "needs": "name" },
     { "type": "hashtag", "label": "A hashtag", "needs": "hashtag" }
   ],
-  "maxEntries": 8,
+  "maxEntries": 12,
   "maxTurns": 20
 }
 ```
@@ -546,6 +546,7 @@ It is a `400`, and nothing changes, if `mode` is not one of the two values or
 |---|---|
 | `available` | Slot types this firmware has. `turn` says what one turn of that slot is, for showing to people |
 | `rotation` | The order slots are shown in. Each entry is shown `turns` times in a row, then the next entry, looping |
+| `rotation[].enabled` | `false` while a slot is paused: it keeps its place, turns and channel but is skipped, and nothing is downloaded for it. At least one slot is always on |
 | `rotation[].channel` | For `makapix` slots: which Makapix art it plays; see Channels below. `channelLabel` is the same for people |
 | `rotation[].problem` | Present while the channel cannot play, in Makapix's words or the board's. Its turns are skipped meanwhile, and Makapix is asked again after 5 minutes |
 | `channels` | The channel types, and what each needs after the colon |
@@ -553,7 +554,8 @@ It is a `400`, and nothing changes, if `mode` is not one of the two values or
 
 The example plays two featured artworks, one the owner has liked, one by an
 artist (skipped: there is no such user), then the clock for 10 seconds, and
-repeats. The same slot type may appear more than once, with different channels.
+repeats; the clock is paused. The same slot type may appear more than once,
+with different channels.
 
 #### Channels
 
@@ -586,7 +588,8 @@ an artwork came from.
 }
 ```
 
-A `makapix` entry without `channel` plays `all`.
+A `makapix` entry without `channel` plays `all`. An entry without `enabled` is on;
+`"enabled": false` pauses it.
 
 Replaces the whole rotation. Unlike the commands above it is applied directly,
 not queued: the reply is `200` with the same body as `GET /slots`. The slot on
@@ -596,7 +599,8 @@ The rotation is saved on the board and restored after a restart.
 It is a `400`, and nothing changes, if `rotation` is not an array of 1 to
 `maxEntries` entries, a `slot` is not one of the `available` names, `turns`
 is not a whole number from 1 to `maxTurns`, a `channel` is not one of the
-forms above, or a slot other than `makapix` has one. Whether a name exists is
+forms above, a slot other than `makapix` has one, `enabled` is not `true` or
+`false`, or every entry is paused. Whether a name exists is
 for Makapix to say: an unknown one is accepted and then shows a `problem`.
 
 ### `GET /transition`

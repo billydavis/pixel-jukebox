@@ -67,7 +67,7 @@ def section(title):
 
 def plan(rotation):
     """A rotation as (slot, turns, channel), leaving out what the board adds for people."""
-    return [(r.get("slot"), r.get("turns"), r.get("channel")) for r in rotation or []]
+    return [(r.get("slot"), r.get("turns"), r.get("channel"), r.get("enabled", True)) for r in rotation or []]
 
 
 print(f"Testing {BASE}")
@@ -257,7 +257,7 @@ try:
     available = [slot["name"] for slot in body.get("available", [])]
     check("slots lists what can go in the rotation", code == 200 and available == ["makapix", "clock"], available)
     trial = [{"slot": "clock", "turns": 2}, {"slot": "makapix", "turns": 1, "channel": "hashtag:#Cat"}]
-    expected = [("clock", 2, None), ("makapix", 1, "hashtag:cat")]  # the channel is stored tidied
+    expected = [("clock", 2, None, True), ("makapix", 1, "hashtag:cat", True)]  # the channel is stored tidied
     code, body = call("PUT", "/slots", {"rotation": trial})
     check("rotation can be replaced", code == 200 and plan(body.get("rotation")) == expected, body)
     check("GET /slots returns the new rotation", plan(call("GET", "/slots")[1]["rotation"]) == expected)
@@ -275,6 +275,14 @@ try:
         code, body = call("PUT", "/slots", bad)
         check(f"rotation rejects {label}", code == 400 and "error" in body, body)
     check("rejected rotations changed nothing", plan(call("GET", "/slots")[1]["rotation"]) == expected)
+    paused = [{"slot": "clock", "turns": 2, "enabled": False}, {"slot": "makapix", "turns": 1}]
+    code, body = call("PUT", "/slots", {"rotation": paused})
+    check("a slot can be paused and keeps its place",
+          code == 200 and plan(body.get("rotation")) == [("clock", 2, None, False), ("makapix", 1, "all", True)], body)
+    code, body = call("PUT", "/slots", {"rotation": [{"slot": "clock", "turns": 1, "enabled": False}]})
+    check("pausing every slot is refused", code == 400, body)
+    code, body = call("PUT", "/slots", {"rotation": [{"slot": "clock", "turns": 1, "enabled": "no"}]})
+    check("enabled must be true or false", code == 400, body)
 
     section("Transitions")
     code, body = call("GET", "/transition")

@@ -586,6 +586,7 @@ static void sendSlots() {
     JsonObject item = rotation.add<JsonObject>();
     item["slot"] = entry.slot;
     item["turns"] = entry.turns;
+    item["enabled"] = entry.enabled;
     if (entry.slot == "makapix") {
       item["channel"] = entry.channel;
       channels::Channel channel;
@@ -636,6 +637,10 @@ static void handlePutSlots() {
       sendError(400, "each entry needs a slot name and a whole number of turns");
       return;
     }
+    if (!item["enabled"].isNull() && !item["enabled"].is<bool>()) {
+      sendError(400, "enabled must be true or false");
+      return;
+    }
     if (!item["channel"].isNull() && !item["channel"].is<const char *>()) {
       sendError(400, "channel must be a string, such as \"promoted\" or \"artist:Fab\"");
       return;
@@ -649,7 +654,7 @@ static void handlePutSlots() {
     if (channel.isEmpty() && item["slot"].as<String>() == "makapix") {
       channel = "all";
     }
-    entries.push_back({item["slot"].as<String>(), (uint8_t)turns, channel});
+    entries.push_back({item["slot"].as<String>(), (uint8_t)turns, channel, item["enabled"] | true});
   }
 
   String error;

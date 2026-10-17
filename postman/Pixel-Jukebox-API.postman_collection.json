@@ -1311,6 +1311,54 @@
           "response": []
         },
         {
+          "name": "Set Rotation (one paused)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/slots",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "slots"
+              ]
+            },
+            "description": "Three artworks and the clock, with the clock paused: it keeps its place and turns but is skipped. At least one slot must stay on.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rotation\": [\n    {\n      \"slot\": \"makapix\",\n      \"turns\": 3\n    },\n    {\n      \"slot\": \"clock\",\n      \"turns\": 1,\n      \"enabled\": false\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Set Rotation (channels)",
           "event": [
             {
@@ -2212,6 +2260,54 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"rotation\": [\n    {\n      \"slot\": \"nope\",\n      \"turns\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Every Slot Paused",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/slots",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "slots"
+              ]
+            },
+            "description": "Expects 400; at least one slot must stay on.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rotation\": [\n    {\n      \"slot\": \"makapix\",\n      \"turns\": 1,\n      \"enabled\": false\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"

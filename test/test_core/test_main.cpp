@@ -162,36 +162,45 @@ static bool valid(const std::vector<RotationItem> &items, std::string *error = n
 }
 
 static void test_rotation_accepts_the_default() {
-  TEST_ASSERT_TRUE(valid({{"makapix", 3}, {"clock", 1}}));
+  TEST_ASSERT_TRUE(valid({{"makapix", 3, true}, {"clock", 1, true}}));
 }
 
 static void test_rotation_accepts_repeats_and_the_limits() {
-  TEST_ASSERT_TRUE(valid({{"makapix", 1}, {"clock", 1}, {"makapix", 1}, {"clock", 1}}));
-  TEST_ASSERT_TRUE(valid({{"clock", MAX_TURNS}}));
-  TEST_ASSERT_TRUE(valid(std::vector<RotationItem>(MAX_ENTRIES, {"makapix", 1})));
+  TEST_ASSERT_TRUE(valid({{"makapix", 1, true}, {"clock", 1, true}, {"makapix", 1, true}, {"clock", 1, true}}));
+  TEST_ASSERT_TRUE(valid({{"clock", MAX_TURNS, true}}));
+  TEST_ASSERT_TRUE(valid(std::vector<RotationItem>(MAX_ENTRIES, {"makapix", 1, true})));
 }
 
 static void test_rotation_rejects_empty_and_oversized() {
   std::string error;
   TEST_ASSERT_FALSE(valid({}, &error));
   TEST_ASSERT_EQUAL_STRING("rotation must have 1 to 8 entries", error.c_str());
-  TEST_ASSERT_FALSE(valid(std::vector<RotationItem>(MAX_ENTRIES + 1, {"makapix", 1})));
+  TEST_ASSERT_FALSE(valid(std::vector<RotationItem>(MAX_ENTRIES + 1, {"makapix", 1, true})));
 }
 
 static void test_rotation_rejects_unknown_slots() {
   std::string error;
-  TEST_ASSERT_FALSE(valid({{"makapix", 1}, {"fire", 1}}, &error));
+  TEST_ASSERT_FALSE(valid({{"makapix", 1, true}, {"fire", 1, true}}, &error));
   TEST_ASSERT_EQUAL_STRING("unknown slot: fire", error.c_str());
-  TEST_ASSERT_FALSE(valid({{"", 1}}));
-  TEST_ASSERT_FALSE(valid({{"Makapix", 1}})); // names are case-sensitive
+  TEST_ASSERT_FALSE(valid({{"", 1, true}}));
+  TEST_ASSERT_FALSE(valid({{"Makapix", 1, true}})); // names are case-sensitive
+}
+
+static void test_rotation_pausing_keeps_entries_but_needs_one_on() {
+  std::string error;
+  TEST_ASSERT_TRUE(valid({{"makapix", 3, false}, {"clock", 1, true}}));
+  TEST_ASSERT_FALSE(valid({{"makapix", 3, false}, {"clock", 1, false}}, &error));
+  TEST_ASSERT_EQUAL_STRING("at least one slot must stay on", error.c_str());
+  // A paused entry is still checked: a bad one is refused even while paused.
+  TEST_ASSERT_FALSE(valid({{"nope", 1, false}, {"clock", 1, true}}));
 }
 
 static void test_rotation_rejects_turns_out_of_range() {
   std::string error;
-  TEST_ASSERT_FALSE(valid({{"clock", 0}}, &error));
+  TEST_ASSERT_FALSE(valid({{"clock", 0, true}}, &error));
   TEST_ASSERT_EQUAL_STRING("turns must be 1 to 20", error.c_str());
-  TEST_ASSERT_FALSE(valid({{"clock", -1}}));
-  TEST_ASSERT_FALSE(valid({{"clock", MAX_TURNS + 1}}));
+  TEST_ASSERT_FALSE(valid({{"clock", -1, true}}));
+  TEST_ASSERT_FALSE(valid({{"clock", MAX_TURNS + 1, true}}));
 }
 
 // --- spectrum_math ---------------------------------------------------------
@@ -1036,6 +1045,7 @@ static int runTests() {
   RUN_TEST(test_rotation_rejects_empty_and_oversized);
   RUN_TEST(test_rotation_rejects_unknown_slots);
   RUN_TEST(test_rotation_rejects_turns_out_of_range);
+  RUN_TEST(test_rotation_pausing_keeps_entries_but_needs_one_on);
 
   spectrum::begin(SAMPLE_RATE, 60.0f, 7000.0f);
   RUN_TEST(test_spectrum_band_edges_span_the_range_in_order);

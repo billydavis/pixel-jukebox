@@ -89,6 +89,10 @@ FOLDERS = [
          {"rotation": DEFAULT_ROTATION}, 200),
         ("Set Rotation (art only)", "PUT", "slots", "Artwork only, no clock.",
          {"rotation": [{"slot": "makapix", "turns": 1}]}, 200),
+        ("Set Rotation (one paused)", "PUT", "slots",
+         "Three artworks and the clock, with the clock paused: it keeps its place and turns but is skipped. "
+         "At least one slot must stay on.",
+         {"rotation": [{"slot": "makapix", "turns": 3}, {"slot": "clock", "turns": 1, "enabled": False}]}, 200),
         ("Set Rotation (channels)", "PUT", "slots",
          "Two featured artworks, one tagged #cat, one by @Fab, then the clock. Channels: all, promoted, mine, "
          "artist:<name>, hashtag:<tag>, likedby:<name> (your own name for your likes).",
@@ -150,6 +154,8 @@ FOLDERS = [
         ("Hold With Wrong Type", "POST", "hold", "Expects 400; held must be a JSON boolean.", {"held": "yes"}, 400),
         ("Unknown Slot", "PUT", "slots", "Expects 400; the rotation is left unchanged.",
          {"rotation": [{"slot": "nope", "turns": 1}]}, 400),
+        ("Every Slot Paused", "PUT", "slots", "Expects 400; at least one slot must stay on.",
+         {"rotation": [{"slot": "makapix", "turns": 1, "enabled": False}]}, 400),
         ("Unknown Channel", "PUT", "slots", "Expects 400; the rotation is left unchanged.",
          {"rotation": [{"slot": "makapix", "turns": 1, "channel": "nope"}]}, 400),
         ("Unknown Endpoint", "GET", "nope", "Expects 404.", None, 404),

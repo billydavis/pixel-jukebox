@@ -18,5 +18,9 @@ bool rotationValid(const std::vector<RotationItem> &items, const std::vector<std
       return false;
     }
   }
+  if (std::none_of(items.begin(), items.end(), [](const RotationItem &item) { return item.enabled; })) {
+    error = "at least one slot must stay on";
+    return false;
+  }
   return true;
 }

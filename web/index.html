@@ -85,6 +85,11 @@ select,input[type=text],input[type=time]{flex:1;min-width:0;min-height:44px;padd
 input[type=text]::placeholder{color:var(--dim)}
 .add.wrap{flex-wrap:wrap}.add.wrap select{flex-basis:100%}
 .rot .nm small.bad{color:var(--held)}
+button.eye{min-width:40px;width:40px;padding:0;display:grid;place-items:center;box-shadow:none;background:none}
+button.eye:active{transform:none}
+button.eye svg{width:22px;height:22px;fill:none;stroke:var(--ink);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.rot li.paused button.eye svg{stroke:var(--dim)}
+.rot li.paused .nm{opacity:.45}
 .times{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
 .times input{width:100%;color-scheme:dark}
 #nightbox .dim{margin-top:20px}
@@ -494,7 +499,13 @@ $('restart').onclick=()=>{
 };
 
 let rot=null;
-const copy=()=>rot.rotation.map(r=>r.slot=='makapix'?{slot:r.slot,turns:r.turns,channel:r.channel}:{slot:r.slot,turns:r.turns});
+const copy=()=>rot.rotation.map(r=>{
+  const e={slot:r.slot,turns:r.turns,enabled:r.enabled!==false};
+  if(r.slot=='makapix')e.channel=r.channel;
+  return e;
+});
+const EYE_OPEN='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_SHUT='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
 
 async function loadRot(){
   try{rot=await call('GET','/slots');drawRot();}catch(e){$('rotnote').textContent='Could not load the rotation.';}
@@ -503,12 +514,23 @@ async function loadRot(){
 function drawRot(){
   const rows=$('rows'),focus=document.activeElement&&document.activeElement.dataset.k;
   rows.textContent='';
+  const onCount=rot.rotation.filter(r=>r.enabled!==false).length;
   rot.rotation.forEach((r,i)=>{
     const a=rot.available.find(x=>x.name==r.slot)||{label:r.slot,turn:'turn'};
+    const on=r.enabled!==false,name=r.slot=='makapix'?'Art: '+r.channelLabel:a.label;
     const li=document.createElement('li'),nm=document.createElement('span'),sm=document.createElement('small');
-    nm.className='nm';nm.textContent=r.slot=='makapix'?'Art: '+r.channelLabel:a.label;
-    sm.textContent=r.turns+' × '+a.turn;nm.appendChild(sm);
-    if(r.problem){const bad=document.createElement('small');bad.className='bad';bad.textContent='Skipped: '+r.problem;nm.appendChild(bad);}
+    li.classList.toggle('paused',!on);
+    // The eye, as in an image editor's layers: shown or paused.
+    const eye=document.createElement('button');
+    eye.className='sm eye';eye.innerHTML=on?EYE_OPEN:EYE_SHUT;eye.dataset.k=i+':e';
+    eye.disabled=on&&onCount<=1;
+    eye.title=on?(eye.disabled?'The last slot that is on cannot be paused':'Pause'):'Resume';
+    eye.setAttribute('aria-label',(on?'Pause ':'Resume ')+name);
+    eye.onclick=()=>{const l=copy();l[i].enabled=!on;saveRot(l);};
+    li.appendChild(eye);
+    nm.className='nm';nm.textContent=name;
+    sm.textContent=(on?'':'Paused · ')+r.turns+' × '+a.turn;nm.appendChild(sm);
+    if(r.problem&&on){const bad=document.createElement('small');bad.className='bad';bad.textContent='Skipped: '+r.problem;nm.appendChild(bad);}
     li.appendChild(nm);
     const btn=(j,text,label,off,fn)=>{
       const b=document.createElement('button');
@@ -518,7 +540,7 @@ function drawRot(){
     btn(0,'−','Fewer turns for',r.turns<=1,()=>{const l=copy();l[i].turns--;saveRot(l);});
     btn(1,'+','More turns for',r.turns>=rot.maxTurns,()=>{const l=copy();l[i].turns++;saveRot(l);});
     btn(2,'↑','Move up',i==0,()=>{const l=copy();[l[i-1],l[i]]=[l[i],l[i-1]];saveRot(l);});
-    btn(3,'×','Remove',rot.rotation.length<=1,()=>{const l=copy();l.splice(i,1);saveRot(l);});
+    btn(3,'×','Remove',rot.rotation.length<=1||(on&&onCount<=1),()=>{const l=copy();l.splice(i,1);saveRot(l);});
     rows.appendChild(li);
   });
   const kind=$('kind');
