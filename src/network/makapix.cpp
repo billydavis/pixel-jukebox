@@ -4,11 +4,14 @@
 #include <HTTPClient.h>
 #include <Preferences.h>
 #include <WiFiClientSecure.h>
+#include <esp_heap_caps.h>
+#include <mbedtls/platform.h>
 
 #include "ca_certs.h"
 #include "config.h"
 #include "app/memory_trace.h"
 #include "pins.h"
+#include "storage/card.h"
 
 namespace makapix {
 
@@ -48,7 +51,7 @@ static int requestLocked(const char *method, const String &path, const String &b
   if (status > 0) {
     response = http.getString();
   }
-  MEMORY_AT("TLS session open");
+  MEMORY_CHECK("TLS session open");
   http.end();
   return status;
 }
@@ -57,6 +60,9 @@ static int requestLocked(const char *method, const String &path, const String &b
 // the display loop (registration), so they take turns.
 static int request(const char *method, const String &path, const String &body, String &response) {
   xSemaphoreTake(lock, portMAX_DELAY);
+  // Card access waits while a TLS request runs: a file being read in another
+  // task was found closed under it whenever the two overlapped (see card.h).
+  CardLock card;
   int status = requestLocked(method, path, body, response);
   xSemaphoreGive(lock);
   return status;
@@ -67,7 +73,21 @@ static void storeToken(const String &token) {
   prefs.putString("api_token", apiToken);
 }
 
+// mbedTLS takes about 45 KB of internal RAM per connection when left to
+// itself (the framework is built that way), and internal RAM is what Wi-Fi,
+// task stacks and the display's DMA need. Its memory comes from PSRAM
+// instead, falling back to internal RAM only if PSRAM is full. The hardware
+// AES and SHA engines copy through their own internal buffers, so the TLS
+// buffers do not need to be in DMA-capable memory.
+static void *tlsCalloc(size_t count, size_t size) {
+  void *memory = heap_caps_calloc(count, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  return memory ? memory : heap_caps_calloc(count, size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+}
+
+static void tlsFree(void *memory) { heap_caps_free(memory); }
+
 void begin() {
+  mbedtls_platform_set_calloc_free(tlsCalloc, tlsFree);
   lock = xSemaphoreCreateMutex();
   prefs.begin("makapix", false);
   playerKey = prefs.getString("player_key", "");

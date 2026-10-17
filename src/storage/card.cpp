@@ -14,9 +14,19 @@ static sdmmc_card_t *card = nullptr;
 static bool writable = false;
 static bool detected = false; // a card answered, even if it could not be mounted
 static String problem = "not checked yet";
+static SemaphoreHandle_t cardMutex = xSemaphoreCreateRecursiveMutex();
+
+CardLock::CardLock() { xSemaphoreTakeRecursive(cardMutex, portMAX_DELAY); }
+CardLock::~CardLock() { xSemaphoreGiveRecursive(cardMutex); }
+
+// The file system and size figures from the last time the card was free to
+// ask, so a status report never waits behind a Makapix request.
+static const char *knownFileSystem = nullptr;
+static uint64_t knownTotal = 0, knownFree = 0;
 
 // Proves the card takes writes, not just reads: write, read back, delete.
 static bool writeTest() {
+  CardLock card;
   const char probe[] = "pixel-jukebox";
   FILE *file = fopen(TEST_FILE, "w");
   if (!file) {
@@ -99,11 +109,19 @@ void cardReport(JsonObject report) {
 
   FATFS *fs = nullptr;
   DWORD freeClusters = 0;
-  if (f_getfree("0:", &freeClusters, &fs) == FR_OK && fs) {
-    uint64_t clusterBytes = (uint64_t)fs->csize * 512;
-    report["fileSystem"] = fs->fs_type == FS_FAT32 ? "FAT32" : fs->fs_type == FS_FAT16 ? "FAT16" : "FAT12";
-    report["totalBytes"] = (uint64_t)(fs->n_fatent - 2) * clusterBytes;
-    report["freeBytes"] = (uint64_t)freeClusters * clusterBytes;
+  if (xSemaphoreTakeRecursive(cardMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    if (f_getfree("0:", &freeClusters, &fs) == FR_OK && fs) {
+      uint64_t clusterBytes = (uint64_t)fs->csize * 512;
+      knownFileSystem = fs->fs_type == FS_FAT32 ? "FAT32" : fs->fs_type == FS_FAT16 ? "FAT16" : "FAT12";
+      knownTotal = (uint64_t)(fs->n_fatent - 2) * clusterBytes;
+      knownFree = (uint64_t)freeClusters * clusterBytes;
+    }
+    xSemaphoreGiveRecursive(cardMutex);
+  }
+  if (knownFileSystem) {
+    report["fileSystem"] = knownFileSystem;
+    report["totalBytes"] = knownTotal;
+    report["freeBytes"] = knownFree;
   }
   if (!problem.isEmpty()) {
     report["problem"] = problem;

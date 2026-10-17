@@ -4,6 +4,7 @@
 #include <WiFi.h>
 #include <time.h>
 
+#include "app/memory_trace.h"
 #include "app/telemetry.h"
 #include "likes_book.h"
 #include "network/makapix.h"
@@ -59,6 +60,7 @@ static void loadBacklog() {
   if (!cardReady()) {
     return;
   }
+  CardLock card;
   FILE *file = fopen(BACKLOG_FILE, "r");
   if (!file) {
     return;
@@ -95,6 +97,7 @@ static void saveNewViews() {
     }
     unsaved = 0;
   }
+  CardLock card;
   FILE *file = fopen(BACKLOG_FILE, "a");
   if (file) {
     fputs(lines.c_str(), file);
@@ -115,6 +118,7 @@ static void rewriteBacklog() {
     }
     unsaved = 0;
   }
+  CardLock card;
   if (lines.empty()) {
     remove(BACKLOG_FILE);
     return;
@@ -160,6 +164,7 @@ static bool sendNextLike() {
     }
   }
   makapix::SendStatus status = makapix::setLiked(postId, liked);
+  MEMORY_CHECK("like sent");
   Guard guard;
   switch (status) {
     case makapix::SendStatus::Ok:
@@ -199,6 +204,7 @@ static void sendNextView() {
   lastViewAt = millis();
   makapix::SendStatus status = makapix::reportView(view.postId, views::isoTime(view.unixSeconds).c_str(),
                                                    view.requested, view.channel.c_str(), view.hashtag.c_str());
+  MEMORY_CHECK("view sent");
   if (status == makapix::SendStatus::RateLimited) {
     Guard guard;
     viewsRateLimited++;
@@ -296,6 +302,7 @@ void reporterSetViewsEnabled(bool enabled) {
     }
   }
   if (!enabled && cardReady()) {
+    CardLock card;
     remove(BACKLOG_FILE);
   }
 }

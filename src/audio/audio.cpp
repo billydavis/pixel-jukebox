@@ -129,9 +129,10 @@ static bool setupI2s() {
   return i2s_set_pin(I2S_PORT, &pins) == ESP_OK;
 }
 
+static bool started = false;
+static bool working = false;
+
 bool audioBegin() {
-  static bool started = false;
-  static bool working = false;
   if (started) {
     return working;
   }
@@ -150,6 +151,20 @@ bool audioBegin() {
   working = true;
   return true;
 }
+
+void audioEnd() {
+  if (!started) {
+    return;
+  }
+  if (working) {
+    digitalWrite(SPEAKER_AMP_PIN, LOW);
+  }
+  i2s_driver_uninstall(I2S_PORT); // harmless if the install had failed
+  started = false;
+  working = false;
+}
+
+bool audioRunning() { return started; }
 
 void audioSetVolume(int percent) {
   percent = constrain(percent, 0, 100);

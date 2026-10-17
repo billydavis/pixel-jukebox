@@ -12,6 +12,7 @@
 #include "config.h"
 #include "display/display.h"
 #include "input/case_climate.h"
+#include "app/memory_trace.h"
 #include "app/mode.h"
 #include "app/night.h"
 #include "app/rotation.h"
@@ -664,6 +665,7 @@ static void handleNotFound() { sendError(404, "No such endpoint"); }
 static void serverTask(void *) {
   for (;;) {
     server.handleClient();
+    MEMORY_CHECK("api");
     vTaskDelay(pdMS_TO_TICKS(SERVER_POLL_MS));
   }
 }

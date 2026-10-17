@@ -25,6 +25,7 @@
 #include "storage/art_cache.h"
 #include "storage/card.h"
 #include "app/transition.h"
+#include "audio/audio.h"
 #include "slots/slot_makapix.h"
 
 static const uint32_t MESSAGE_MS = 1500;
@@ -262,6 +263,7 @@ void loop() {
     return;
   }
 
+  MEMORY_CHECK("display loop");
   connectionMaintain();
   clockChipMaintain();
   nightTick();
@@ -273,8 +275,13 @@ void loop() {
   }
 
   // Sound mode shows one visualizer until the mode changes; otherwise the
-  // rotation decides.
+  // rotation decides. Outside sound mode the microphones are switched off,
+  // which gives their buffers back to internal RAM.
   bool sound = modeIsSound();
+  if (!sound && audioRunning()) {
+    audioEnd();
+    Serial.println("Audio stopped");
+  }
   // An artwork asked for from the gallery plays between turns of the rotation,
   // which then carries on where it was.
   MakapixSlot *requested = nullptr;
@@ -300,6 +307,7 @@ void loop() {
     display->setLive(false);
   }
   bool started = slot->start();
+  MEMORY_CHECK("slot start");
   if (animate) {
     if (started) {
       slot->update();

@@ -7,6 +7,7 @@
 
 #include "cache_index.h"
 #include "gif_pad.h"
+#include "app/memory_trace.h"
 #include "storage/card.h"
 
 static const char *ART_DIR = CARD_ROOT "/art";
@@ -29,9 +30,10 @@ static size_t orderPosition = 0;
 static String problem;
 
 namespace {
+// The cache's index and its files are covered by the card lock, which every
+// task using the card takes (see card.h).
 struct Guard {
-  Guard() { xSemaphoreTake(lock, portMAX_DELAY); }
-  ~Guard() { xSemaphoreGive(lock); }
+  CardLock card;
 };
 } // namespace
 
@@ -90,7 +92,6 @@ static void compactLog() {
 }
 
 void artCacheBegin() {
-  lock = xSemaphoreCreateMutex();
   if (!cardReady()) {
     problem = "no card";
     return;
@@ -227,6 +228,7 @@ static uint8_t *readArt(uint32_t postId, size_t &size) {
     }
   }
   fclose(file);
+  MEMORY_CHECK("card read");
   if (data && memcmp(data, "GIF8", 4) != 0) {
     free(data);
     data = nullptr;

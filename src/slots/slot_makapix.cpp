@@ -6,6 +6,7 @@
 
 #include "display/display.h"
 #include "display/gif_player.h"
+#include "app/memory_trace.h"
 #include "app/status.h"
 #include "app/telemetry.h"
 #include "network/reporter.h"
@@ -56,6 +57,7 @@ static std::vector<Feed *> feeds;
 static SemaphoreHandle_t feedsLock; // the API reads problems from another task
 static Feed *loadingFeed = nullptr;
 static SemaphoreHandle_t loaderDone;
+static TaskHandle_t loader = nullptr;
 static bool loading = false;
 
 namespace {
@@ -119,6 +121,7 @@ static LoadStatus loadNext(Feed &feed, LoadedArtwork &loaded) {
     const makapix::Artwork &artwork = feed.queue[feed.queueIndex++];
     size_t size = 0;
     uint8_t *data = downloadGif(artwork.gifUrl, size);
+    MEMORY_CHECK("download");
     if (!data) {
       continue;
     }
@@ -130,6 +133,7 @@ static LoadStatus loadNext(Feed &feed, LoadedArtwork &loaded) {
     }
     telemetryNoteImage(size);
     artCacheStore(artwork.postId, artwork.ownerHandle, artwork.dwellMs, data, size);
+    MEMORY_CHECK("cache store");
     loaded = {artwork, data, size};
     setProblem(feed, "");
     return LoadStatus::Ready;
@@ -137,12 +141,16 @@ static LoadStatus loadNext(Feed &feed, LoadedArtwork &loaded) {
   return loadFromCache(loaded) ? LoadStatus::Ready : LoadStatus::Failed;
 }
 
-static void loaderTask(void *param) {
-  Feed *feed = (Feed *)param;
-  feed->status = loadNext(*feed, feed->pending);
-  telemetryNoteTaskExit("loader", LOADER_STACK_BYTES);
-  xSemaphoreGive(loaderDone);
-  vTaskDelete(nullptr);
+// One loader for the life of the board: it waits to be told to load, loads,
+// and waits again. Making a task with a 16 KB stack for every artwork, as it
+// once did, broke internal RAM into pieces too small for a TLS session.
+static void loaderTask(void *) {
+  for (;;) {
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    Feed *feed = loadingFeed;
+    feed->status = loadNext(*feed, feed->pending);
+    xSemaphoreGive(loaderDone);
+  }
 }
 
 // Loads the feed's next artwork in the background. The result is collected
@@ -150,8 +158,10 @@ static void loaderTask(void *param) {
 static void startLoading(Feed *feed) {
   loading = true;
   loadingFeed = feed;
-  if (xTaskCreatePinnedToCore(loaderTask, "loader", LOADER_STACK_BYTES, feed, 1, nullptr, LOADER_CORE) != pdPASS) {
-    feed->status = loadNext(*feed, feed->pending);
+  if (loader) {
+    xTaskNotifyGive(loader);
+  } else {
+    feed->status = loadNext(*feed, feed->pending); // no loader task: load here instead
     xSemaphoreGive(loaderDone);
   }
 }
@@ -223,6 +233,12 @@ void MakapixSlot::begin() {
   loaderDone = xSemaphoreCreateBinary();
   feedsLock = xSemaphoreCreateMutex();
   makapix::begin();
+  // Made once, early, while internal RAM is still in one piece.
+  if (xTaskCreatePinnedToCore(loaderTask, "loader", LOADER_STACK_BYTES, nullptr, 1, &loader, LOADER_CORE) == pdPASS) {
+    telemetryRegisterTask("loader", loader, LOADER_STACK_BYTES);
+  } else {
+    loader = nullptr;
+  }
 }
 
 void MakapixSlot::useChannel(const String &spec) { feed = feedFor(spec.isEmpty() ? String("all") : spec); }
@@ -339,6 +355,7 @@ bool MakapixSlot::showFromCard(uint32_t postId) {
 }
 
 bool MakapixSlot::play(const LoadedArtwork &current) {
+  MEMORY_CHECK("play");
   Serial.printf("Playing post %u (%u bytes%s)\n", (unsigned)current.artwork.postId, (unsigned)current.size,
                 current.artwork.fromCache ? ", from the card" : "");
   if (!gifOpen(current.data, current.size)) {

@@ -6,8 +6,14 @@
 // its ES7210 ADC (I2C control, I2S audio at 16 kHz).
 
 // Starts the I2C bus, both codecs and I2S in both directions. Safe to call
-// more than once; later calls report whether the first one worked.
+// more than once; later calls report whether the first one worked, until
+// audioEnd().
 bool audioBegin();
+
+// Stops I2S, giving back the 18 KB of internal RAM its DMA buffers hold.
+// The next audioBegin() starts everything again. Safe to call when stopped.
+void audioEnd();
+bool audioRunning();
 
 // 0-100.
 void audioSetVolume(int percent);

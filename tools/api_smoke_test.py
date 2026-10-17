@@ -109,6 +109,13 @@ try:
     check("diagnostics say where the time came from",
           clock.get("source") in ("network", "clock chip", "not set") and "present" in clock.get("chip", {}), clock)
     code, body = call("GET", "/diagnostics")
+    heap = body.get("heap", {})
+    # Floors from the memory review (0.21.0): at rest about 110-126 KB is free and
+    # the lowest seen under the gallery load test and sound mode was about 70 KB.
+    # A TLS session no longer needs internal RAM, so falling below these means
+    # something new is eating the margin.
+    check("internal RAM has kept at least 48 KB free since start-up", heap.get("lowestFree", 0) >= 48 * 1024, heap)
+    check("internal RAM still has a 32 KB block free", heap.get("largestBlock", 0) >= 32 * 1024, heap)
     case = body.get("case", {})
     check("diagnostics report the temperature inside the case",
           case.get("present") is False

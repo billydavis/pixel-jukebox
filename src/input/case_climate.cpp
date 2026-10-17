@@ -4,6 +4,7 @@
 #include <Wire.h>
 #include <math.h>
 
+#include "app/memory_trace.h"
 #include "app/telemetry.h"
 #include "pins.h"
 #include "shtc3_math.h"
@@ -66,7 +67,9 @@ static bool measure(float &celsius, float &humidity) {
 static void climateTask(void *) {
   for (;;) {
     float celsius, humidity;
-    if (measure(celsius, humidity)) {
+    bool measured = measure(celsius, humidity);
+    MEMORY_CHECK("climate");
+    if (measured) {
       Guard guard;
       latestC = celsius;
       latestRh = humidity;
