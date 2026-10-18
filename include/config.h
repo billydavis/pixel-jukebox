@@ -1,7 +1,7 @@
 #pragma once
 
 #define DEVICE_MODEL "pixel-jukebox-64x64"
-#define FIRMWARE_VERSION "0.30.2"
+#define FIRMWARE_VERSION "0.30.4"
 #define USER_AGENT "pixel-jukebox/" FIRMWARE_VERSION
 
 #define MAKAPIX_API_URL "https://makapix.club/api"

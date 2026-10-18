@@ -11,6 +11,9 @@
 
 static const uint32_t JOIN_TIMEOUT_MS = 20000;
 static const int BOOT_ATTEMPTS = 2;
+// With art on the card, start-up waits this long before playing from it and
+// joining in the background instead. A normal join takes a few seconds.
+static const uint32_t QUICK_JOIN_MS = 8000;
 static const uint32_t RETRY_MS = 60000;
 static const uint32_t MESSAGE_MS = 1500;
 
@@ -31,15 +34,21 @@ void connectionStart() {
   }
 
   showMessage("WiFi", "joining...", colour::amber());
-  for (int attempt = 0; attempt < BOOT_ATTEMPTS; attempt++) {
-    if (wifiConnect(JOIN_TIMEOUT_MS)) {
+  uint32_t startedAt = millis();
+  // With art on the card there is something to show without Wi-Fi, so after
+  // one short attempt the panel plays it and keeps trying in the background:
+  // when it fails, the router is more likely down than the password wrong.
+  // Holding BOOT for five seconds still opens setup. Without a card it tries
+  // longer, since the setup hotspot is the only thing left to offer.
+  bool card = artCacheAvailable();
+  int attempts = card ? 1 : BOOT_ATTEMPTS;
+  for (int attempt = 0; attempt < attempts; attempt++) {
+    if (wifiConnect(card ? QUICK_JOIN_MS : JOIN_TIMEOUT_MS)) {
+      Serial.printf("Joined Wi-Fi in %lu ms\n", (unsigned long)(millis() - startedAt));
       return; // connectionMaintain() announces the connection
     }
   }
-  // With art on the card there is still something to show, so keep playing
-  // and keep trying; the router is more likely down than the password wrong.
-  // Holding BOOT for five seconds still opens setup.
-  if (artCacheAvailable()) {
+  if (card) {
     Serial.println("Could not join the saved network; playing from the card");
     showMessage("WiFi", "offline,\nplaying card", colour::amber());
     delay(MESSAGE_MS);

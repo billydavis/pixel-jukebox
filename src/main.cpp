@@ -260,12 +260,14 @@ static void nightDark() {
 void setup() {
   Serial.begin(115200);
   MEMORY_AT("start");
+  telemetryBootMark("start");
 
   if (!setupDisplay()) {
     Serial.println("Display init failed (DMA buffer allocation)");
     return;
   }
   MEMORY_AT("display");
+  telemetryBootMark("display");
   // The time and the night schedule come before anything is drawn, so a
   // restart at night does not flash the room: the panel starts at the night
   // level (dark when it is off) and skips the test pattern.
@@ -283,28 +285,36 @@ void setup() {
   crashBegin(); // after the clock, to note when a crash record was found
   caseClimateBegin();
   MEMORY_AT("clock, crash, sensor");
+  telemetryBootMark("clock, crash, sensor");
   cardBegin();
   MEMORY_AT("card");
+  telemetryBootMark("card");
   artCacheBegin();
   MEMORY_AT("cache");
+  telemetryBootMark("cache");
 
   telemetryRegisterTask("display", xTaskGetCurrentTaskHandle(), getArduinoLoopTaskStackSize());
   firmwareUpdateBegin();
   authBegin(); // before Wi-Fi: the setup page can remove the PIN
   connectionStart();
   MEMORY_AT("wifi, api");
+  telemetryBootMark("wifi, api");
 
   statusBegin();
   commandsBegin();
   rotationBegin();
   MEMORY_AT("rotation");
+  telemetryBootMark("rotation");
   reporterBegin(); // after rotationBegin(), which starts the Makapix client
   liveBegin();
   MEMORY_AT("reporter");
+  telemetryBootMark("reporter");
   modeBegin();
   MEMORY_AT("mode");
+  telemetryBootMark("mode");
   transitionBegin();
   MEMORY_AT("setup done");
+  telemetryBootMark("setup done");
   outgoing = (uint16_t *)ps_malloc(PANEL_RES_X * PANEL_RES_Y * sizeof(uint16_t));
 }
 
@@ -378,6 +388,11 @@ void loop() {
   }
 
   if (started) {
+    static bool firstShown = false;
+    if (!firstShown) {
+      firstShown = true;
+      telemetryBootMark("first slot on screen");
+    }
     slot->shown();
     skippedInARow = 0;
     statusSetSlot(slot->name());

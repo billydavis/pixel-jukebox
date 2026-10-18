@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <vector>
 
+#include "app/telemetry.h"
 #include "cache_index.h"
 #include "gif_pad.h"
 #include "app/memory_trace.h"
@@ -40,11 +41,20 @@ static String artPath(uint32_t postId) { return String(ART_DIR) + "/" + postId +
 
 // Deletes files in the art folder that the index does not list: half-written
 // files from a power cut, and anything left over when the index was full.
-static int removeStrayFiles() {
+// Squares the catalogue with the art folder in one pass over the folder:
+// files the catalogue does not know (a write cut short, say) are deleted,
+// and entries whose file has gone (a card edited on a computer) are dropped.
+//
+// One pass matters. FAT folders have no index, so looking each file up on
+// its own reads the folder from the top every time: with 1,500 artworks that
+// took 48 s of every start-up (2026-10-18).
+static int reconcileWithFolder() {
   DIR *dir = opendir(ART_DIR);
   if (!dir) {
     return 0;
   }
+  std::vector<uint32_t> present;
+  present.reserve(catalogue->count());
   std::vector<String> strays;
   while (struct dirent *item = readdir(dir)) {
     String name = item->d_name;
@@ -54,11 +64,20 @@ static int removeStrayFiles() {
     uint32_t postId = strtoul(name.c_str(), nullptr, 10);
     if (!name.endsWith(".gif") || name.indexOf('.') != name.lastIndexOf('.') || !catalogue->find(postId)) {
       strays.push_back(String(ART_DIR) + "/" + name);
+    } else {
+      present.push_back(postId);
     }
   }
   closedir(dir);
   for (const String &path : strays) {
     remove(path.c_str());
+  }
+  std::sort(present.begin(), present.end());
+  for (int i = catalogue->count() - 1; i >= 0; i--) {
+    uint32_t postId = catalogue->at(i).postId;
+    if (!std::binary_search(present.begin(), present.end(), postId)) {
+      catalogue->remove(postId);
+    }
   }
   return strays.size();
 }
@@ -115,14 +134,8 @@ void artCacheBegin() {
     fclose(file);
   }
 
-  // An entry whose file is missing (a card edited on a computer, say) is dropped.
-  for (int i = catalogue->count() - 1; i >= 0; i--) {
-    struct stat info;
-    if (stat(artPath(catalogue->at(i).postId).c_str(), &info) != 0) {
-      catalogue->remove(catalogue->at(i).postId);
-    }
-  }
-  int strays = removeStrayFiles();
+  telemetryBootMark("cache log read");
+  int strays = reconcileWithFolder();
   if (lines > catalogue->count() * 2 + 64 || damaged > 0 || strays > 0) {
     compactLog();
   }
@@ -378,7 +391,7 @@ int artCacheClear() {
   }
   catalogue->clear();
   remove(LOG_FILE);
-  removeStrayFiles();
+  reconcileWithFolder(); // the catalogue is empty, so anything left is deleted
   order.clear();
   orderPosition = 0;
   Serial.printf("Cache: cleared %d artworks\n", removed);

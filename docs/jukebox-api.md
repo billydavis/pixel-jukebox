@@ -195,6 +195,7 @@ sizes are in bytes.
 | Field | Meaning |
 |---|---|
 | `lastReset` | Why the board last started: `power on`, `software restart`, `crash`, `watchdog`, `brownout` or `other` |
+| `boot` | How long start-up took to reach each step, in ms since power-on: `[{"step": "cache", "ms": 3072}, ...]`, ending with `first slot on screen`. On a full 1,500-artwork card the art appears about 12 s after power-on |
 | `heap`, `psram` | Internal and external memory. `lowestFree` is the least that has been free since startup; `largestBlock` is the biggest single allocation possible now |
 | `tasks` | `lowestFree` is the least stack each task has had spare. `loader` is short-lived and appears once it has run |
 | `artwork` | Artworks downloaded since startup and the size of the largest |

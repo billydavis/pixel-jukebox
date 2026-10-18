@@ -16,4 +16,8 @@ void telemetryNoteTaskExit(const char *name, uint32_t stackBytes);
 // Called for each artwork downloaded, with the bytes held for it.
 void telemetryNoteImage(size_t bytes);
 
+// Notes how far start-up has got, in ms since power-on, for /diagnostics
+// ("boot"). `step` must be a string literal.
+void telemetryBootMark(const char *step);
+
 void telemetryReport(JsonObject report);

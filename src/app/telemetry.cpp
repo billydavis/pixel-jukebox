@@ -76,9 +76,29 @@ static void reportRegion(JsonObject region, uint32_t caps) {
   region["largestBlock"] = heap_caps_get_largest_free_block(caps);
 }
 
+struct BootMark {
+  const char *step;
+  uint32_t ms;
+};
+static const int MAX_BOOT_MARKS = 16;
+static BootMark bootMarks[MAX_BOOT_MARKS];
+static int bootMarkCount = 0;
+
+void telemetryBootMark(const char *step) {
+  if (bootMarkCount < MAX_BOOT_MARKS) {
+    bootMarks[bootMarkCount++] = {step, millis()};
+  }
+}
+
 void telemetryReport(JsonObject report) {
   report["uptimeSeconds"] = millis() / 1000;
   report["lastReset"] = resetReason();
+  JsonArray boot = report["boot"].to<JsonArray>();
+  for (int i = 0; i < bootMarkCount; i++) {
+    JsonObject mark = boot.add<JsonObject>();
+    mark["step"] = bootMarks[i].step;
+    mark["ms"] = bootMarks[i].ms;
+  }
 
   reportRegion(report["heap"].to<JsonObject>(), MALLOC_CAP_INTERNAL);
 

@@ -28,7 +28,7 @@ Priority is a suggestion until it has been agreed.
 | 12 | Weather slot | M | 4 | Needs a weather service. The only way to show a temperature that means anything, since room readings are out |
 | 13 | Use the speaker | S | 5 | For example a chime on a like or on the hour |
 | 14 | ~~Raise the default brightness~~ | S | Closed | Not wanted: the panel looks better dim (the owner runs it at about 51 of 255), and lower brightness means less heat and slower LED ageing. Below about 20 the darkest shades start to vanish |
-| 15 | Shorten the 40 s wait before playing offline at boot | S | 4 | Two 20 s attempts to join Wi-Fi when the router is down |
+| 15 | ~~Shorten the 40 s wait before playing offline at boot~~ | S | Done (0.30.3) | With art on the card, one 8 s attempt, then it plays from the card and keeps trying every minute in the background. Without a card, still two 20 s attempts before the setup hotspot |
 | 28 | Starter art in the spare flash | M | 4 | The firmware reserves a 23 MB storage area it never uses. A few dozen built-in pieces would give a new panel something to play before it is on Wi-Fi or registered, and offline without a card |
 | 29 | Auto-dim when the room is quiet | S | 4 | The board has no light sensor, so it cannot tell dark; it can tell quiet, from the microphones. The schedule (#10) covers night. A light sensor on the I2C connector would be a hardware project |
 | 32 | ~~Photo mode~~ | S | Done (0.17.0) | About 520 Hz instead of 100 so cameras film without bands; restarts to switch. Open: check the picture at the faster clock, and whether normal mode should run at 16 MHz too (200 Hz, same colours) |
