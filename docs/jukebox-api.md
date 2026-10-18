@@ -777,6 +777,12 @@ it:
 | Play a channel (`play_channel`): all, promoted, an artist, a hashtag, liked by someone | Leaves sound mode and plays it as `PUT /channel`, at once |
 | Play a playset (`play_playset`) | Not supported yet: received and ignored |
 
+While the night schedule has the panel off, it goes offline on makapix.club
+too: it says goodbye and disconnects, and connects again in the morning, or as
+soon as the panel is woken from the control page or its button. So the website
+cannot wake a panel that is off for the night. A clock-only or dimmed night
+stays connected.
+
 Art, likes and view reports still go over HTTPS. The certificate is fetched
 with the panel's token the first time, kept on the board, and renewed by the
 panel when it has 30 days left or when the broker turns it away three times in
@@ -793,7 +799,7 @@ a row (at most once a day). After a drop the panel reconnects after 1 s, then
 
 | Field | Meaning |
 |---|---|
-| `state` | `connected`, `connecting`, `retrying`, `waiting` (for Wi-Fi or for the panel to be linked) or `off` |
+| `state` | `connected`, `connecting`, `retrying`, `night` (offline while the night schedule has the panel off), `waiting` (for Wi-Fi or for the panel to be linked) or `off` |
 | `reconnects` | Connections made since start-up after the first |
 | `lastCommand` | The last command from the website; `actedOn` is false for one the panel does not support |
 | `certificateExpires` | When the panel's MQTT certificate runs out (UTC date) |

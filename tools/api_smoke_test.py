@@ -339,7 +339,7 @@ try:
     section("Live connection")
     code, live_state = call("GET", "/live")
     check("live reports its state",
-          code == 200 and live_state.get("state") in ("connected", "connecting", "retrying", "waiting", "off"),
+          code == 200 and live_state.get("state") in ("connected", "connecting", "retrying", "night", "waiting", "off"),
           live_state)
     code, body = call("PUT", "/live", {"enabled": "yes"})
     check("live rejects a non-boolean", code == 400, body)

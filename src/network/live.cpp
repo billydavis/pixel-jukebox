@@ -9,6 +9,7 @@
 
 #include "app/commands.h"
 #include "app/mode.h"
+#include "app/night.h"
 #include "app/rotation.h"
 #include "app/status.h"
 #include "app/telemetry.h"
@@ -30,7 +31,7 @@ static const uint32_t DAY_MS = 24UL * 60 * 60 * 1000;
 static const size_t MQTT_BUFFER_BYTES = 2048;    // commands are small; a larger one (a playset) is dropped
 static const time_t TRUSTED_AFTER = 1700000000;  // before this the clock is not set
 
-enum class State { Off, Waiting, Connecting, Connected, Retrying };
+enum class State { Off, Night, Waiting, Connecting, Connected, Retrying };
 
 // PubSubClient waits for the broker by calling available() in a loop that
 // never sleeps. On core 0 that starved the idle task, and the task watchdog
@@ -377,12 +378,18 @@ static void step() {
     Guard guard;
     on = enabled;
   }
-  if (!on || WiFi.status() != WL_CONNECTED || !makapix::isRegistered()) {
+  // While the night schedule has the panel off, it says goodbye and is
+  // offline on makapix.club until morning, or until someone wakes it here.
+  bool night = nightNow().off;
+  if (!on || night || WiFi.status() != WL_CONNECTED || !makapix::isRegistered()) {
     if (mqtt.connected()) {
+      Serial.println(night ? "Live: off for the night" : "Live: disconnecting");
       sayGoodbye();
     }
-    setState(on ? State::Waiting : State::Off,
-             !on ? "" : WiFi.status() != WL_CONNECTED ? "waiting for Wi-Fi" : "waiting for the panel to be linked");
+    failures = 0; // a fresh start when it may connect again
+    retryAt = 0;
+    setState(!on ? State::Off : night ? State::Night : State::Waiting,
+             !on || night ? "" : WiFi.status() != WL_CONNECTED ? "waiting for Wi-Fi" : "waiting for the panel to be linked");
     return;
   }
   if (mqtt.connected()) {
@@ -457,6 +464,8 @@ void liveSetEnabled(bool on) {
 
 static const char *stateName(State value) {
   switch (value) {
+    case State::Night:
+      return "night";
     case State::Waiting:
       return "waiting";
     case State::Connecting:

@@ -929,7 +929,7 @@ $('photo').onclick=async()=>{
   catch(e){$('photonote').textContent='Could not switch. Try again.';}
   setTimeout(()=>{photoBusy=false;$('photonote').textContent='';poll();},12000);
 };
-const LIVE_STATES={connected:'Connected',connecting:'Connecting',retrying:'Trying again',waiting:'Waiting',off:'Off'};
+const LIVE_STATES={connected:'Connected',connecting:'Connecting',retrying:'Trying again',night:'Offline for the night',waiting:'Waiting',off:'Off'};
 async function loadMk(){
   try{
     const [v,l,live]=await Promise.all([call('GET','/views'),call('GET','/likes'),call('GET','/live')]);
