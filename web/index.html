@@ -560,7 +560,7 @@ function render(){
   $('nownote').textContent=night.overridden?'Night schedule paused by hand for a while.':
     night.active?'Night: '+(night.panel=='off'?'the panel is off.':night.panel=='clock'?'clock only.':'dimmed.'):'';
   if(st.panel&&!photoBusy){
-    const on=st.panel.mode=='photo';
+    const on=st.panel.photo;
     $('photo').setAttribute('aria-checked',on);
     $('hz').textContent=(on?'On: ':'Off: ')+'redraws '+st.panel.refreshHz+' times a second';
   }
@@ -884,7 +884,7 @@ $('photo').onclick=async()=>{
   const on=$('photo').getAttribute('aria-checked')!='true';
   photoBusy=true;$('photo').disabled=true;$('photo').setAttribute('aria-checked',on);
   $('photonote').textContent='Restarting the panel in '+(on?'photo':'normal')+' mode. This page reconnects by itself.';
-  try{await call('PUT','/panel',{mode:on?'photo':'normal'});}
+  try{await call('PUT','/panel',{photo:on});}
   catch(e){$('photonote').textContent='Could not switch. Try again.';}
   setTimeout(()=>{photoBusy=false;$('photonote').textContent='';poll();},12000);
 };

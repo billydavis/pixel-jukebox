@@ -12,7 +12,8 @@ Priority is a suggestion until it has been agreed.
 | 2 | ~~View reports~~ | S | Done (0.14.0) | One call per artwork shown; feeds artists' view counts and trending. Views from offline play saved and sent later |
 | 3 | ~~Channels~~ | S-M | Done (0.18.0) | One per artwork slot in the rotation: everything, promoted, mine, an artist, a hashtag, liked by a name |
 | 4 | **Playsets** | M | 4 | Weighted mixes of channels set up on makapix.club; can include the card |
-| 5 | **Live presence and remote commands (MQTT)** | L | 3 | "Online" on Makapix with the artwork showing, and next / previous / show this / switch channel from the website |
+| 5 | **Live presence and remote commands (MQTT)** | L | 3 | "Online" on Makapix with the artwork showing, and next / previous / show this / switch channel from the website. Do #35 with it |
+| 35 | One "what's on screen" layer for overrides | M | with #5 | Sound mode, night clock-only and off, and "show this artwork" each take over the screen with their own special cases in `main.cpp` (Hold and Show refused in sound mode, Next meaning something else). MQTT's "show this post" would be a fourth. Make them all overrides of the rotation in one place first. From a review of `/mode`, 2026-10-18 |
 | 6 | Comments on the control page | S | 5 | Low value on a 64x64 panel |
 
 ## Panel and hardware

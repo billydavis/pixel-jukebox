@@ -236,7 +236,7 @@ static void handleStatus() {
   nightState["panel"] = night.off ? "off" : night.clockOnly ? "clock" : "playing";
   nightState["overridden"] = night.overridden;
   JsonObject panel = doc["panel"].to<JsonObject>();
-  panel["mode"] = displayModeName(displayMode());
+  panel["photo"] = displayMode() == PanelMode::Photo;
   panel["refreshHz"] = display->refreshHz();
   sendJson(200, doc);
 }
@@ -563,37 +563,28 @@ static void handleCrashTest() {
 }
 #endif
 
-// --- panel mode ---------------------------------------------------------------------
+// --- photo mode -------------------------------------------------------------------
 
-static void sendPanel(int status, bool restarting) {
+static void handleGetPanel() {
   JsonDocument doc;
-  doc["mode"] = displayModeName(displayMode());
+  doc["photo"] = displayMode() == PanelMode::Photo;
   doc["refreshHz"] = display->refreshHz();
-  JsonArray modes = doc["modes"].to<JsonArray>();
-  modes.add("normal");
-  modes.add("photo");
-  if (restarting) {
-    doc["restarting"] = true;
-  }
-  sendJson(status, doc);
+  sendJson(200, doc);
 }
 
-static void handleGetPanel() { sendPanel(200, false); }
-
-// {"mode": "photo"}. The mode is used from the next start-up, so a change
-// restarts the board.
+// {"photo": true}. Used from the next start-up, so a change restarts the board.
 static void handlePutPanel() {
   JsonDocument body;
   if (!readBody(body)) {
     return;
   }
-  PanelMode mode;
-  if (!body["mode"].is<const char *>() || !displayModeFromName(body["mode"].as<String>(), mode)) {
-    sendError(400, "mode must be \"normal\" or \"photo\"");
+  if (!body["photo"].is<bool>()) {
+    sendError(400, "photo must be true or false");
     return;
   }
+  PanelMode mode = body["photo"].as<bool>() ? PanelMode::Photo : PanelMode::Normal;
   if (mode == displayMode()) {
-    sendPanel(200, false);
+    handleGetPanel();
     return;
   }
   displaySaveMode(mode);
@@ -603,7 +594,7 @@ static void handlePutPanel() {
     return;
   }
   JsonDocument doc;
-  doc["mode"] = displayModeName(mode);
+  doc["photo"] = mode == PanelMode::Photo;
   doc["restarting"] = true;
   sendJson(202, doc);
 }

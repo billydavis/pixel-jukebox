@@ -79,12 +79,13 @@ bool modeSet(bool wantSound, const String &visualizer, String &error) {
   bool changed = false;
   {
     Guard guard;
-    if (wantSound && !visualizer.isEmpty()) {
-      int index = findVisualizer(visualizer);
-      if (index < 0) {
-        error = "unknown visualizer: " + visualizer;
-        return false;
-      }
+    // Checked even when switching to rotation, so a typo is never silently ignored.
+    int index = visualizer.isEmpty() ? -1 : findVisualizer(visualizer);
+    if (!visualizer.isEmpty() && index < 0) {
+      error = "unknown visualizer: " + visualizer;
+      return false;
+    }
+    if (wantSound && index >= 0) {
       if ((size_t)index != selected) {
         selected = index;
         prefs.putString("visualizer", VISUALIZERS[selected].info.name);

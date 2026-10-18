@@ -193,14 +193,15 @@ try:
 
     section("Panel")
     code, panel = call("GET", "/panel")
-    check("the panel says its mode and refresh rate",
-          code == 200 and panel.get("mode") in ("normal", "photo") and panel.get("refreshHz", 0) > 0, panel)
-    code, body = call("PUT", "/panel", {"mode": "nope"})
-    check("an unknown panel mode is refused", code == 400, body)
-    code, body = call("PUT", "/panel", {"mode": panel.get("mode", "normal")})
-    check("asking for the current mode changes nothing", code == 200 and not body.get("restarting"), body)
+    check("the panel says whether photo mode is on, and its refresh rate",
+          code == 200 and isinstance(panel.get("photo"), bool) and panel.get("refreshHz", 0) > 0, panel)
+    for bad in ({"photo": "yes"}, {"mode": "photo"}, {}):
+        code, body = call("PUT", "/panel", bad)
+        check(f"photo mode rejects {json.dumps(bad)}", code == 400, body)
+    code, body = call("PUT", "/panel", {"photo": panel.get("photo", False)})
+    check("asking for the setting already in use changes nothing", code == 200 and not body.get("restarting"), body)
     code, now = call("GET", "/status")
-    check("status shows the panel mode", now.get("panel", {}).get("mode") == panel.get("mode"), now.get("panel"))
+    check("status shows photo mode", now.get("panel", {}).get("photo") == panel.get("photo"), now.get("panel"))
 
     code, body = call("GET", "/gallery", base=f"http://{HOST}")
     check("the old gallery address still works", code == 200, body)
@@ -237,7 +238,8 @@ try:
     call("POST", "/hold", {"held": True})
     time.sleep(SETTLE_S)
     check("hold is ignored in sound mode", status()["slot"]["held"] is False)
-    for bad in ({"mode": "party"}, {}, {"mode": "sound", "visualizer": "nope"}, {"mode": "sound", "visualizer": 5}):
+    for bad in ({"mode": "party"}, {}, {"mode": "sound", "visualizer": "nope"}, {"mode": "sound", "visualizer": 5},
+                {"mode": "rotation", "visualizer": "nope"}):
         code, body = call("PUT", "/mode", bad)
         check(f"mode rejects {json.dumps(bad)}", code == 400 and "error" in body, body)
     code, body = call("PUT", "/mode", {"mode": "rotation"})

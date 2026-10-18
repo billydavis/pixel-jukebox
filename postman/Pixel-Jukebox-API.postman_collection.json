@@ -1159,7 +1159,7 @@
       "name": "Panel",
       "item": [
         {
-          "name": "Get Panel Mode",
+          "name": "Get Photo Mode",
           "event": [
             {
               "listen": "test",
@@ -1193,12 +1193,12 @@
                 "panel"
               ]
             },
-            "description": "The panel mode and its refresh rate."
+            "description": "Whether photo mode is on, and the refresh rate."
           },
           "response": []
         },
         {
-          "name": "Photo Mode",
+          "name": "Photo Mode On",
           "event": [
             {
               "listen": "test",
@@ -1239,7 +1239,7 @@
             "description": "Redraws about five times as often, so cameras film the panel without dark bands. Saved; the board restarts to switch.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"mode\": \"photo\"\n}",
+              "raw": "{\n  \"photo\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1250,7 +1250,7 @@
           "response": []
         },
         {
-          "name": "Normal Mode",
+          "name": "Photo Mode Off",
           "event": [
             {
               "listen": "test",
@@ -1291,7 +1291,7 @@
             "description": "Back to the most accurate colours. Saved; the board restarts to switch.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"mode\": \"normal\"\n}",
+              "raw": "{\n  \"photo\": false\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2709,7 +2709,7 @@
           "response": []
         },
         {
-          "name": "Unknown Panel Mode",
+          "name": "Photo Mode With Wrong Type",
           "event": [
             {
               "listen": "test",
@@ -2750,7 +2750,7 @@
             "description": "Expects 400; nothing changes and the board does not restart.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"mode\": \"nope\"\n}",
+              "raw": "{\n  \"photo\": \"yes\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

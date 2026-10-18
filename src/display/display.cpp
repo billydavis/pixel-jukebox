@@ -149,14 +149,6 @@ PanelMode displayMode() { return mode; }
 
 const char *displayModeName(PanelMode value) { return value == PanelMode::Photo ? "photo" : "normal"; }
 
-bool displayModeFromName(const String &name, PanelMode &value) {
-  if (name == "normal" || name == "photo") {
-    value = name == "photo" ? PanelMode::Photo : PanelMode::Normal;
-    return true;
-  }
-  return false;
-}
-
 void displaySaveMode(PanelMode value) { prefs.putBool("photo", value == PanelMode::Photo); }
 
 static uint8_t applied = 0; // what the panel is showing now

@@ -75,7 +75,6 @@ uint8_t displayAppliedBrightness();
 enum class PanelMode : uint8_t { Normal, Photo };
 PanelMode displayMode();
 const char *displayModeName(PanelMode mode);
-bool displayModeFromName(const String &name, PanelMode &mode);
 void displaySaveMode(PanelMode mode);
 
 void drawTestPattern();

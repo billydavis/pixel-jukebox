@@ -55,6 +55,11 @@ artwork loads, a queued command is delayed until playback starts, and `next`
 or `hold` may be dropped because there is no slot yet for it to act on. If the queue is full
 the reply is `503` and nothing is queued.
 
+The same goes for `POST /card/art/{postId}/show`, `POST /restart`,
+`POST /wifi/setup`, and `PUT /panel` when it changes the setting: all answer
+`202`, and the last three before the board restarts. Every other change takes
+effect before the reply, which is `200` with the new state.
+
 ## Endpoints
 
 | Method | Path | Purpose |
@@ -72,8 +77,8 @@ the reply is `503` and nothing is queued.
 | `PUT` | `/views` | Turn view reports on or off |
 | `GET` | `/night` | The night schedule |
 | `PUT` | `/night` | Change the night schedule |
-| `GET` | `/panel` | The panel mode and refresh rate |
-| `PUT` | `/panel` | Switch between normal and photo mode |
+| `GET` | `/panel` | Whether photo mode is on, and the refresh rate |
+| `PUT` | `/panel` | Turn photo mode on or off |
 | `GET` | `/card` | The microSD card and the offline artwork on it |
 | `GET` | `/card/art` | The artworks saved on the card, a page at a time |
 | `GET` | `/card/art/{postId}.gif` | One saved artwork's GIF |
@@ -123,7 +128,7 @@ the reply is `503` and nothing is queued.
   "visualizer": "spectrum",
   "brightness": 32,
   "night": { "active": false, "panel": "playing", "overridden": false },
-  "panel": { "mode": "normal", "refreshHz": 100 }
+  "panel": { "photo": false, "refreshHz": 100 }
 }
 ```
 
@@ -144,7 +149,7 @@ the reply is `503` and nothing is queued.
 | `visualizer` | The visualizer sound mode uses, whether or not it is showing now |
 | `brightness` | 0-255, as showing now: the night schedule may have lowered it |
 | `night` | Whether it is night by the schedule, what the panel is doing (`playing`, `clock` or `off`) and whether someone has taken over for a while; see `GET /night` |
-| `panel` | The panel mode and how often the panel redraws; see `GET /panel` |
+| `panel` | Whether photo mode is on, and how often the panel redraws; see `GET /panel` |
 
 ### `GET /diagnostics`
 
@@ -353,27 +358,27 @@ the others stay as they are. Saved on the board. Reply: `200` with the
 ### `GET /panel`
 
 ```json
-{ "mode": "normal", "refreshHz": 100, "modes": ["normal", "photo"] }
+{ "photo": false, "refreshHz": 100 }
 ```
 
 The panel draws each colour as a sequence of on and off times, many times a
 second. Eyes see a steady picture, but a camera's short exposure catches part
 of a cycle and shows dark bands rolling through the picture.
 
-| Mode | Refresh | Use |
+| `photo` | Refresh | Use |
 |---|---|---|
-| `normal` | about 100 Hz | The most accurate colours |
-| `photo` | about 500 Hz | Filming and photographing: cameras see a steady picture. The five dimmest steps of each colour get equal time, so dark shades are less smooth |
+| `false` | about 100 Hz | The most accurate colours |
+| `true` | about 500 Hz | Filming and photographing: cameras see a steady picture. The five dimmest steps of each colour get equal time, so dark shades are less smooth |
 
 `refreshHz` is the rate the display driver worked out at start-up.
 
 ### `PUT /panel`
 
-`{"mode": "photo"}` or `{"mode": "normal"}`. The driver lays out its memory for
-one mode when it starts, so the mode is saved and the board restarts to use it
-(about 5 s, the API included). Reply: `202 {"mode":"photo","restarting":true}`.
-Asking for the mode already in use changes nothing: `200` with the `GET /panel`
-document. `400` for anything else.
+`{"photo": true}` or `{"photo": false}`. The driver lays out its memory for one
+refresh rate when it starts, so the setting is saved and the board restarts to
+use it (about 5 s, the API included). Reply: `202 {"photo":true,"restarting":true}`.
+Asking for the setting already in use changes nothing: `200` with the `GET /panel`
+document. `400` unless `photo` is `true` or `false`.
 
 ### `GET /card`
 
@@ -517,7 +522,7 @@ interrupting whatever is on screen. Returning to `rotation` carries on from
 where the rotation left off.
 
 It is a `400`, and nothing changes, if `mode` is not one of the two values or
-`visualizer` is not a name from the `visualizers` list.
+`visualizer` is not a name from the `visualizers` list, even with `rotation`.
 
 ### `GET /slots`
 
