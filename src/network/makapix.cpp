@@ -19,9 +19,72 @@ static const int PAGE_SIZE = 25;
 static const uint16_t HTTP_TIMEOUT_MS = 15000;
 
 static Preferences prefs;
-static SemaphoreHandle_t lock; // one TLS session at a time: two at once can run internal RAM out
+static SemaphoreHandle_t lock; // one request at a time: they share the connection below
 static String playerKey;
 static String apiToken;
+
+// The connection to Makapix, kept open between requests (HTTP keep-alive), so
+// most requests skip the TLS handshake, the slowest and most CPU-hungry part.
+//
+// The card lock (storage/card.h) is taken for each TLS operation on its own,
+// as the live connection does, rather than for a whole request: a request
+// held it for up to 4.6 s, mostly waiting on the network, and every card read
+// behind it waited too, the control page's pictures included, which stalled
+// the one-at-a-time web server for seconds (2026-10-18).
+class LockedTls : public WiFiClientSecure {
+ public:
+  int connect(IPAddress ip, uint16_t port) override {
+    CardLock card;
+    return WiFiClientSecure::connect(ip, port);
+  }
+  int connect(IPAddress ip, uint16_t port, int32_t timeout) override {
+    CardLock card;
+    return WiFiClientSecure::connect(ip, port, timeout);
+  }
+  int connect(const char *host, uint16_t port) override {
+    CardLock card;
+    return WiFiClientSecure::connect(host, port);
+  }
+  int connect(const char *host, uint16_t port, int32_t timeout) override {
+    CardLock card;
+    return WiFiClientSecure::connect(host, port, timeout);
+  }
+  size_t write(uint8_t byte) override {
+    CardLock card;
+    return WiFiClientSecure::write(byte);
+  }
+  size_t write(const uint8_t *buf, size_t size) override {
+    CardLock card;
+    return WiFiClientSecure::write(buf, size);
+  }
+  int available() override {
+    CardLock card;
+    return WiFiClientSecure::available();
+  }
+  int read() override {
+    CardLock card;
+    return WiFiClientSecure::read();
+  }
+  int read(uint8_t *buf, size_t size) override {
+    CardLock card;
+    return WiFiClientSecure::read(buf, size);
+  }
+  int peek() override {
+    CardLock card;
+    return WiFiClientSecure::peek();
+  }
+  void stop() override {
+    CardLock card;
+    WiFiClientSecure::stop();
+  }
+  uint8_t connected() override {
+    CardLock card;
+    return WiFiClientSecure::connected();
+  }
+};
+
+static LockedTls tls;
+static HTTPClient http; // also kept: destroying it would close the connection
 
 
 // Retry-After in whole seconds (Makapix sends it with 429), clamped to a sane
@@ -42,13 +105,10 @@ static uint32_t retryAfterSeconds(HTTPClient &http) {
 
 static int requestLocked(const char *method, const String &path, const String &body, String &response,
                          uint32_t *retryAfter) {
-  WiFiClientSecure client;
-  client.setCACert(MAKAPIX_ROOT_CAS);
-
-  HTTPClient http;
   http.setUserAgent(USER_AGENT);
   http.setTimeout(HTTP_TIMEOUT_MS);
-  if (!http.begin(client, String(MAKAPIX_API_URL) + path)) {
+  http.setReuse(true);
+  if (!http.begin(tls, String(MAKAPIX_API_URL) + path)) {
     return -1;
   }
   if (apiToken.length()) {
@@ -71,18 +131,15 @@ static int requestLocked(const char *method, const String &path, const String &b
     *retryAfter = retryAfterSeconds(http);
   }
   MEMORY_CHECK("TLS session open");
-  http.end();
+  http.end(); // keeps the connection open for the next request when Makapix allows
   return status;
 }
 
 // Every call to Makapix goes through here, from the loader, the reporter and
-// the display loop (registration), so they take turns.
+// the display loop (registration), so they take turns on the one connection.
 static int request(const char *method, const String &path, const String &body, String &response,
                    uint32_t *retryAfter = nullptr) {
   xSemaphoreTake(lock, portMAX_DELAY);
-  // Card access waits while a TLS request runs: a file being read in another
-  // task was found closed under it whenever the two overlapped (see card.h).
-  CardLock card;
   int status = requestLocked(method, path, body, response, retryAfter);
   xSemaphoreGive(lock);
   return status;
@@ -109,6 +166,7 @@ static void tlsFree(void *memory) { heap_caps_free(memory); }
 void begin() {
   mbedtls_platform_set_calloc_free(tlsCalloc, tlsFree);
   lock = xSemaphoreCreateMutex();
+  tls.setCACert(MAKAPIX_ROOT_CAS);
   prefs.begin("makapix", false);
   playerKey = prefs.getString("player_key", "");
   apiToken = prefs.getString("api_token", "");

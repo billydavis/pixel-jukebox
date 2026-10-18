@@ -207,6 +207,8 @@ sizes are in bytes.
 | `case` | Temperature and humidity inside the case, from the board's SHTC3 sensor, read once a minute; `lowestC` and `highestC` since start-up. The board and the panel warm the air around the sensor, so this is how hot the electronics run, not the room: expect several degrees above it, and humidity correspondingly lower. `null` until the first reading; `present` is `false` if the sensor did not answer |
 | `firmware` | `version`; `slot`, the flash slot it runs from (`app0` or `app1`); `newAndOnProbation`, true for a just-installed firmware that is not yet kept (see `POST /update`); `updating`, true while an upload is being written |
 | `live` | The live connection to makapix.club, as `GET /live` |
+| `web` | How the web server is keeping up: `slowestMs` (the slowest request since start-up), `overOneSecond` (how many took longer), `slowestHandlerUri`, and for card pictures `slowestCardReadMs` and `slowestPictureSendMs`, to tell a slow card from slow Wi-Fi |
+| `cardLock` | The card lock (shared by card access and TLS): the longest wait for it and the longest hold, with the task names |
 | `crash` | Whether a crash record is stored, and if so which task crashed and why. Details from `GET /crash` |
 | `clock.source` | Where the time came from: `network` (internet time, checked about hourly), `clock chip` (the board's PCF85063, read at start-up, until the network answers) or `not set`. `utc` is `null` until the time is known |
 | `clock.chip` | The clock chip. `keptTimeAtStart` is `false` after the power was off, unless a backup battery is fitted. It is set from the network each time that answers; `driftSecondsAtLastSet` is how far it had wandered by then (a second either way is rounding: it counts whole seconds) |

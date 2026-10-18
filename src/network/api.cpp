@@ -43,6 +43,15 @@ static const uint32_t SERVER_POLL_MS = 2;
 static WebServer server(80);
 static bool started = false;
 
+// The slowest request since start-up, for /diagnostics. A request that waits
+// holds up every other, since the server takes one at a time.
+static uint32_t slowestMs = 0, slowCount = 0;
+static String slowestUri;
+// Inside a handler: the whole of it, and for card pictures the read and the
+// send apart, to tell a slow card from a slow network.
+static uint32_t slowestHandlerMs = 0, slowestReadMs = 0, slowestSendMs = 0;
+static String slowestHandlerUri;
+
 static void sendJson(int status, const JsonDocument &doc) {
   String body;
   serializeJson(doc, body);
@@ -107,7 +116,13 @@ static WebServer::THandlerFunction guarded(WebServer::THandlerFunction handler) 
       sendAuthRefusal(result);
       return;
     }
+    uint32_t startedAt = millis();
     handler();
+    uint32_t took = millis() - startedAt;
+    if (took > slowestHandlerMs) {
+      slowestHandlerMs = took;
+      slowestHandlerUri = server.uri();
+    }
   };
 }
 
@@ -277,6 +292,15 @@ static void handleDiagnostics() {
   reporterReportViews(doc["views"].to<JsonObject>());
   reporterReportLikes(doc["likes"].to<JsonObject>());
   liveReport(doc["live"].to<JsonObject>());
+  JsonObject web = doc["web"].to<JsonObject>();
+  web["slowestMs"] = slowestMs;
+  web["slowestUri"] = slowestUri;
+  web["overOneSecond"] = slowCount;
+  web["slowestHandlerMs"] = slowestHandlerMs;
+  web["slowestHandlerUri"] = slowestHandlerUri;
+  web["slowestCardReadMs"] = slowestReadMs;
+  web["slowestPictureSendMs"] = slowestSendMs;
+  cardLockReport(doc["cardLock"].to<JsonObject>());
   JsonObject firmware = doc["firmware"].to<JsonObject>();
   firmware["version"] = FIRMWARE_VERSION;
   firmwareUpdateReport(firmware);
@@ -445,14 +469,18 @@ static void handleArtImage() {
   uint32_t postId = pathPostId();
   uint8_t *data = nullptr;
   size_t size = 0;
+  uint32_t startedAt = millis();
   if (!postId || !artCacheReadFile(postId, data, size)) {
     sendError(404, "That artwork is not on the card");
     return;
   }
+  uint32_t readAt = millis();
   // An artwork never changes once saved, so the browser may keep it.
   server.sendHeader("Cache-Control", "max-age=86400");
   server.send_P(200, "image/gif", (const char *)data, size);
   free(data);
+  slowestReadMs = max(slowestReadMs, readAt - startedAt);
+  slowestSendMs = max(slowestSendMs, (uint32_t)millis() - readAt);
 }
 
 static void handleShowArt() {
@@ -1117,7 +1145,16 @@ static void handleNotFound() { sendError(404, "No such endpoint"); }
 
 static void serverTask(void *) {
   for (;;) {
+    uint32_t startedAt = millis();
     server.handleClient();
+    uint32_t took = millis() - startedAt;
+    if (took >= 1000) {
+      slowCount++;
+    }
+    if (took > slowestMs) {
+      slowestMs = took;
+      slowestUri = server.uri();
+    }
     MEMORY_CHECK("api");
     vTaskDelay(pdMS_TO_TICKS(SERVER_POLL_MS));
   }

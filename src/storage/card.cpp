@@ -16,8 +16,52 @@ static bool detected = false; // a card answered, even if it could not be mounte
 static String problem = "not checked yet";
 static SemaphoreHandle_t cardMutex = xSemaphoreCreateRecursiveMutex();
 
-CardLock::CardLock() { xSemaphoreTakeRecursive(cardMutex, portMAX_DELAY); }
-CardLock::~CardLock() { xSemaphoreGiveRecursive(cardMutex); }
+// How the lock is used, for /diagnostics: the longest anyone waited for it
+// and the longest anyone held it, and which task. Only the outermost take of
+// a task counts (the lock is recursive).
+static TaskHandle_t holder = nullptr;
+static int depth = 0;
+static uint32_t heldSince = 0;
+static uint32_t longestWaitMs = 0, longestHoldMs = 0;
+static char longestWaitBy[16] = "", longestHoldBy[16] = "";
+
+CardLock::CardLock() {
+  TaskHandle_t self = xTaskGetCurrentTaskHandle();
+  if (holder == self) {
+    xSemaphoreTakeRecursive(cardMutex, portMAX_DELAY);
+    depth++;
+    return;
+  }
+  uint32_t asked = millis();
+  xSemaphoreTakeRecursive(cardMutex, portMAX_DELAY);
+  holder = self;
+  depth = 1;
+  heldSince = millis();
+  uint32_t waited = heldSince - asked;
+  if (waited > longestWaitMs) {
+    longestWaitMs = waited;
+    strlcpy(longestWaitBy, pcTaskGetName(self), sizeof(longestWaitBy));
+  }
+}
+
+CardLock::~CardLock() {
+  if (--depth == 0) {
+    uint32_t held = millis() - heldSince;
+    if (held > longestHoldMs) {
+      longestHoldMs = held;
+      strlcpy(longestHoldBy, pcTaskGetName(holder), sizeof(longestHoldBy));
+    }
+    holder = nullptr;
+  }
+  xSemaphoreGiveRecursive(cardMutex);
+}
+
+void cardLockReport(JsonObject out) {
+  out["longestWaitMs"] = longestWaitMs;
+  out["longestWaitBy"] = longestWaitBy;
+  out["longestHoldMs"] = longestHoldMs;
+  out["longestHoldBy"] = longestHoldBy;
+}
 
 // The file system and size figures from the last time the card was free to
 // ask, so a status report never waits behind a Makapix request.

@@ -33,6 +33,10 @@ void cardReport(JsonObject report);
 // crypto hardware), so the cure is to never let the two overlap: card access
 // and TLS requests take turns behind this lock. The lock is recursive: code
 // already holding it may take it again.
+// For /diagnostics: the longest wait for the lock and the longest hold, with
+// the task names.
+void cardLockReport(JsonObject out);
+
 class CardLock {
 public:
   CardLock();

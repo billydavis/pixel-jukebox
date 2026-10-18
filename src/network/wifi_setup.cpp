@@ -54,6 +54,12 @@ bool wifiHasCredentials() {
   return !ssid.isEmpty();
 }
 
+// The radio stays awake. By default it dozes between the router's beacons,
+// which made the control page crawl: a 30 KB picture took up to 4.4 s to
+// send and replies came in spikes (2026-10-18). The panel runs from the
+// mains, so the power saved is not worth it.
+static void stayAwake() { WiFi.setSleep(false); }
+
 bool wifiConnect(uint32_t timeoutMs) {
   String ssid, password;
   credentials(ssid, password);
@@ -62,6 +68,7 @@ bool wifiConnect(uint32_t timeoutMs) {
   }
 
   WiFi.mode(WIFI_STA);
+  stayAwake();
   WiFi.begin(ssid.c_str(), password.c_str());
   uint32_t start = millis();
   while (WiFi.status() != WL_CONNECTED) {
@@ -80,6 +87,7 @@ void wifiRetry() {
     return;
   }
   WiFi.mode(WIFI_STA);
+  stayAwake();
   WiFi.begin(ssid.c_str(), password.c_str());
 }
 
