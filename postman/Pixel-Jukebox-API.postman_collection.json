@@ -2355,6 +2355,50 @@
       ]
     },
     {
+      "name": "Firmware",
+      "item": [
+        {
+          "name": "Update Firmware",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/update",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "update"
+              ]
+            },
+            "description": "Installs new firmware. As saved it has no file and expects 400; to really update, attach firmware.bin under Body > binary with Content-Type application/octet-stream. tools/ota_upload.py is easier and checks the result."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Error cases",
       "item": [
         {

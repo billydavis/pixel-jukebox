@@ -148,6 +148,12 @@ FOLDERS = [
          "Restarts the board into its setup hotspot (network name Pixel-Jukebox). The board goes offline; "
          "it rejoins the saved network after three minutes if nobody connects.", None, 202),
     ]),
+    ("Firmware", [
+        ("Update Firmware", "POST", "update",
+         "Installs new firmware. As saved it has no file and expects 400; to really update, attach "
+         "firmware.bin under Body > binary with Content-Type application/octet-stream. "
+         "tools/ota_upload.py is easier and checks the result.", None, 400),
+    ]),
     ("Error cases", [
         ("Brightness Out Of Range", "PUT", "brightness", "Expects 400; the brightness is left unchanged.",
          {"value": 300}, 400),

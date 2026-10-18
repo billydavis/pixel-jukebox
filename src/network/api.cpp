@@ -9,6 +9,7 @@
 #include "app/clock_chip.h"
 #include "app/commands.h"
 #include "app/crash_report.h"
+#include "app/firmware_update.h"
 #include "config.h"
 #include "display/display.h"
 #include "input/case_climate.h"
@@ -251,6 +252,9 @@ static void handleDiagnostics() {
   artCacheReport(doc["cache"].to<JsonObject>());
   reporterReportViews(doc["views"].to<JsonObject>());
   reporterReportLikes(doc["likes"].to<JsonObject>());
+  JsonObject firmware = doc["firmware"].to<JsonObject>();
+  firmware["version"] = FIRMWARE_VERSION;
+  firmwareUpdateReport(firmware);
   sendJson(200, doc);
 }
 
@@ -761,6 +765,116 @@ static void handlePutSlots() {
   sendSlots();
 }
 
+// --- new firmware ---------------------------------------------------------------------
+
+// The firmware arrives as the raw request body (application/octet-stream) and
+// is written to flash as it comes, so it never has to fit in memory. The PIN is
+// checked once, before anything is written; the reply comes after the end.
+static bool updateReceived = false; // the body went through the raw handler
+static AuthResult updateAuth = AuthResult::Missing;
+static int updateStatus = 0; // an error's status, 0 when all is well
+static String updateError;
+
+static void failUpdate(int status, const String &error) {
+  if (updateStatus == 0) {
+    updateStatus = status;
+    updateError = error;
+  }
+}
+
+// The web server's own raw-body loop asks for whole 1436-byte pieces, so on
+// the last, shorter piece it spins for its 5 s timeout without yielding and the
+// watchdog restarts the board. So the body is read here, at the start, taking
+// whatever has arrived and waiting politely when nothing has; then the server
+// is told the body is used up, which skips its loop.
+static const uint32_t BODY_STALL_MS = 10000;
+static uint8_t bodyBuffer[4096];
+
+static bool receiveFirmware(size_t length, bool keep) {
+  WiFiClient client = server.client();
+  size_t remaining = length;
+  uint32_t lastData = millis();
+  while (remaining > 0) {
+    int ready = client.available();
+    if (ready > 0) {
+      size_t want = min(min((size_t)ready, sizeof(bodyBuffer)), remaining);
+      int got = client.read(bodyBuffer, want);
+      if (got <= 0) {
+        continue;
+      }
+      remaining -= got;
+      lastData = millis();
+      if (keep && updateStatus == 0) {
+        String error;
+        if (!firmwareUpdateWrite(bodyBuffer, got, error)) {
+          failUpdate(400, error); // almost always the wrong file; the rest is read and dropped
+        }
+      }
+    } else if (!client.connected() || millis() - lastData > BODY_STALL_MS) {
+      return false;
+    } else {
+      delay(2);
+    }
+  }
+  return true;
+}
+
+static void handleUpdateBody() {
+  HTTPRaw &raw = server.raw();
+  if (raw.status != RAW_START) {
+    return; // the whole body was read at the start
+  }
+  updateReceived = true;
+  updateStatus = 0;
+  updateError = "";
+  updateAuth = requestAuth();
+  int length = server.clientContentLength();
+  bool keep = false;
+  if (updateAuth == AuthResult::Allowed) {
+    String error;
+    if (length <= 0) {
+      failUpdate(400, "Send firmware.bin as the request body");
+    } else if (!firmwareUpdateStart(length, server.header("X-Firmware-MD5"), error)) {
+      failUpdate(firmwareUpdateActive() || error.startsWith("The last update") ? 409 : 400, error);
+    } else {
+      keep = true;
+    }
+  }
+  if (length > 0 && !receiveFirmware(length, keep)) {
+    firmwareUpdateAbort();
+    failUpdate(400, "The upload stopped part way; nothing was changed");
+  }
+  raw.totalSize = length > 0 ? length : 0; // the body is used up: the server skips its own loop
+}
+
+static void handleUpdate() {
+  bool received = updateReceived;
+  updateReceived = false;
+  if (!received) {
+    sendError(400, "Send firmware.bin as the body, with Content-Type: application/octet-stream");
+    return;
+  }
+  if (updateAuth != AuthResult::Allowed) {
+    sendAuthRefusal(updateAuth);
+    return;
+  }
+  if (updateStatus != 0) {
+    firmwareUpdateAbort();
+    sendError(updateStatus, updateError.c_str());
+    return;
+  }
+  String error;
+  if (!firmwareUpdateFinish(error)) {
+    sendError(400, error.c_str());
+    return;
+  }
+  JsonDocument doc;
+  doc["updated"] = true;
+  doc["restarting"] = true;
+  sendJson(200, doc);
+  commandSend(CommandType::Restart);
+}
+
 static void handleNotFound() { sendError(404, "No such endpoint"); }
 
 static void serverTask(void *) {
@@ -770,6 +884,8 @@ static void serverTask(void *) {
     vTaskDelay(pdMS_TO_TICKS(SERVER_POLL_MS));
   }
 }
+
+bool apiRunning() { return started && WiFi.status() == WL_CONNECTED; }
 
 void apiBegin() {
   if (started) {
@@ -819,9 +935,10 @@ void apiBegin() {
   server.on(API_BASE "/auth/login", HTTP_POST, handleLogin);
   server.on(API_BASE "/auth/logout", HTTP_POST, handleLogout);
   server.on(API_BASE "/auth/pin", HTTP_PUT, guarded(handlePutPin));
+  server.on(API_BASE "/update", HTTP_POST, handleUpdate, handleUpdateBody); // checks the PIN itself
   server.onNotFound(handleNotFound);
   // The server keeps only the headers it is told to.
-  static const char *headers[] = {"Cookie", "Authorization", AUTH_PIN_HEADER};
+  static const char *headers[] = {"Cookie", "Authorization", AUTH_PIN_HEADER, "X-Firmware-MD5"};
   server.collectHeaders(headers, sizeof(headers) / sizeof(headers[0]));
   server.begin();
 

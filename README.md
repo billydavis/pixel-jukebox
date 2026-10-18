@@ -52,6 +52,7 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 | **Scaling** | 16x16 and 32x32 art is scaled by a whole number and centred, so pixels stay sharp |
 | **Preloading** | The next artwork downloads in the background while the current one plays |
 | **Recovery** | Re-registers if the device is removed on the site; reconnects after a Wi-Fi drop; skips bad files |
+| **Updates over Wi-Fi** | Send new firmware from the PC with `python tools/ota_upload.py`, or the Update button in Settings. It is written alongside the running firmware and only used once it checks out; if it then fails to start properly, the panel goes back to the previous firmware by itself. USB still works |
 | **PIN** | An optional 4 to 8 digit PIN for the control page and the API, set in Settings. Each browser signs in once and stays signed in, through restarts. Five wrong guesses lock sign-in for 30 seconds. Forgot it? Hold the button for 5 seconds and tick "Also remove the control-page PIN" on the Wi-Fi setup page |
 | **Security** | Verifies the makapix.club TLS certificate before sending the device token |
 | **Diagnostics** | Separate builds for a colour and power check and a speaker test |
@@ -193,7 +194,7 @@ The firmware is grouped by area, one folder each. Every folder holds a handful o
 | Folder | What is in it |
 |---|---|
 | `src/` | `main.cpp`: start-up, running each slot, handling commands |
-| `src/app/` | What the panel is doing: the rotation, modes, transitions, night schedule, clock chip, button and command queue, crash records and diagnostics |
+| `src/app/` | What the panel is doing: the rotation, modes, transitions, night schedule, clock chip, button and command queue, firmware updates, crash records and diagnostics |
 | `src/slots/` | The things that can be on screen: artwork, clock, visualizers. Each implements `slot.h` |
 | `src/display/` | Drawing to the panel, and GIF playback |
 | `src/audio/` | Speaker, microphones and the sound analysis behind the visualizers |
@@ -216,9 +217,10 @@ A few conventions:
 - Code adapted from p64 keeps its copyright and licence notice (see Acknowledgements).
 
 ```sh
-pio run                 # build
-pio run -t upload       # build and flash
-pio device monitor      # serial log at 115200 baud
+pio run                          # build
+pio run -t upload                # build and flash over USB
+python tools/ota_upload.py       # flash the last build over Wi-Fi
+pio device monitor               # serial log at 115200 baud
 ```
 
 ## Testing

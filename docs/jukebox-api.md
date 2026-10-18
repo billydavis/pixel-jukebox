@@ -97,6 +97,7 @@ effect before the reply, which is `200` with the new state.
 | `GET` | `/transition` | The transition played between slots |
 | `PUT` | `/transition` | Choose the transition |
 | `POST` | `/wifi/setup` | Restart into the Wi-Fi setup hotspot |
+| `POST` | `/update` | Install new firmware sent from a PC |
 | `GET` | `/auth` | Whether a PIN is set and this client is signed in (open) |
 | `POST` | `/auth/login` | Sign in with the PIN (open) |
 | `POST` | `/auth/logout` | Sign this browser out (open) |
@@ -187,6 +188,7 @@ sizes are in bytes.
 | `tasks` | `lowestFree` is the least stack each task has had spare. `loader` is short-lived and appears once it has run |
 | `artwork` | Artworks downloaded since startup and the size of the largest |
 | `case` | Temperature and humidity inside the case, from the board's SHTC3 sensor, read once a minute; `lowestC` and `highestC` since start-up. The board and the panel warm the air around the sensor, so this is how hot the electronics run, not the room: expect several degrees above it, and humidity correspondingly lower. `null` until the first reading; `present` is `false` if the sensor did not answer |
+| `firmware` | `version`; `slot`, the flash slot it runs from (`app0` or `app1`); `newAndOnProbation`, true for a just-installed firmware that is not yet kept (see `POST /update`); `updating`, true while an upload is being written |
 | `crash` | Whether a crash record is stored, and if so which task crashed and why. Details from `GET /crash` |
 | `clock.source` | Where the time came from: `network` (internet time, checked about hourly), `clock chip` (the board's PCF85063, read at start-up, until the network answers) or `not set`. `utc` is `null` until the time is known |
 | `clock.chip` | The clock chip. `keptTimeAtStart` is `false` after the power was off, unless a backup battery is fitted. It is set from the network each time that answers; `driftSecondsAtLastSet` is how far it had wandered by then (a second either way is rounding: it counts whole seconds) |
@@ -660,6 +662,37 @@ network named `Pixel-Jukebox` and serves a setup page there (see the README).
 The saved network is kept: if nobody connects to the hotspot for three minutes,
 the board restarts and rejoins it. Holding the BOOT button for five seconds does
 the same thing.
+
+### `POST /update`
+
+Installs new firmware sent from a PC, so no USB cable is needed. The body is
+the raw `firmware.bin` from `pio run`
+(`.pio/build/waveshare-s3-rgb-matrix/firmware.bin`), sent with
+`Content-Type: application/octet-stream` and a `Content-Length`. An optional
+`X-Firmware-MD5` header (32 hex digits) is checked against what arrived.
+`tools/ota_upload.py` does all of this, and the Settings tab of the control
+page has an Update button.
+
+```sh
+curl -H "Content-Type: application/octet-stream" --data-binary @.pio/build/waveshare-s3-rgb-matrix/firmware.bin http://pixel-jukebox.local/api/v1/update
+```
+
+The flash has two firmware slots. The upload is written into the one not
+running, while the panel shows "Update receiving" and a percentage, and is then
+checked as a whole. Only then is it chosen for the next start-up: the reply is
+`200 {"updated":true,"restarting":true}` and the board restarts into it.
+
+The new firmware starts on probation. It is kept once its API has been up for
+30 seconds. If it crashes, hangs, restarts or does not get its API up within
+10 minutes, the board goes back to the previous firmware. Until it is kept, a
+second update is refused (`409`), so there is always a firmware to go back to.
+`GET /diagnostics` shows the slot and whether it is still on probation.
+
+Like every other route it needs the PIN when one is set; the PIN is checked
+before anything is written. `400` for an empty body, a body sent as a form,
+or a file that is not firmware for this board (nothing is changed), `409`
+while an update is in progress or on probation. USB uploads keep working and are
+the way back if the panel ever stops answering.
 
 ## The PIN
 

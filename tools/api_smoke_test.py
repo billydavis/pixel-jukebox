@@ -316,6 +316,28 @@ try:
         check(f"transition rejects {json.dumps(bad)}", code == 400 and "error" in body, body)
     check("rejected values changed nothing", call("GET", "/transition")[1]["transition"] == names[-1])
 
+    section("Firmware update")
+    code, body = call("GET", "/diagnostics")
+    firmware = body.get("firmware", {})
+    check("diagnostics names the firmware slot and its state",
+          firmware.get("slot") in ("app0", "app1") and firmware.get("newAndOnProbation") in (True, False), firmware)
+    code, body = call("POST", "/update", raw=b"", auth=None)
+    check("an update with no file is refused", code == 400, body)
+    junk = b"\x00" * 4096
+    request = urllib.request.Request(BASE + "/update", data=junk, method="POST",
+                                     headers={"Content-Type": "application/octet-stream",
+                                              **({"X-Jukebox-Pin": PIN} if PIN else {})})
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            code = response.status
+    except urllib.error.HTTPError as error:
+        code = error.code
+    check("a file that is not firmware is refused", code == 400)
+    code, body = call("GET", "/diagnostics")
+    check("after a refused file nothing changed",
+          body.get("firmware", {}).get("slot") == firmware.get("slot") and not body["firmware"].get("updating"),
+          body.get("firmware"))
+
     section("PIN")
     code, body = call("GET", "/auth", auth={})
     check("GET /auth is open and says whether a PIN is set",
@@ -342,6 +364,8 @@ try:
             check("the PIN in X-Jukebox-Pin lets a script in",
                   call("GET", "/status", auth={"X-Jukebox-Pin": TEST_PIN})[0] == 200)
             check("a wrong X-Jukebox-Pin gets 401", call("GET", "/status", auth={"X-Jukebox-Pin": "0000"})[0] == 401)
+            check("with a PIN, an update without credentials gets 401",
+                  call("POST", "/update", raw=b"\x00" * 16, auth={})[0] == 401)
             code, body = call("POST", "/auth/login", {"pin": "0000"}, auth={})
             check("signing in with a wrong PIN gets 401", code == 401, body)
             code, body, headers = call_full("POST", "/auth/login", {"pin": TEST_PIN}, auth={})

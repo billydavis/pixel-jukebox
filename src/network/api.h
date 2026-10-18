@@ -6,3 +6,6 @@
 // Starts the HTTP server and announces it over mDNS. Call once Wi-Fi is
 // connected; later calls do nothing.
 void apiBegin();
+
+// True once the server is running and Wi-Fi is connected.
+bool apiRunning();

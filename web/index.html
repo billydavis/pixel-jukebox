@@ -212,6 +212,8 @@ input::placeholder{color:var(--dim)}
 .gate .key{width:100%}
 input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
 .pins{display:grid;gap:var(--s3)}
+.bar{height:10px;background:var(--sunk)}
+.bar i{display:block;width:0;height:100%;background:var(--accent);transition:width 200ms var(--ease)}
 .pinkeys{display:flex;flex-wrap:wrap;gap:var(--s3)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -433,6 +435,17 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
       <div><button class="key small" id="wifi">Change Wi-Fi</button></div>
     </div>
     <div class="section">
+      <h2>Firmware</h2>
+      <p class="lead" id="fwlead">&nbsp;</p>
+      <div class="pinkeys">
+        <label class="key small" for="fwfile">Choose firmware.bin</label>
+        <input id="fwfile" type="file" accept=".bin,application/octet-stream" hidden>
+        <button class="key small go" id="fwgo" disabled>Update</button>
+      </div>
+      <div class="bar" id="fwbar" hidden><i id="fwfill"></i></div>
+      <p class="note" id="fwnote" role="status">Build with pio run, then pick .pio/build/waveshare-s3-rgb-matrix/firmware.bin.</p>
+    </div>
+    <div class="section">
       <h2>Device</h2>
       <dl class="facts" id="devfacts"></dl>
       <div><button class="key small" id="restart">Restart panel</button></div>
@@ -443,7 +456,7 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
 
 <script>
 const $=id=>document.getElementById(id),API='/api/v1';
-let st=null,timer=0,dragging=false,sendTimer=0,online=false,photoBusy=false,locked=false;
+let st=null,timer=0,dragging=false,sendTimer=0,online=false,photoBusy=false,locked=false,updating=false;
 
 async function call(method,path,body){
   const r=await fetch(API+path,{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
@@ -474,7 +487,7 @@ function twoTap(button,armedText,onArm,act){
 const TABS=['now','rot','art','night','set'];
 const wide=matchMedia('(min-width:900px)');
 let tab='now';
-const loaders={rot:()=>{loadRot();loadTrans();},art:()=>{loadArt(false);loadCard();},night:()=>loadNight(),set:()=>{loadMk();loadPin();showDevice();}};
+const loaders={rot:()=>{loadRot();loadTrans();},art:()=>{loadArt(false);loadCard();},night:()=>loadNight(),set:()=>{loadMk();loadPin();loadFw();showDevice();}};
 function showTab(name,focus){
   if(!TABS.includes(name))name='now';
   if(wide.matches&&name=='now')name=store.get('jukebox.tab')||'rot';
@@ -573,7 +586,7 @@ function showBrightness(v){$('bri').value=v;$('briv').textContent=v;$('bri').sty
 
 async function poll(){
   clearTimeout(timer);
-  if(locked)return;
+  if(locked||updating)return;
   try{st=await call('GET','/status');online=true;}catch(e){online=false;}
   if(locked)return;
   render();
@@ -998,6 +1011,60 @@ $('signout').onclick=async()=>{
   try{await call('POST','/auth/logout');}catch(e){}
   lock();
 };
+
+/* ---- new firmware ------------------------------------------------------------------- */
+let fw=null;
+async function loadFw(){
+  if(updating)return;
+  try{fw=(await call('GET','/diagnostics')).firmware;}catch(e){return;}
+  $('fwlead').textContent='Running '+fw.version+(fw.newAndOnProbation?', just installed: kept once it has run for 30 seconds.':'.');
+}
+$('fwfile').onchange=()=>{
+  const f=$('fwfile').files[0];
+  $('fwgo').disabled=!f;
+  $('fwnote').textContent=f?f.name+', '+Math.round(f.size/1024)+' KB. The panel shows the progress and restarts at the end; if the new firmware does not start properly, it goes back to this one.':'';
+};
+function fwFail(text){
+  updating=false;$('fwgo').disabled=false;$('fwbar').hidden=true;
+  $('fwnote').textContent=text;poll();
+}
+$('fwgo').onclick=()=>{
+  const f=$('fwfile').files[0];
+  if(!f)return;
+  updating=true;clearTimeout(timer);
+  $('fwgo').disabled=true;$('fwbar').hidden=false;$('fwfill').style.width='0';
+  $('fwnote').textContent='Sending';
+  const x=new XMLHttpRequest();
+  x.open('POST',API+'/update');
+  x.setRequestHeader('Content-Type','application/octet-stream');
+  x.upload.onprogress=e=>{if(e.lengthComputable){const pc=Math.round(e.loaded/e.total*100);$('fwfill').style.width=pc+'%';$('fwnote').textContent='Sending, '+pc+'%';}};
+  x.onerror=()=>fwFail('The upload stopped. Nothing was changed; try again.');
+  x.onload=()=>{
+    let reason='';try{reason=JSON.parse(x.responseText).error||'';}catch(e){}
+    if(x.status==401||x.status==429){updating=false;lock(reason);return;}
+    if(x.status!=200)return fwFail((reason||'The panel refused the file')+'.');
+    $('fwfill').style.width='100%';
+    $('fwnote').textContent='Written and checked. The panel is restarting into the new firmware.';
+    fwWait(fw?fw.slot:'',Date.now());
+  };
+  x.send(f);
+};
+// Waits for the panel to come back from the other firmware slot and keep it.
+async function fwWait(oldSlot,since){
+  await new Promise(r=>setTimeout(r,4000));
+  let now=null;
+  try{now=(await call('GET','/diagnostics')).firmware;}catch(e){}
+  const waited=(Date.now()-since)/1000;
+  if(!now){
+    if(waited>120)return fwFail('The panel has not come back after two minutes. If it stays away, upload over USB.');
+    return fwWait(oldSlot,since);
+  }
+  if(now.slot==oldSlot)return fwFail('The new firmware did not start properly, so the panel went back to '+now.version+'.');
+  $('fwnote').textContent=now.newAndOnProbation?'Back, running '+now.version+'. Checking it for 30 seconds before keeping it.':'Updated to '+now.version+'.';
+  if(now.newAndOnProbation&&waited<200)return fwWait(oldSlot,since);
+  updating=false;$('fwbar').hidden=true;$('fwfile').value='';$('fwgo').disabled=true;
+  fw=now;loadFw();poll();
+}
 
 /* ---- keyboard and start-up ------------------------------------------------------------------- */
 addEventListener('keydown',e=>{

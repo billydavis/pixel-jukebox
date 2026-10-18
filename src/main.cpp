@@ -12,11 +12,13 @@
 #include "app/crash_report.h"
 #include "app/memory_trace.h"
 #include "app/diagnostics.h"
+#include "app/firmware_update.h"
 #include "display/display.h"
 #include "input/case_climate.h"
 #include "app/mode.h"
 #include "app/night.h"
 #include "network/auth.h"
+#include "network/api.h"
 #include "network/connection.h"
 #include "network/reporter.h"
 #include "pins.h"
@@ -45,6 +47,18 @@ static void restartBoard() {
   showMessage("Pixel", "Jukebox\nrestarting", colour::amber());
   delay(MESSAGE_MS);
   ESP.restart();
+}
+
+// While new firmware arrives the panel shows how far it has got instead of art.
+static void showUpdateProgress() {
+  static int shown = -1;
+  int percent = firmwareUpdatePercent();
+  if (percent != shown) {
+    shown = percent;
+    statusSetSlot("");
+    showMessage("Update", "receiving\n" + String(percent) + "%", colour::amber());
+  }
+  delay(100);
 }
 
 // Two small bars in the top-right corner while the current slot is held.
@@ -137,6 +151,11 @@ static void runSlot(Slot *slot) {
         }
       }
       nightTick();
+      if (firmwareUpdateActive()) {
+        statusSetHeld(false);
+        slot->stop();
+        return;
+      }
       if (millis() - nightCheckedAt >= NIGHT_CHECK_MS) {
         nightCheckedAt = millis();
         if (nightWantsChange(slot)) {
@@ -242,6 +261,7 @@ void setup() {
   MEMORY_AT("cache");
 
   telemetryRegisterTask("display", xTaskGetCurrentTaskHandle(), getArduinoLoopTaskStackSize());
+  firmwareUpdateBegin();
   authBegin(); // before Wi-Fi: the setup page can remove the PIN
   connectionStart();
   MEMORY_AT("wifi, api");
@@ -267,6 +287,11 @@ void loop() {
 
   MEMORY_CHECK("display loop");
   connectionMaintain();
+  firmwareUpdateMaintain(apiRunning());
+  if (firmwareUpdateActive()) {
+    showUpdateProgress();
+    return;
+  }
   clockChipMaintain();
   nightTick();
   NightNow night = nightNow();
