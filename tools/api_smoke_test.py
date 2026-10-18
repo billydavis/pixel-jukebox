@@ -17,6 +17,7 @@ import os
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 HOST = sys.argv[1] if len(sys.argv) > 1 else "pixel-jukebox.local"
@@ -163,7 +164,7 @@ try:
     code, slots = call("GET", "/slots")
     check("slots list the channel types",
           code == 200 and [c.get("type") for c in slots.get("channels", [])]
-          == ["all", "promoted", "mine", "likedby", "artist", "hashtag"], slots.get("channels"))
+          == ["all", "promoted", "mine", "likedby", "artist", "hashtag", "uploads"], slots.get("channels"))
     check("every artwork slot has a channel",
           all(r.get("channel") for r in slots.get("rotation", []) if r.get("slot") == "makapix"), slots.get("rotation"))
     for bad in ({"slot": "makapix", "turns": 1, "channel": "nope"},
@@ -219,7 +220,7 @@ try:
     code, body = call("PUT", "/views", {"report": views.get("report", True)})
     check("view reports accept their current value", code == 200 and body.get("report") == views.get("report"), body)
     code, now = call("GET", "/status")
-    if now.get("artwork"):
+    if now.get("artwork") and now["artwork"].get("postId"):  # uploads are not Makapix posts: no like
         check("the artwork on screen says whether it is liked", isinstance(now["artwork"].get("liked"), bool),
               now["artwork"])
 
@@ -345,6 +346,48 @@ try:
     check("live rejects a non-boolean", code == 400, body)
     check("diagnostics include the live connection", "live" in call("GET", "/diagnostics")[1])
 
+    section("Uploads")
+    # The smallest valid GIF there is: 1 x 1, one transparent pixel.
+    tiny_gif = (b"GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff!\xf9\x04\x01\x00\x00\x00\x00"
+                b",\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;")
+
+    def upload(data, name="smoke test.gif", auth=None):
+        headers = {"Content-Type": "application/octet-stream", "X-File-Name": urllib.parse.quote(name)}
+        headers.update(({"X-Jukebox-Pin": PIN} if PIN else {}) if auth is None else auth)
+        request = urllib.request.Request(BASE + "/uploads", data=data, method="POST", headers=headers)
+        try:
+            with urllib.request.urlopen(request, timeout=15) as response:
+                return response.status, json.loads(response.read())
+        except urllib.error.HTTPError as error:
+            return error.code, json.loads(error.read() or b"{}")
+
+    code, body = call("GET", "/uploads")
+    check("uploads are listed", code == 200 and isinstance(body.get("uploads"), list) and "available" in body, body)
+    if body.get("available"):
+        code, made = upload(tiny_gif, "smoke test / caf\u00e9.gif")
+        upload_id = made.get("id")
+        check("a GIF can be uploaded, its name tidied",
+              code == 201 and upload_id and made.get("width") == 1 and made.get("name") == "smoke test _ caf__", made)
+        check("the upload is listed", any(u["id"] == upload_id for u in call("GET", "/uploads")[1]["uploads"]))
+        with urllib.request.urlopen(f"{BASE}/uploads/{upload_id}.gif", timeout=10) as response:
+            check("the upload can be fetched as it was sent", response.read() == tiny_gif)
+        code, body = call("POST", f"/uploads/{upload_id}/show")
+        check("an upload can be shown",
+              code == 202 and wait_for(lambda s: ((s.get("artwork") or {}).get("upload") or {}).get("id") == upload_id),
+              body)
+        code, body = upload(b"GIF89a\x50\x00\x50\x00" + b"\x00" * 40, "too big.gif")
+        check("an 80 x 80 GIF is refused", code == 400 and "64 x 64" in body.get("error", ""), body)
+        code, body = upload(b"\x89PNG\r\n\x1a\n" + b"\x00" * 40, "picture.png")
+        check("a PNG is refused", code == 400 and "not a GIF" in body.get("error", ""), body)
+        code, body = upload(b"")
+        check("an empty upload is refused", code == 400, body)
+        check("showing an upload that does not exist is refused", call("POST", "/uploads/999999/show")[0] == 404)
+        code, body = call("DELETE", f"/uploads/{upload_id}")
+        check("an upload can be removed", code == 200 and body.get("removed") == upload_id, body)
+        check("a removed upload is gone", call("GET", f"/uploads/{upload_id}.gif")[0] == 404)
+    else:
+        print("  (no card: upload checks skipped)")
+
     section("Firmware update")
     code, body = call("GET", "/diagnostics")
     firmware = body.get("firmware", {})
@@ -393,6 +436,7 @@ try:
             check("the PIN in X-Jukebox-Pin lets a script in",
                   call("GET", "/status", auth={"X-Jukebox-Pin": TEST_PIN})[0] == 200)
             check("a wrong X-Jukebox-Pin gets 401", call("GET", "/status", auth={"X-Jukebox-Pin": "0000"})[0] == 401)
+            check("with a PIN, an upload without credentials gets 401", upload(tiny_gif, auth={})[0] == 401)
             check("with a PIN, an update without credentials gets 401",
                   call("POST", "/update", raw=b"\x00" * 16, auth={})[0] == 401)
             code, body = call("POST", "/auth/login", {"pin": "0000"}, auth={})

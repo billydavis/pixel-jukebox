@@ -12,13 +12,14 @@
 //   artist:<name>      one artist's art
 //   hashtag:<tag>      posts carrying a hashtag
 //   likedby:<name>     art someone has reacted to; with your own name, your likes
+//   uploads            art uploaded to the panel's card (not from Makapix)
 //
 // Names and tags may start with @ or #, which is dropped. Makapix checks that
 // a name exists; here only the shape is checked.
 
 namespace channels {
 
-enum class Kind { All, Promoted, Mine, Artist, Hashtag, LikedBy };
+enum class Kind { All, Promoted, Mine, Artist, Hashtag, LikedBy, Uploads };
 
 struct Channel {
   Kind kind = Kind::All;
@@ -34,7 +35,7 @@ std::string format(const Channel &channel);
 // For people: "Everything", "Promoted", "My art", "@Fab", "#cat", "Liked by @Fab".
 std::string label(const Channel &channel);
 
-// The Makapix query_posts channel name.
+// The Makapix query_posts channel name. Uploads are not on Makapix: "all".
 const char *makapixName(Kind kind);
 
 // A play_channel command from makapix.club ("all", "promoted", "by_user" or

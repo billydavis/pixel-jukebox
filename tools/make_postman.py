@@ -164,6 +164,17 @@ FOLDERS = [
         ("Live Connection Off", "PUT", "live",
          "Says offline to makapix.club and disconnects; stays off across restarts.", {"enabled": False}, 200),
     ]),
+    ("Uploads", [
+        ("List Uploads", "GET", "uploads", "GIFs uploaded to the card, newest first.", None, 200),
+        ("Upload A GIF", "POST", "uploads",
+         "As saved it has no file and expects 400. Attach a GIF of 64 x 64 or less under Body > binary, with "
+         "Content-Type application/octet-stream and the file name in an X-File-Name header.", None, 400),
+        ("Get An Upload's GIF", "GET", "uploads/{{upload_id}}.gif", "One upload's GIF.", None, 200),
+        ("Show An Upload", "POST", "uploads/{{upload_id}}/show", "Shows an upload for one turn.", None, 202),
+        ("Remove An Upload", "DELETE", "uploads/{{upload_id}}", "Deletes an upload from the card.", None, 200),
+        ("Play My Uploads", "PUT", "channel", "Every artwork slot plays your uploads, for now.",
+         {"channel": "uploads"}, 200),
+    ]),
     ("Firmware", [
         ("Update Firmware", "POST", "update",
          "Installs new firmware. As saved it has no file and expects 400; to really update, attach "
@@ -253,6 +264,11 @@ collection = {
         "value": "2486",
         "type": "string",
         "description": "A postId from List Saved Art, for the requests on one saved artwork.",
+    }, {
+        "key": "upload_id",
+        "value": "1",
+        "type": "string",
+        "description": "An id from List Uploads, for the requests on one upload.",
     }, {
         "key": "pin",
         "value": "",

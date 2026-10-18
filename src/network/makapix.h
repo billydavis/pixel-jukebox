@@ -14,6 +14,8 @@ struct Artwork {
   String gifUrl; // plain-HTTP vault URL of the GIF rendition
   uint32_t dwellMs;
   bool fromCache = false; // played from the card, not downloaded
+  uint32_t uploadId = 0;  // an upload (storage/uploads.h) rather than a Makapix post
+  String title;           // an upload's name
 };
 
 enum class LinkStatus { Linked, Pending, RateLimited, Failed };

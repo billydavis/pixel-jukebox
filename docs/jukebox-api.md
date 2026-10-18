@@ -105,6 +105,11 @@ effect before the reply, which is `200` with the new state.
 | `PUT` | `/transition` | Choose the transition |
 | `POST` | `/wifi/setup` | Restart into the Wi-Fi setup hotspot |
 | `POST` | `/update` | Install new firmware sent from a PC |
+| `GET` | `/uploads` | Art uploaded to the card |
+| `POST` | `/uploads` | Upload a GIF |
+| `GET` | `/uploads/{id}.gif` | One upload's GIF |
+| `POST` | `/uploads/{id}/show` | Show an upload now |
+| `DELETE` | `/uploads/{id}` | Delete an upload |
 | `GET` | `/auth` | Whether a PIN is set and this client is signed in (open) |
 | `POST` | `/auth/login` | Sign in with the PIN (open) |
 | `POST` | `/auth/logout` | Sign this browser out (open) |
@@ -681,6 +686,55 @@ network named `Pixel-Jukebox` and serves a setup page there (see the README).
 The saved network is kept: if nobody connects to the hotspot for three minutes,
 the board restarts and rejoins it. Holding the BOOT button for five seconds does
 the same thing.
+
+## Uploads
+
+GIFs uploaded from a phone or PC are kept on the card in `jukebox/uploads/`,
+apart from the art cache, so they are never evicted and play with or without
+Wi-Fi. The `uploads` channel plays them, shuffled, in an artwork slot or as
+`PUT /channel`. They are not Makapix posts, so no views or likes are sent.
+Up to 200, each a GIF (GIF87a or GIF89a) of 64 x 64 or smaller and at most
+512 KB; 16 x 16 and 32 x 32 art is scaled up like Makapix art. The Art tab of
+the control page uploads, shows and removes them.
+
+While an upload is on screen, `GET /status` has `artwork` as
+`{"postId": null, "source": "upload", "upload": {"id": 3, "name": "cat"}, "channel": "My uploads"}`.
+
+### `GET /uploads`
+
+```json
+{ "available": true, "count": 2, "max": 200, "bytes": 924,
+  "uploads": [ { "id": 2, "name": "sun _ moon", "width": 64, "height": 64, "bytes": 259 } ] }
+```
+
+Newest first. `available` is false with no usable card.
+
+### `POST /uploads`
+
+The body is the GIF itself, sent as for `POST /update`
+(`Content-Type: application/octet-stream`). Its name goes in `X-File-Name`,
+percent-encoded (`encodeURIComponent`); it is tidied to letters, digits,
+spaces, dots, dashes and underscores, 40 at most, without `.gif`. The header
+is checked before anything is kept. Reply: `201` with the upload, as in the
+list. `400` for something that is not a GIF, is bigger than 64 x 64 or 512 KB,
+or is empty; `409` with 200 uploads already or one in progress; `507` when the
+card is full.
+
+```sh
+curl -H "Content-Type: application/octet-stream" -H "X-File-Name: cat.gif" --data-binary @cat.gif http://pixel-jukebox.local/api/v1/uploads
+```
+
+### `GET /uploads/{id}.gif`
+
+The GIF as uploaded. `404` for no such upload.
+
+### `POST /uploads/{id}/show`
+
+Shows it for one turn, like `POST /show/{postId}`. Reply: `202 {"queued":"showUpload"}`.
+
+### `DELETE /uploads/{id}`
+
+Reply: `200 {"removed": 3}`. `404` for no such upload.
 
 ### `POST /update`
 

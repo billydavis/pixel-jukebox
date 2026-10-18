@@ -1,6 +1,7 @@
 #include "network/api.h"
 
 #include <ArduinoJson.h>
+#include <functional>
 #include <ESPmDNS.h>
 #include <WebServer.h>
 #include <WiFi.h>
@@ -29,6 +30,8 @@
 #include "slots/slot_makapix.h"
 #include "storage/art_cache.h"
 #include "storage/card.h"
+#include "storage/uploads.h"
+#include "upload_rules.h"
 #include "transitions.h"
 
 #define API_BASE "/api/v1"
@@ -214,7 +217,16 @@ static void handleStatus() {
   }
   slot["held"] = status.held;
 
-  if (status.hasArtwork) {
+  if (status.hasArtwork && status.uploadId) {
+    // An upload: not a Makapix post, so no owner, link or like.
+    JsonObject artwork = doc["artwork"].to<JsonObject>();
+    artwork["postId"] = nullptr;
+    artwork["source"] = "upload";
+    JsonObject upload = artwork["upload"].to<JsonObject>();
+    upload["id"] = status.uploadId;
+    upload["name"] = status.uploadName;
+    artwork["channel"] = status.channel;
+  } else if (status.hasArtwork) {
     JsonObject artwork = doc["artwork"].to<JsonObject>();
     artwork["postId"] = status.postId;
     artwork["owner"] = status.owner;
@@ -796,7 +808,8 @@ static void sendSlots() {
   JsonArray channelTypes = doc["channels"].to<JsonArray>();
   const char *const TYPES[][3] = {{"all", "Everything", ""},          {"promoted", "Promoted", ""},
                                   {"mine", "My art", ""},             {"likedby", "Liked by", "name"},
-                                  {"artist", "An artist", "name"},    {"hashtag", "A hashtag", "hashtag"}};
+                                  {"artist", "An artist", "name"},    {"hashtag", "A hashtag", "hashtag"},
+                                  {"uploads", "My uploads", ""}};
   for (const auto &type : TYPES) {
     JsonObject item = channelTypes.add<JsonObject>();
     item["type"] = type[0];
@@ -858,35 +871,50 @@ static void handlePutSlots() {
   sendSlots();
 }
 
-// --- new firmware ---------------------------------------------------------------------
+// --- raw request bodies: new firmware and uploads -------------------------------------
 
-// The firmware arrives as the raw request body (application/octet-stream) and
-// is written to flash as it comes, so it never has to fit in memory. The PIN is
-// checked once, before anything is written; the reply comes after the end.
-static bool updateReceived = false; // the body went through the raw handler
-static AuthResult updateAuth = AuthResult::Missing;
-static int updateStatus = 0; // an error's status, 0 when all is well
-static String updateError;
+// Firmware and uploaded art arrive as the raw request body
+// (application/octet-stream) and are written out as they come, so they never
+// have to fit in memory. The PIN is checked once, before anything is written;
+// the reply comes after the end. The server takes one request at a time, so
+// the state below is shared.
+static bool bodyReceived = false; // the body went through a raw handler
+static AuthResult bodyAuth = AuthResult::Missing;
+static int bodyStatus = 0; // an error's status, 0 when all is well
+static String bodyError;
 
-static void failUpdate(int status, const String &error) {
-  if (updateStatus == 0) {
-    updateStatus = status;
-    updateError = error;
+static void failBody(int status, const String &error) {
+  if (bodyStatus == 0) {
+    bodyStatus = status;
+    bodyError = error;
   }
+}
+
+// Starts a raw body: notes the PIN check and the length. False when nothing
+// should be kept (the PIN is missing, say); the body must still be read.
+static bool beginBody(int &length) {
+  bodyReceived = true;
+  bodyStatus = 0;
+  bodyError = "";
+  bodyAuth = requestAuth();
+  length = server.clientContentLength();
+  return bodyAuth == AuthResult::Allowed;
 }
 
 // The web server's own raw-body loop asks for whole 1436-byte pieces, so on
 // the last, shorter piece it spins for its 5 s timeout without yielding and the
 // watchdog restarts the board. So the body is read here, at the start, taking
 // whatever has arrived and waiting politely when nothing has; then the server
-// is told the body is used up, which skips its loop.
+// is told the body is used up, which skips its loop. Each piece goes to
+// `keep` until it reports a problem; after that the rest is read and dropped.
 static const uint32_t BODY_STALL_MS = 10000;
 static uint8_t bodyBuffer[4096];
 
-static bool receiveFirmware(size_t length, bool keep) {
+static bool receiveBody(HTTPRaw &raw, int length, std::function<bool(uint8_t *, size_t, String &)> keep) {
   WiFiClient client = server.client();
-  size_t remaining = length;
+  size_t remaining = length > 0 ? length : 0;
   uint32_t lastData = millis();
+  bool complete = true;
   while (remaining > 0) {
     int ready = client.available();
     if (ready > 0) {
@@ -897,17 +925,40 @@ static bool receiveFirmware(size_t length, bool keep) {
       }
       remaining -= got;
       lastData = millis();
-      if (keep && updateStatus == 0) {
-        String error;
-        if (!firmwareUpdateWrite(bodyBuffer, got, error)) {
-          failUpdate(400, error); // almost always the wrong file; the rest is read and dropped
-        }
+      String error;
+      if (keep && bodyStatus == 0 && !keep(bodyBuffer, got, error)) {
+        failBody(400, error); // almost always the wrong file
       }
     } else if (!client.connected() || millis() - lastData > BODY_STALL_MS) {
-      return false;
+      complete = false;
+      break;
     } else {
       delay(2);
     }
+  }
+  raw.totalSize = length > 0 ? length : 0; // the body is used up: the server skips its own loop
+  if (!complete) {
+    failBody(400, "The upload stopped part way; nothing was changed");
+  }
+  return complete;
+}
+
+// The reply's first part, shared: false (with the reply sent) when the body
+// never came through a raw handler, the PIN was wrong, or something failed.
+static bool bodyOk(const char *expected) {
+  bool received = bodyReceived;
+  bodyReceived = false;
+  if (!received) {
+    sendError(400, (String("Send ") + expected + " as the body, with Content-Type: application/octet-stream").c_str());
+    return false;
+  }
+  if (bodyAuth != AuthResult::Allowed) {
+    sendAuthRefusal(bodyAuth);
+    return false;
+  }
+  if (bodyStatus != 0) {
+    sendError(bodyStatus, bodyError.c_str());
+    return false;
   }
   return true;
 }
@@ -917,43 +968,24 @@ static void handleUpdateBody() {
   if (raw.status != RAW_START) {
     return; // the whole body was read at the start
   }
-  updateReceived = true;
-  updateStatus = 0;
-  updateError = "";
-  updateAuth = requestAuth();
-  int length = server.clientContentLength();
+  int length;
   bool keep = false;
-  if (updateAuth == AuthResult::Allowed) {
+  if (beginBody(length)) {
     String error;
     if (length <= 0) {
-      failUpdate(400, "Send firmware.bin as the request body");
+      failBody(400, "Send firmware.bin as the request body");
     } else if (!firmwareUpdateStart(length, server.header("X-Firmware-MD5"), error)) {
-      failUpdate(firmwareUpdateActive() || error.startsWith("The last update") ? 409 : 400, error);
+      failBody(firmwareUpdateActive() || error.startsWith("The last update") ? 409 : 400, error);
     } else {
       keep = true;
     }
   }
-  if (length > 0 && !receiveFirmware(length, keep)) {
-    firmwareUpdateAbort();
-    failUpdate(400, "The upload stopped part way; nothing was changed");
-  }
-  raw.totalSize = length > 0 ? length : 0; // the body is used up: the server skips its own loop
+  receiveBody(raw, length, keep ? std::function<bool(uint8_t *, size_t, String &)>(firmwareUpdateWrite) : nullptr);
 }
 
 static void handleUpdate() {
-  bool received = updateReceived;
-  updateReceived = false;
-  if (!received) {
-    sendError(400, "Send firmware.bin as the body, with Content-Type: application/octet-stream");
-    return;
-  }
-  if (updateAuth != AuthResult::Allowed) {
-    sendAuthRefusal(updateAuth);
-    return;
-  }
-  if (updateStatus != 0) {
+  if (!bodyOk("firmware.bin")) {
     firmwareUpdateAbort();
-    sendError(updateStatus, updateError.c_str());
     return;
   }
   String error;
@@ -966,6 +998,119 @@ static void handleUpdate() {
   doc["restarting"] = true;
   sendJson(200, doc);
   commandSend(CommandType::Restart);
+}
+
+// --- uploads -------------------------------------------------------------------------
+
+static void addUpload(JsonArray list, const UploadInfo &info) {
+  JsonObject item = list.add<JsonObject>();
+  item["id"] = info.id;
+  item["name"] = info.name;
+  item["width"] = info.width;
+  item["height"] = info.height;
+  item["bytes"] = info.bytes;
+}
+
+static void handleListUploads() {
+  JsonDocument doc;
+  uploadsReport(doc.to<JsonObject>());
+  JsonArray list = doc["uploads"].to<JsonArray>();
+  for (const UploadInfo &info : uploadsList()) {
+    addUpload(list, info);
+  }
+  sendJson(200, doc);
+}
+
+// The file's name comes in X-File-Name, percent-encoded as browsers must for
+// a header (encodeURIComponent).
+static void handleUploadBody() {
+  HTTPRaw &raw = server.raw();
+  if (raw.status != RAW_START) {
+    return;
+  }
+  int length;
+  bool keep = false;
+  if (beginBody(length)) {
+    String error;
+    String name = uploads::percentDecode(server.header("X-File-Name").c_str()).c_str();
+    if (length <= 0) {
+      failBody(400, "Send a GIF as the request body");
+    } else if (!uploadsStart(length, name, error)) {
+      failBody(error.startsWith("Another") ? 409 : error.startsWith("The card is full") ? 507 : 400, error);
+    } else {
+      keep = true;
+    }
+  }
+  receiveBody(raw, length,
+              keep ? std::function<bool(uint8_t *, size_t, String &)>(
+                         [](uint8_t *data, size_t size, String &error) { return uploadsWrite(data, size, error); })
+                   : nullptr);
+}
+
+static void handleUpload() {
+  if (!bodyOk("a GIF")) {
+    uploadsAbort();
+    return;
+  }
+  UploadInfo info;
+  String error;
+  if (!uploadsFinish(info, error)) {
+    sendError(400, error.c_str());
+    return;
+  }
+  JsonDocument doc;
+  JsonArray one = doc["uploads"].to<JsonArray>();
+  addUpload(one, info);
+  JsonDocument reply;
+  reply.set(doc["uploads"][0]);
+  sendJson(201, reply);
+}
+
+static uint32_t pathUploadId() {
+  String text = server.pathArg(0);
+  if (text.isEmpty() || text.length() > 9) {
+    return 0;
+  }
+  for (char c : text) {
+    if (!isdigit(c)) {
+      return 0;
+    }
+  }
+  return text.toInt();
+}
+
+static void handleUploadImage() {
+  uint32_t id = pathUploadId();
+  uint8_t *data = nullptr;
+  size_t size = 0;
+  if (!id || !uploadsRead(id, data, size)) {
+    sendError(404, "No such upload");
+    return;
+  }
+  server.sendHeader("Cache-Control", "max-age=86400"); // an upload never changes under its id
+  server.send_P(200, "image/gif", (const char *)data, size);
+  free(data);
+}
+
+static void handleShowUpload() {
+  uint32_t id = pathUploadId();
+  UploadInfo info;
+  if (!id || !uploadsFind(id, info)) {
+    sendError(404, "No such upload");
+    return;
+  }
+  sendQueued(commandSend(CommandType::ShowUpload, id), "showUpload");
+}
+
+static void handleRemoveUpload() {
+  uint32_t id = pathUploadId();
+  if (!id || !uploadsRemove(id)) {
+    sendError(404, "No such upload");
+    return;
+  }
+  JsonDocument doc;
+  doc["removed"] = id;
+  sendJson(200, doc);
 }
 
 static void handleNotFound() { sendError(404, "No such endpoint"); }
@@ -1036,9 +1181,14 @@ void apiBegin() {
   server.on(API_BASE "/auth/logout", HTTP_POST, handleLogout);
   server.on(API_BASE "/auth/pin", HTTP_PUT, guarded(handlePutPin));
   server.on(API_BASE "/update", HTTP_POST, handleUpdate, handleUpdateBody); // checks the PIN itself
+  server.on(API_BASE "/uploads", HTTP_GET, guarded(handleListUploads));
+  server.on(API_BASE "/uploads", HTTP_POST, handleUpload, handleUploadBody); // checks the PIN itself
+  server.on(UriBraces(API_BASE "/uploads/{}.gif"), HTTP_GET, guarded(handleUploadImage));
+  server.on(UriBraces(API_BASE "/uploads/{}/show"), HTTP_POST, guarded(handleShowUpload));
+  server.on(UriBraces(API_BASE "/uploads/{}"), HTTP_DELETE, guarded(handleRemoveUpload));
   server.onNotFound(handleNotFound);
   // The server keeps only the headers it is told to.
-  static const char *headers[] = {"Cookie", "Authorization", AUTH_PIN_HEADER, "X-Firmware-MD5"};
+  static const char *headers[] = {"Cookie", "Authorization", AUTH_PIN_HEADER, "X-Firmware-MD5", "X-File-Name"};
   server.collectHeaders(headers, sizeof(headers) / sizeof(headers[0]));
   server.begin();
 

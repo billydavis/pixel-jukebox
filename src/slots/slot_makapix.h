@@ -15,9 +15,16 @@ class MakapixSlot : public Slot {
  public:
   void begin();
 
+  // Called every 50 ms while start() waits for a download (up to 15 s), so
+  // the display loop can still act on commands that need no slot, such as
+  // brightness. Set once by main.cpp.
+  static void (*whileWaiting)();
+
   // The next start() shows this artwork instead, once: from the card when it
   // is there, otherwise fetched from Makapix.
   void request(uint32_t postId) { requestedPost = postId; }
+  // The same for an upload (storage/uploads.h).
+  void requestUpload(uint32_t uploadId) { requestedUpload = uploadId; }
 
   // The channel the next start() plays from, as a channels.h string.
   void useChannel(const String &spec);
@@ -36,6 +43,7 @@ class MakapixSlot : public Slot {
   bool startRegistration();
   bool startPlaying();
   bool showRequested(uint32_t postId);
+  bool showUpload(uint32_t uploadId);
   bool play(const LoadedArtwork &artwork);
   uint32_t updateRegistration();
   uint32_t updatePlaying();
@@ -43,6 +51,7 @@ class MakapixSlot : public Slot {
   Mode mode = Mode::Idle;
   Feed *feed = nullptr; // the channel in use
   uint32_t requestedPost = 0;
+  uint32_t requestedUpload = 0;
   uint32_t startedAt = 0;
 
   // Registration
@@ -56,6 +65,7 @@ class MakapixSlot : public Slot {
   // Playback
   uint8_t *data = nullptr;
   uint32_t postId = 0;
+  uint32_t uploadId = 0; // playing an upload: no view is reported
   bool requested = false; // asked for from the gallery
   bool viewNoted = false;
   const channels::Channel *playingChannel = nullptr; // where the artwork came from; null from the card

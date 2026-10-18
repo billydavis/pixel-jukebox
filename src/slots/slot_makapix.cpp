@@ -11,6 +11,7 @@
 #include "app/telemetry.h"
 #include "network/reporter.h"
 #include "storage/art_cache.h"
+#include "storage/uploads.h"
 
 static const uint32_t CODE_VALID_MS = 15 * 60 * 1000;
 static const uint32_t CODE_SHOW_MS = 45000; // per turn, so other slots still get shown
@@ -18,6 +19,7 @@ static const uint32_t POLL_INTERVAL_MS = 5000;
 static const uint32_t RATE_LIMIT_WAIT_MS = 60000;
 static const uint32_t LINKED_SHOW_MS = 1500;
 static const uint32_t LOAD_WAIT_MS = 15000;
+static const uint32_t UPLOAD_DWELL_MS = 30000; // as long as Makapix's default
 static const uint32_t IDLE_UPDATE_MS = 100;
 static const uint32_t VIEW_AFTER_MS = 2000; // shown this long, an artwork counts as seen
 static const int MAX_LOAD_ATTEMPTS = 5;
@@ -92,7 +94,44 @@ static bool loadFromCache(LoadedArtwork &loaded) {
 // connection, or when Makapix cannot be reached, it plays from the card
 // instead. A channel Makapix refuses, or one with no art that fits, is not
 // covered up with art from the card: the slot is skipped and says why.
+// An upload, read from the card into an artwork like any other.
+static bool readUpload(uint32_t id, LoadedArtwork &loaded) {
+  UploadInfo info;
+  uint8_t *data = nullptr;
+  size_t size = 0;
+  if (!uploadsFind(id, info) || !uploadsRead(id, data, size)) {
+    return false;
+  }
+  makapix::Artwork artwork;
+  artwork.postId = 0;
+  artwork.dwellMs = UPLOAD_DWELL_MS;
+  artwork.fromCache = true;
+  artwork.uploadId = id;
+  artwork.title = info.name;
+  loaded = {artwork, data, size};
+  return true;
+}
+
+// The uploads channel plays from the card, with or without Wi-Fi.
+static LoadStatus loadUpload(Feed &feed, LoadedArtwork &loaded) {
+  for (int attempt = 0; attempt < MAX_LOAD_ATTEMPTS; attempt++) {
+    uint32_t id;
+    if (!uploadsNext(id)) {
+      setProblem(feed, uploadsAvailable() ? "no uploads yet: add some on the Art tab" : "there is no card");
+      return LoadStatus::Refused;
+    }
+    if (readUpload(id, loaded)) {
+      setProblem(feed, "");
+      return LoadStatus::Ready;
+    }
+  }
+  return LoadStatus::Failed;
+}
+
 static LoadStatus loadNext(Feed &feed, LoadedArtwork &loaded) {
+  if (feed.channel.kind == channels::Kind::Uploads) {
+    return loadUpload(feed, loaded);
+  }
   if (WiFi.status() != WL_CONNECTED) {
     return loadFromCache(loaded) ? LoadStatus::Ready : LoadStatus::Failed;
   }
@@ -167,12 +206,23 @@ static void startLoading(Feed *feed) {
 }
 
 // Waits up to `ms` for the loader to finish, and hands its result to its feed.
+void (*MakapixSlot::whileWaiting)() = nullptr;
+
 static bool collectLoader(uint32_t ms) {
   if (!loading) {
     return true;
   }
-  if (xSemaphoreTake(loaderDone, pdMS_TO_TICKS(ms)) != pdTRUE) {
-    return false;
+  // In short waits, so commands that need no slot are not held up behind a
+  // slow download (a brightness change took up to 15 s before, 2026-10-18).
+  static const uint32_t STEP_MS = 50;
+  uint32_t startedAt = millis();
+  while (xSemaphoreTake(loaderDone, pdMS_TO_TICKS(STEP_MS)) != pdTRUE) {
+    if (millis() - startedAt >= ms) {
+      return false;
+    }
+    if (MakapixSlot::whileWaiting) {
+      MakapixSlot::whileWaiting();
+    }
   }
   loading = false;
   loadingFeed->ready = true;
@@ -245,6 +295,11 @@ void MakapixSlot::useChannel(const String &spec) { feed = feedFor(spec.isEmpty()
 
 bool MakapixSlot::start() {
   mode = Mode::Idle;
+  if (requestedUpload) {
+    uint32_t id = requestedUpload;
+    requestedUpload = 0;
+    return showUpload(id);
+  }
   if (requestedPost) {
     uint32_t postId = requestedPost;
     requestedPost = 0;
@@ -252,6 +307,9 @@ bool MakapixSlot::start() {
   }
   if (!feed) {
     useChannel("all");
+  }
+  if (feed->channel.kind == channels::Kind::Uploads) {
+    return startPlaying(); // the card is enough: no Wi-Fi or Makapix link needed
   }
   if (WiFi.status() != WL_CONNECTED) {
     // Offline: the loader can still play from the card.
@@ -382,6 +440,20 @@ bool MakapixSlot::showRequested(uint32_t postId) {
   return true;
 }
 
+// One upload asked for from the Art tab, for one turn.
+bool MakapixSlot::showUpload(uint32_t id) {
+  LoadedArtwork upload;
+  if (!readUpload(id, upload)) {
+    Serial.printf("Upload %u is not on the card\n", (unsigned)id);
+    return false;
+  }
+  if (!play(upload)) {
+    return false;
+  }
+  requested = true;
+  return true;
+}
+
 bool MakapixSlot::play(const LoadedArtwork &current) {
   MEMORY_CHECK("play");
   Serial.printf("Playing post %u (%u bytes%s)\n", (unsigned)current.artwork.postId, (unsigned)current.size,
@@ -396,12 +468,17 @@ bool MakapixSlot::play(const LoadedArtwork &current) {
   if (shareUrl.startsWith("http://")) {
     shareUrl = "https://" + shareUrl.substring(7);
   }
-  statusSetArtwork(current.artwork.postId, current.artwork.ownerHandle, shareUrl, current.artwork.fromCache,
-                   current.artwork.fromCache || !feed ? "" : channels::label(feed->channel).c_str());
+  if (current.artwork.uploadId) {
+    statusSetUpload(current.artwork.uploadId, current.artwork.title);
+  } else {
+    statusSetArtwork(current.artwork.postId, current.artwork.ownerHandle, shareUrl, current.artwork.fromCache,
+                     current.artwork.fromCache || !feed ? "" : channels::label(feed->channel).c_str());
+  }
   playingChannel = nullptr; // set by the caller when it came from a channel
   mode = Mode::Playing;
   startedAt = millis();
   postId = current.artwork.postId;
+  uploadId = current.artwork.uploadId;
   requested = false;
   viewNoted = false;
   data = current.data;
@@ -448,7 +525,9 @@ uint32_t MakapixSlot::updateRegistration() {
 uint32_t MakapixSlot::updatePlaying() {
   if (!viewNoted && !failed && millis() - startedAt >= VIEW_AFTER_MS) {
     viewNoted = true;
-    if (playingChannel) {
+    if (uploadId) {
+      // An upload is not a Makapix post: nothing to report.
+    } else if (playingChannel) {
       const char *hashtag = playingChannel->kind == channels::Kind::Hashtag ? playingChannel->value.c_str() : "";
       reporterNoteView(postId, requested, channels::makapixName(playingChannel->kind), hashtag);
     } else {

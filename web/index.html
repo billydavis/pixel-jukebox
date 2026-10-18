@@ -216,6 +216,7 @@ input::placeholder{color:var(--dim)}
 input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
 .pins{display:grid;gap:var(--s3)}
 .bar{height:10px;background:var(--sunk)}
+.view{display:grid;gap:var(--s3);margin-top:var(--s2)}
 .bar i{display:block;width:0;height:100%;background:var(--accent);transition:width 200ms var(--ease)}
 .pinkeys{display:flex;flex-wrap:wrap;gap:var(--s3)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -346,11 +347,31 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
 
   <section class="panel" id="p-art" role="tabpanel" aria-labelledby="t-art">
     <div class="section">
-      <h2>Saved art</h2>
-      <p class="lead" id="artsum">Art played online is saved on the card and shown when Makapix or the Wi-Fi is down.</p>
-      <ul class="grid" id="grid" aria-label="Saved artworks"></ul>
-      <p class="note" id="artnote" role="status"></p>
-      <div><button class="key small" id="more" hidden>Show more</button></div>
+      <h2>Art</h2>
+      <div class="seg" role="group" aria-label="Collection">
+        <button id="vmine" aria-pressed="true" aria-controls="v-mine">My uploads</button>
+        <button id="vsaved" aria-pressed="false" aria-controls="v-saved">Saved art</button>
+      </div>
+      <div class="view" id="v-mine">
+        <p class="lead" id="upsum">&nbsp;</p>
+        <div class="pinkeys" id="upkeys">
+          <label class="key small go" for="upfile" id="uplabel">Upload GIFs</label>
+          <input id="upfile" type="file" accept=".gif,image/gif" multiple hidden>
+          <button class="key small" id="upplay" hidden>Play my uploads</button>
+        </div>
+        <div class="bar" id="upbar" hidden><i id="upfill"></i></div>
+        <ul class="grid" id="upgrid" aria-label="My uploads"></ul>
+        <p class="note" id="upnote" role="status"></p>
+      </div>
+      <div class="view" id="v-saved" hidden>
+        <p class="lead" id="artsum">&nbsp;</p>
+        <ul class="grid" id="grid" aria-label="Saved artworks"></ul>
+        <p class="note" id="artnote" role="status"></p>
+        <div class="pinkeys">
+          <button class="key small" id="more" hidden>Show more</button>
+          <button class="key small" id="clear" hidden>Clear saved art</button>
+        </div>
+      </div>
     </div>
     <div class="pick" id="pick" hidden>
       <span class="what"><b id="pwho">&nbsp;</b><small id="psub">&nbsp;</small></span>
@@ -359,12 +380,6 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
         <button class="key small" id="pdrop">Remove</button>
       </span>
       <button class="icon" id="pclose" aria-label="Close"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
-    </div>
-    <div class="section">
-      <h2>Card</h2>
-      <dl class="facts" id="cardfacts"></dl>
-      <p class="note" id="cardnote" role="status"></p>
-      <div><button class="key small" id="clear" hidden>Clear saved art</button></div>
     </div>
   </section>
 
@@ -460,6 +475,11 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
       <p class="note" id="fwnote" role="status">Build with pio run, then pick .pio/build/waveshare-s3-rgb-matrix/firmware.bin.</p>
     </div>
     <div class="section">
+      <h2>Card</h2>
+      <dl class="facts" id="cardfacts"></dl>
+      <p class="note" id="cardnote" role="status"></p>
+    </div>
+    <div class="section">
       <h2>Device</h2>
       <dl class="facts" id="devfacts"></dl>
       <div><button class="key small" id="restart">Restart panel</button></div>
@@ -501,7 +521,7 @@ function twoTap(button,armedText,onArm,act){
 const TABS=['now','rot','art','night','set'];
 const wide=matchMedia('(min-width:900px)');
 let tab='now';
-const loaders={rot:()=>{loadRot();loadTrans();},art:()=>{loadArt(false);loadCard();},night:()=>loadNight(),set:()=>{loadMk();loadPin();loadFw();showDevice();}};
+const loaders={rot:()=>{loadRot();loadTrans();},art:()=>loadArtTab(),night:()=>loadNight(),set:()=>{loadMk();loadPin();loadFw();loadCard();showDevice();}};
 function showTab(name,focus){
   if(!TABS.includes(name))name='now';
   if(wide.matches&&name=='now')name=store.get('jukebox.tab')||'rot';
@@ -534,7 +554,9 @@ function uptime(s){
   const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);
   return d?d+'d '+h+'h':h?h+'h '+m+'m':m?m+'m':s+'s';
 }
-function artSrc(art){return art.source=='card'?API+'/card/art/'+art.postId+'.gif':art.gifUrl;}
+function artSrc(art){
+  return art.upload?API+'/uploads/'+art.upload.id+'.gif':art.source=='card'?API+'/card/art/'+art.postId+'.gif':art.gifUrl;
+}
 function setImg(img,src){
   if(src){if(img.dataset.src!=src){img.dataset.src=src;img.src=src;}img.hidden=false;}
   else{img.hidden=true;img.removeAttribute('src');delete img.dataset.src;}
@@ -551,7 +573,9 @@ function render(){
 
   const art=st.artwork,slot=st.slot.name,msg=$('msg'),night=st.night||{};
   let who=' ',sub=' ',text='';
-  if(art){
+  if(art&&art.upload){
+    who=art.upload.name;sub='Your upload';
+  }else if(art){
     who=art.owner?'@'+art.owner:'Unknown artist';
     sub='Makapix post '+art.postId+(art.source=='card'?', from the card':art.channel&&art.channel!='Everything'?' · '+art.channel:'');
   }else if(night.panel=='off'){text='Off for the night';who='Night';sub='Next wakes it for a while';}
@@ -560,12 +584,12 @@ function render(){
   else if(slot=='makapix'){text='Code on the panel';who='Waiting to be linked';sub='Enter the code at makapix.club';}
   else{text='Between pieces';}
   setImg($('art'),art?artSrc(art):'');setImg($('mart'),art?artSrc(art):'');
-  if(art)$('art').alt='Artwork by '+(art.owner||'an unknown artist');
+  if(art)$('art').alt=art.upload?'Your upload '+art.upload.name:'Artwork by '+(art.owner||'an unknown artist');
   msg.hidden=!!art;msg.textContent=text;msg.className=!art&&slot=='clock'?'clock':'';
   $('who').textContent=$('mwho').textContent=who;
   $('sub').textContent=$('msub').textContent=sub;
 
-  const like=$('like');like.hidden=!art;
+  const like=$('like');like.hidden=!art||!!art.upload; // an upload is not on Makapix
   const ovr=st.channelOverride;
   $('ovr').hidden=!ovr;
   if(ovr){
@@ -597,8 +621,9 @@ function render(){
     $('photo').setAttribute('aria-checked',on);
     $('hz').textContent=(on?'On: ':'Off: ')+'redraws '+st.panel.refreshHz+' times a second';
   }
-  const playing=art?String(art.postId):'';
+  const playing=art&&!art.upload?String(art.postId):'',playingUp=art&&art.upload?String(art.upload.id):'';
   $('grid').querySelectorAll('.tile').forEach(t=>t.classList.toggle('playing',t.dataset.post==playing));
+  $('upgrid').querySelectorAll('.tile').forEach(t=>t.classList.toggle('playing',t.dataset.upload==playingUp));
   if(tab=='set')showDevice();
 }
 
@@ -622,7 +647,7 @@ function back(){act('POST','/back');}
 // "hashtag:cat" as people write it.
 function channelLabel(spec){
   const [k,v]=spec.split(':');
-  return k=='hashtag'?'#'+v:k=='artist'?'@'+v:k=='likedby'?'art liked by @'+v:k=='promoted'?'promoted art':k=='mine'?'your art':'everything';
+  return k=='hashtag'?'#'+v:k=='artist'?'@'+v:k=='likedby'?'art liked by @'+v:k=='promoted'?'promoted art':k=='mine'?'your art':k=='uploads'?'your uploads':'everything';
 }
 $('ovroff').onclick=async()=>{try{await call('DELETE','/channel');}catch(e){}poll();};
 function hold(){
@@ -774,7 +799,7 @@ $('trans').onchange=async()=>{
 
 /* ---- saved art ------------------------------------------------------------------------- */
 function size(bytes){
-  return bytes>=1<<30?(bytes/(1<<30)).toFixed(1)+' GB':bytes>=1<<20?Math.round(bytes/(1<<20))+' MB':Math.round(bytes/1024)+' KB';
+  return bytes>=1<<30?(bytes/(1<<30)).toFixed(1)+' GB':bytes>=1<<20?Math.round(bytes/(1<<20))+' MB':bytes>=1024?Math.round(bytes/1024)+' KB':bytes+' bytes';
 }
 function facts(el,rows){
   el.textContent='';
@@ -799,9 +824,32 @@ async function loadCard(){
 const PAGE=24;
 let artTotal=0,chosen=null;
 function artSummary(){
-  $('artsum').textContent=artTotal?artTotal+' artwork'+(artTotal==1?'':'s')+' saved, most recently played first. Tap one to show it now or remove it.'
+  $('artsum').textContent=artTotal?artTotal.toLocaleString()+' saved, most recently played first. Tap one to show it now or remove it.'
     :'Art played online is saved on the card and shown when Makapix or the Wi-Fi is down.';
   $('clear').hidden=!artTotal;
+}
+
+/* ---- the Art tab: my uploads or saved art, one at a time ------------------------------ */
+let artView=null,savedLoaded=false;
+function setArtView(view,focus){
+  artView=view;
+  const mine=view=='mine';
+  $('vmine').setAttribute('aria-pressed',mine);$('vsaved').setAttribute('aria-pressed',!mine);
+  $('v-mine').hidden=!mine;$('v-saved').hidden=mine;
+  unpickArt();
+  if(!mine&&!savedLoaded){savedLoaded=true;loadArt(false);}
+  if(focus)$(mine?'vmine':'vsaved').focus();
+}
+$('vmine').onclick=()=>setArtView('mine');
+$('vsaved').onclick=()=>setArtView('saved');
+[$('vmine'),$('vsaved')].forEach(b=>b.onkeydown=e=>{
+  if(e.key=='ArrowLeft'||e.key=='ArrowRight'){e.preventDefault();setArtView(artView=='mine'?'saved':'mine',true);}
+});
+// Opens on your uploads when there are any; after that, on whichever you chose.
+async function loadArtTab(){
+  await loadUploads();
+  if(!artView)setArtView(uploads.length?'mine':'saved');
+  else if(artView=='saved')loadArt(false);
 }
 function tileFor(a){
   const li=document.createElement('li'),b=document.createElement('button'),
@@ -855,7 +903,7 @@ $('more').onclick=()=>loadArt(true);
 $('pshow').onclick=async()=>{
   if(!chosen)return;
   try{
-    await call('POST','/card/art/'+chosen.a.postId+'/show');
+    await call('POST',chosen.upload?'/uploads/'+chosen.a.id+'/show':'/card/art/'+chosen.a.postId+'/show');
     $('psub').textContent='Showing on the panel next.';
     clearTimeout(timer);timer=setTimeout(poll,2500);
   }catch(e){
@@ -865,6 +913,7 @@ $('pshow').onclick=async()=>{
 };
 $('pdrop').onclick=async()=>{
   if(!chosen)return;
+  if(chosen.upload)return dropUpload();
   const {b,a}=chosen;
   $('pshow').disabled=$('pdrop').disabled=true;
   try{await call('DELETE','/card/art/'+a.postId);}
@@ -877,6 +926,100 @@ $('pdrop').onclick=async()=>{
   $('artnote').textContent=(a.owner?'@'+a.owner+"'s":'The')+' artwork was removed from the card.';
   if(!artTotal)$('artnote').textContent=await emptyReason();
 };
+/* ---- my uploads -------------------------------------------------------------------- */
+let uploads=[];
+function uploadTile(u){
+  const li=document.createElement('li'),b=document.createElement('button'),
+    pic=document.createElement('span'),img=document.createElement('img'),cap=document.createElement('span');
+  b.className='tile';b.dataset.upload=u.id;b.setAttribute('aria-pressed','false');
+  pic.className='pic';
+  img.src=API+'/uploads/'+u.id+'.gif';img.loading='lazy';img.width=64;img.height=64;img.alt=u.name;
+  cap.textContent=u.name;
+  pic.appendChild(img);b.append(pic,cap);li.appendChild(b);
+  b.onclick=()=>pickUpload(b,u);
+  b.classList.toggle('playing',!!(st&&st.artwork&&st.artwork.upload&&st.artwork.upload.id==u.id));
+  return li;
+}
+let uploadsReady=true;
+function showUploads(){
+  const grid=$('upgrid');grid.textContent='';
+  uploads.forEach(u=>grid.appendChild(uploadTile(u)));
+  const n=uploads.length;
+  $('upplay').hidden=!n;
+  $('upkeys').hidden=!uploadsReady;
+  $('upsum').textContent=!uploadsReady?'Put a FAT32 card in the panel to keep your own GIFs on it.':
+    n?n+' upload'+(n==1?'':'s')+'. Tap one to show it now or remove it.':
+    'Your own GIFs, 64 × 64 or smaller, from this phone or computer. They play with or without Wi-Fi.';
+}
+async function loadUploads(){
+  try{
+    const r=await call('GET','/uploads');
+    uploads=r.uploads;uploadsReady=r.available;showUploads();
+  }catch(e){$('upnote').textContent='Could not read the uploads.';}
+}
+function pickUpload(b,u){
+  if(chosen)chosen.b.setAttribute('aria-pressed','false');
+  chosen={b,a:u,upload:true};
+  b.setAttribute('aria-pressed','true');
+  $('pwho').textContent=u.name;
+  $('psub').textContent='Your upload, '+u.width+' × '+u.height+', '+size(u.bytes);
+  $('pick').hidden=false;
+  $('pshow').disabled=$('pdrop').disabled=false;
+}
+async function dropUpload(){
+  const {a}=chosen;
+  $('pshow').disabled=$('pdrop').disabled=true;
+  try{await call('DELETE','/uploads/'+a.id);}
+  catch(e){
+    if(e.message!='404'){$('psub').textContent='Could not remove it. Try again.';$('pshow').disabled=$('pdrop').disabled=false;return;}
+  }
+  unpickArt();
+  uploads=uploads.filter(u=>u.id!=a.id);showUploads();
+  $('upnote').textContent=a.name+' was removed.';
+}
+// The first ten bytes say whether it is a GIF and how big.
+async function gifCheck(file){
+  const h=new Uint8Array(await file.slice(0,10).arrayBuffer());
+  if(h.length<10||String.fromCharCode(...h.slice(0,6)).replace('87a','89a')!='GIF89a')return 'is not a GIF';
+  const w=h[6]|h[7]<<8,ht=h[8]|h[9]<<8;
+  if(w>64||ht>64)return 'is '+w+' × '+ht+'; the panel is 64 × 64';
+  if(file.size>512*1024)return 'is over 512 KB';
+  return '';
+}
+function sendUpload(file,onProgress){
+  return new Promise(resolve=>{
+    const x=new XMLHttpRequest();
+    x.open('POST',API+'/uploads');
+    x.setRequestHeader('Content-Type','application/octet-stream');
+    x.setRequestHeader('X-File-Name',encodeURIComponent(file.name));
+    x.upload.onprogress=e=>{if(e.lengthComputable)onProgress(e.loaded/e.total);};
+    x.onerror=()=>resolve({status:0});
+    x.onload=()=>{let body={};try{body=JSON.parse(x.responseText);}catch(e){}resolve({status:x.status,body});};
+    x.send(file);
+  });
+}
+$('upfile').onchange=async()=>{
+  const files=[...$('upfile').files];$('upfile').value='';
+  if(!files.length)return;
+  const problems=[];let added=0;
+  $('upbar').hidden=false;
+  for(let i=0;i<files.length;i++){
+    const f=files[i],problem=await gifCheck(f);
+    if(problem){problems.push(f.name+' '+problem);continue;}
+    $('upnote').textContent='Uploading '+f.name+(files.length>1?' ('+(i+1)+' of '+files.length+')':'');
+    const r=await sendUpload(f,p=>{$('upfill').style.width=Math.round((i+p)/files.length*100)+'%';});
+    if(r.status==201){uploads.unshift(r.body);added++;showUploads();}
+    else if(r.status==401||r.status==429){lock(r.body&&r.body.error);break;}
+    else problems.push(f.name+': '+(r.body&&r.body.error?r.body.error:'the panel did not answer'));
+  }
+  $('upbar').hidden=true;$('upfill').style.width='0';
+  $('upnote').textContent=(added?added+' uploaded. ':'')+(problems.length?'Not uploaded: '+problems.join('; ')+'.':'');
+};
+$('upplay').onclick=async()=>{
+  try{await call('PUT','/channel',{channel:'uploads'});$('upnote').textContent='Playing your uploads in place of the rotation\'s channels, for now.';poll();}
+  catch(e){$('upnote').textContent='Could not switch. Try again.';}
+};
+
 twoTap($('clear'),()=>'Tap again to delete '+artTotal,()=>{},async done=>{
   $('clear').disabled=true;$('clear').textContent='Clearing';
   try{
@@ -1084,23 +1227,28 @@ $('fwgo').onclick=()=>{
     if(x.status!=200)return fwFail((reason||'The panel refused the file')+'.');
     $('fwfill').style.width='100%';
     $('fwnote').textContent='Written and checked. The panel is restarting into the new firmware.';
-    fwWait(fw?fw.slot:'',Date.now());
+    fwWait(fw?fw.slot:'',Date.now(),false);
   };
   x.send(f);
 };
-// Waits for the panel to come back from the other firmware slot and keep it.
-async function fwWait(oldSlot,since){
-  await new Promise(r=>setTimeout(r,4000));
+// Waits for the panel to restart (until then the old firmware still answers:
+// it restarts once its display loop takes the command), come back from the
+// other firmware slot, and keep it.
+async function fwWait(oldSlot,since,restarted){
+  await new Promise(r=>setTimeout(r,3000));
   let now=null;
-  try{now=(await call('GET','/diagnostics')).firmware;}catch(e){}
   const waited=(Date.now()-since)/1000;
+  try{
+    const d=await call('GET','/diagnostics');
+    if(restarted||d.uptimeSeconds<=waited){now=d.firmware;restarted=true;}
+  }catch(e){}
   if(!now){
     if(waited>120)return fwFail('The panel has not come back after two minutes. If it stays away, upload over USB.');
-    return fwWait(oldSlot,since);
+    return fwWait(oldSlot,since,restarted);
   }
   if(now.slot==oldSlot)return fwFail('The new firmware did not start properly, so the panel went back to '+now.version+'.');
   $('fwnote').textContent=now.newAndOnProbation?'Back, running '+now.version+'. Checking it for 30 seconds before keeping it.':'Updated to '+now.version+'.';
-  if(now.newAndOnProbation&&waited<200)return fwWait(oldSlot,since);
+  if(now.newAndOnProbation&&waited<200)return fwWait(oldSlot,since,true);
   updating=false;$('fwbar').hidden=true;$('fwfile').value='';$('fwgo').disabled=true;
   fw=now;loadFw();poll();
 }

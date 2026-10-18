@@ -97,15 +97,21 @@ def main():
         sys.exit(f"Refused ({status}): {body}")
     print("  written and checked; the panel is restarting")
 
-    deadline = time.time() + COME_BACK_S
+    # The panel restarts once its display loop takes the command, which can be
+    # a while if it is waiting on a download; until then the old firmware still
+    # answers. So wait for a fresh start (uptime back near zero) before judging.
+    sent_at = time.time()
+    deadline = sent_at + COME_BACK_S
     now = None
-    time.sleep(5)
     while time.time() < deadline:
+        time.sleep(3)
         try:
-            now = get(args.host, "/diagnostics", pin)["firmware"]
-            break
+            diagnostics = get(args.host, "/diagnostics", pin)
         except (OSError, KeyError, ValueError):
-            time.sleep(3)
+            continue
+        if diagnostics["uptimeSeconds"] <= time.time() - sent_at:
+            now = diagnostics["firmware"]
+            break
     if now is None:
         sys.exit(f"The panel did not come back within {COME_BACK_S} s. If it stays away, upload over USB.")
     print(f"  back, running {now['version']} from {now['slot']}")

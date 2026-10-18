@@ -18,6 +18,12 @@
       "description": "A postId from List Saved Art, for the requests on one saved artwork."
     },
     {
+      "key": "upload_id",
+      "value": "1",
+      "type": "string",
+      "description": "An id from List Uploads, for the requests on one upload."
+    },
+    {
       "key": "pin",
       "value": "",
       "type": "string",
@@ -2700,6 +2706,262 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"enabled\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Uploads",
+      "item": [
+        {
+          "name": "List Uploads",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/uploads",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "uploads"
+              ]
+            },
+            "description": "GIFs uploaded to the card, newest first."
+          },
+          "response": []
+        },
+        {
+          "name": "Upload A GIF",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/uploads",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "uploads"
+              ]
+            },
+            "description": "As saved it has no file and expects 400. Attach a GIF of 64 x 64 or less under Body > binary, with Content-Type application/octet-stream and the file name in an X-File-Name header."
+          },
+          "response": []
+        },
+        {
+          "name": "Get An Upload's GIF",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/uploads/{{upload_id}}.gif",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "uploads",
+                "{{upload_id}}.gif"
+              ]
+            },
+            "description": "One upload's GIF."
+          },
+          "response": []
+        },
+        {
+          "name": "Show An Upload",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 202', function () {",
+                  "  pm.response.to.have.status(202);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/uploads/{{upload_id}}/show",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "uploads",
+                "{{upload_id}}",
+                "show"
+              ]
+            },
+            "description": "Shows an upload for one turn."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove An Upload",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/uploads/{{upload_id}}",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "uploads",
+                "{{upload_id}}"
+              ]
+            },
+            "description": "Deletes an upload from the card."
+          },
+          "response": []
+        },
+        {
+          "name": "Play My Uploads",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/channel",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "channel"
+              ]
+            },
+            "description": "Every artwork slot plays your uploads, for now.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"uploads\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

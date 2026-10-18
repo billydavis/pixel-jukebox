@@ -40,6 +40,8 @@ bool parse(const std::string &spec, Channel &channel, std::string &error) {
     parsed.kind = Kind::Promoted;
   } else if (spec == "mine") {
     parsed.kind = Kind::Mine;
+  } else if (spec == "uploads") {
+    parsed.kind = Kind::Uploads;
   } else {
     size_t colon = spec.find(':');
     std::string type = spec.substr(0, colon);
@@ -83,6 +85,8 @@ std::string format(const Channel &channel) {
       return "promoted";
     case Kind::Mine:
       return "mine";
+    case Kind::Uploads:
+      return "uploads";
     case Kind::Artist:
       return "artist:" + channel.value;
     case Kind::Hashtag:
@@ -100,6 +104,8 @@ std::string label(const Channel &channel) {
       return "Promoted";
     case Kind::Mine:
       return "My art";
+    case Kind::Uploads:
+      return "My uploads";
     case Kind::Artist:
       return "@" + channel.value;
     case Kind::Hashtag:

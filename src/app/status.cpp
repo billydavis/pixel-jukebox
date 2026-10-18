@@ -36,6 +36,20 @@ void statusSetArtwork(uint32_t postId, const String &owner, const String &gifUrl
   current.gifUrl = gifUrl;
   current.fromCache = fromCache;
   current.channel = channel;
+  current.uploadId = 0;
+  current.uploadName = "";
+}
+
+void statusSetUpload(uint32_t uploadId, const String &name) {
+  Guard guard;
+  current.hasArtwork = true;
+  current.postId = 0;
+  current.owner = "";
+  current.gifUrl = "";
+  current.fromCache = true;
+  current.channel = "My uploads";
+  current.uploadId = uploadId;
+  current.uploadName = name;
 }
 
 void statusClearArtwork() {
@@ -45,6 +59,8 @@ void statusClearArtwork() {
   current.owner = "";
   current.gifUrl = "";
   current.fromCache = false;
+  current.uploadId = 0;
+  current.uploadName = "";
 }
 
 PlayerStatus statusGet() {

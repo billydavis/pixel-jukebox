@@ -14,6 +14,8 @@ struct PlayerStatus {
   bool fromCache = false;
   String channel; // label of the channel it came from; empty when from the card
   String screen;  // what has the panel: screen::name() of the current source
+  uint32_t uploadId = 0; // an upload is showing (postId is 0 then)
+  String uploadName;
 };
 
 void statusBegin();
@@ -22,5 +24,7 @@ void statusSetHeld(bool held);
 void statusSetScreen(const char *name);
 void statusSetArtwork(uint32_t postId, const String &owner, const String &gifUrl, bool fromCache,
                       const String &channel = "");
+// An upload (storage/uploads.h) in place of a Makapix artwork.
+void statusSetUpload(uint32_t uploadId, const String &name);
 void statusClearArtwork();
 PlayerStatus statusGet();

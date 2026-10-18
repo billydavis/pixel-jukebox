@@ -25,6 +25,7 @@
 #include "spectrum_math.h"
 #include "tap_detector.h"
 #include "transitions.h"
+#include "upload_rules.h"
 #include "view_queue.h"
 
 #ifdef ARDUINO
@@ -1312,6 +1313,75 @@ static void test_beat_repeated_beats_each_show() {
   TEST_ASSERT_EQUAL(8, seen); // the average does not climb so far that later beats vanish
 }
 
+// ---- upload_rules -------------------------------------------------------------
+
+static void test_upload_reads_gif_size() {
+  const uint8_t gif[] = {'G', 'I', 'F', '8', '9', 'a', 32, 0, 16, 0, 0};
+  int w = 0, h = 0;
+  TEST_ASSERT_TRUE(uploads::gifSize(gif, sizeof(gif), w, h));
+  TEST_ASSERT_EQUAL(32, w);
+  TEST_ASSERT_EQUAL(16, h);
+  const uint8_t big[] = {'G', 'I', 'F', '8', '7', 'a', 0x40, 0x01, 0x40, 0x01};
+  TEST_ASSERT_TRUE(uploads::gifSize(big, sizeof(big), w, h));
+  TEST_ASSERT_EQUAL(320, w);
+  const uint8_t png[] = {0x89, 'P', 'N', 'G', 13, 10, 26, 10, 0, 0};
+  TEST_ASSERT_FALSE(uploads::gifSize(png, sizeof(png), w, h));
+  TEST_ASSERT_FALSE(uploads::gifSize(gif, 9, w, h)); // too short for a header
+}
+
+static void test_upload_size_rules() {
+  TEST_ASSERT_EQUAL_STRING("", uploads::sizeProblem(64, 64, 1000).c_str());
+  TEST_ASSERT_EQUAL_STRING("", uploads::sizeProblem(16, 16, 100).c_str());
+  TEST_ASSERT_TRUE(uploads::sizeProblem(65, 64, 1000).find("64 x 64") != std::string::npos);
+  TEST_ASSERT_TRUE(uploads::sizeProblem(64, 64, 600 * 1024).find("512 KB") != std::string::npos);
+  TEST_ASSERT_FALSE(uploads::sizeProblem(0, 64, 10).empty());
+}
+
+static void test_upload_tidies_names() {
+  TEST_ASSERT_EQUAL_STRING("cat on a mat", uploads::tidyName("cat on a mat.GIF").c_str());
+  TEST_ASSERT_EQUAL_STRING("a_b_c", uploads::tidyName("a/b:c").c_str());
+  TEST_ASSERT_EQUAL_STRING("upload", uploads::tidyName("").c_str());
+  TEST_ASSERT_EQUAL_STRING("upload", uploads::tidyName(" . ").c_str());
+  TEST_ASSERT_EQUAL_STRING("caf__", uploads::tidyName("caf\xC3\xA9.gif").c_str()); // one non-ASCII letter, two bytes
+  TEST_ASSERT_EQUAL(uploads::MAX_NAME, uploads::tidyName(std::string(100, 'x')).size());
+}
+
+static void test_upload_file_names_round_trip() {
+  std::string file = uploads::fileName(12, 32, 16, "cat on a mat.gif");
+  TEST_ASSERT_EQUAL_STRING("12-32x16-cat on a mat.gif", file.c_str());
+  uint32_t id = 0;
+  int w = 0, h = 0;
+  std::string name;
+  TEST_ASSERT_TRUE(uploads::parseFileName(file, id, w, h, name));
+  TEST_ASSERT_EQUAL_UINT32(12, id);
+  TEST_ASSERT_EQUAL(32, w);
+  TEST_ASSERT_EQUAL(16, h);
+  TEST_ASSERT_EQUAL_STRING("cat on a mat", name.c_str());
+  TEST_ASSERT_TRUE(uploads::parseFileName("3-64x64-a-b-c.gif", id, w, h, name)); // dashes in the name
+  TEST_ASSERT_EQUAL_STRING("a-b-c", name.c_str());
+  TEST_ASSERT_FALSE(uploads::parseFileName("12.part", id, w, h, name));
+  TEST_ASSERT_FALSE(uploads::parseFileName("cat.gif", id, w, h, name));
+  TEST_ASSERT_FALSE(uploads::parseFileName("0-8x8-x.gif", id, w, h, name));
+  TEST_ASSERT_FALSE(uploads::parseFileName("5-99x8-x.gif", id, w, h, name)); // bigger than the panel
+  TEST_ASSERT_FALSE(uploads::parseFileName("5-8x8-.gif", id, w, h, name));
+}
+
+static void test_upload_decodes_percent_names() {
+  TEST_ASSERT_EQUAL_STRING("cat on a mat.gif", uploads::percentDecode("cat%20on%20a%20mat.gif").c_str());
+  TEST_ASSERT_EQUAL_STRING("100%", uploads::percentDecode("100%").c_str());
+  TEST_ASSERT_EQUAL_STRING("a%zzb", uploads::percentDecode("a%zzb").c_str());
+}
+
+static void test_channels_uploads() {
+  channels::Channel channel;
+  std::string error;
+  TEST_ASSERT_TRUE(channels::parse("uploads", channel, error));
+  TEST_ASSERT_TRUE(channel.kind == channels::Kind::Uploads);
+  TEST_ASSERT_EQUAL_STRING("uploads", channels::format(channel).c_str());
+  TEST_ASSERT_EQUAL_STRING("My uploads", channels::label(channel).c_str());
+  TEST_ASSERT_FALSE(channels::parse("uploads:x", channel, error));
+}
+
 static int runTests() {
   UNITY_BEGIN();
   RUN_TEST(test_gif_pad_grows_a_small_gif);
@@ -1434,6 +1504,12 @@ static int runTests() {
   RUN_TEST(test_beat_a_kick_stands_out_and_fades);
   RUN_TEST(test_beat_small_wobbles_are_ignored);
   RUN_TEST(test_beat_repeated_beats_each_show);
+  RUN_TEST(test_upload_reads_gif_size);
+  RUN_TEST(test_upload_size_rules);
+  RUN_TEST(test_upload_tidies_names);
+  RUN_TEST(test_upload_file_names_round_trip);
+  RUN_TEST(test_upload_decodes_percent_names);
+  RUN_TEST(test_channels_uploads);
   return UNITY_END();
 }
 

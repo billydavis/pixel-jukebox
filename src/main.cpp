@@ -28,6 +28,7 @@
 #include "app/telemetry.h"
 #include "storage/art_cache.h"
 #include "storage/card.h"
+#include "storage/uploads.h"
 #include "app/transition.h"
 #include "screen_rules.h"
 #include "audio/audio.h"
@@ -40,6 +41,7 @@ static const uint32_t COMMAND_POLL_MS = 5;
 static size_t skippedInARow = 0;
 static uint16_t *outgoing = nullptr; // the frame a transition starts from
 static uint32_t requestedPost = 0;   // an artwork asked for (gallery, Back, makapix.club)
+static uint32_t requestedUpload = 0; // an upload asked for from the Art tab
 static bool requestFromBack = false; // that request came from Back: not a new step in the history
 static screen::Source lastSource = screen::Source::Rotation;
 static screen::History history;
@@ -151,6 +153,12 @@ static void runSlot(Slot *slot, screen::Source source) {
             statusSetHeld(false);
             slot->stop();
             return;
+          case CommandType::ShowUpload:
+            Serial.printf("Command: show upload %u\n", (unsigned)command.value);
+            requestedUpload = command.value;
+            statusSetHeld(false);
+            slot->stop();
+            return;
           case CommandType::SetBrightness:
             Serial.printf("Command: brightness %u\n", command.value);
             nightSetBrightness(command.value);
@@ -194,6 +202,30 @@ static void runSlot(Slot *slot, screen::Source source) {
   }
 }
 
+// While a slot is waiting for a download: brightness, restart and Wi-Fi
+// setup are acted on at once; anything that changes what is on screen waits
+// in the queue for the slot.
+static void serviceWhileWaiting() {
+  Command command;
+  while (commandPeek(command)) {
+    if (command.type != CommandType::SetBrightness && command.type != CommandType::Restart &&
+        command.type != CommandType::WifiSetup) {
+      return;
+    }
+    commandReceive(command);
+    if (command.type == CommandType::SetBrightness) {
+      Serial.printf("Command: brightness %u\n", command.value);
+      nightSetBrightness(command.value);
+    } else if (command.type == CommandType::Restart) {
+      restartBoard();
+    } else {
+      connectionEnterSetup();
+    }
+  }
+  nightTick();
+  firmwareUpdateMaintain(apiRunning());
+}
+
 // With nothing on screen, hold and next have nothing to act on.
 static void handleCommandsWhileIdle() {
   Command command;
@@ -206,6 +238,8 @@ static void handleCommandsWhileIdle() {
       restartBoard();
     } else if (command.type == CommandType::ShowArtwork) {
       requestedPost = command.value;
+    } else if (command.type == CommandType::ShowUpload) {
+      requestedUpload = command.value;
     } else if (command.type == CommandType::Back) {
       requestPrevious();
     }
@@ -225,6 +259,10 @@ static void nightDark() {
       switch (command.type) {
         case CommandType::ShowArtwork:
           requestedPost = command.value;
+          nightWake();
+          return;
+        case CommandType::ShowUpload:
+          requestedUpload = command.value;
           nightWake();
           return;
         case CommandType::Next:
@@ -290,6 +328,7 @@ void setup() {
   MEMORY_AT("card");
   telemetryBootMark("card");
   artCacheBegin();
+  uploadsBegin();
   MEMORY_AT("cache");
   telemetryBootMark("cache");
 
@@ -316,6 +355,7 @@ void setup() {
   MEMORY_AT("setup done");
   telemetryBootMark("setup done");
   outgoing = (uint16_t *)ps_malloc(PANEL_RES_X * PANEL_RES_Y * sizeof(uint16_t));
+  MakapixSlot::whileWaiting = serviceWhileWaiting;
 }
 
 void loop() {
@@ -337,7 +377,7 @@ void loop() {
   // Who has the panel this turn: screen_rules decides between the night
   // schedule, sound mode, a request and the rotation.
   bool nightOff = nightNow().off;
-  screen::Source source = screen::choose(screenInputs(requestedPost != 0));
+  screen::Source source = screen::choose(screenInputs(requestedPost != 0 || requestedUpload != 0));
   statusSetScreen(screen::name(source));
   if (source == screen::Source::Dark) {
     lastSource = source;
@@ -358,7 +398,12 @@ void loop() {
   // where it was.
   bool fromBack = false;
   if (source == screen::Source::Request) {
-    rotationArtworkSlot()->request(requestedPost);
+    if (requestedUpload) {
+      rotationArtworkSlot()->requestUpload(requestedUpload);
+    } else {
+      rotationArtworkSlot()->request(requestedPost);
+    }
+    requestedUpload = 0;
     requestedPost = 0;
     fromBack = requestFromBack;
     requestFromBack = false;

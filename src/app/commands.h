@@ -14,6 +14,7 @@ enum class CommandType : uint8_t {
   Restart,       // restart the board, for instance after a card is inserted
   ShowArtwork,   // value: a postId to show for one turn, from the card or Makapix
   Back,          // show the artwork before the current one
+  ShowUpload,    // value: an upload's id (storage/uploads.h), to show for one turn
 };
 
 struct Command {
