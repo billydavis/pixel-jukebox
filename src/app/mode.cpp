@@ -9,6 +9,10 @@ static SpectrumSlot spectrumSlot;
 static VuSlot vuSlot;
 static ScopeSlot scopeSlot;
 static FireSlot fireSlot;
+static RingsSlot ringsSlot;
+static StarfieldSlot starfieldSlot;
+static StereoSlot stereoSlot;
+static HifiSlot hifiSlot;
 
 struct Visualizer {
   SlotInfo info;
@@ -19,6 +23,10 @@ static const Visualizer VISUALIZERS[] = {
     {{"vu", "VU meter", ""}, &vuSlot},
     {{"scope", "Oscilloscope", ""}, &scopeSlot},
     {{"fire", "Fire", ""}, &fireSlot},
+    {{"rings", "Pulse rings", ""}, &ringsSlot},
+    {{"starfield", "Starfield", ""}, &starfieldSlot},
+    {{"stereo", "Stereo scope", ""}, &stereoSlot},
+    {{"hifi", "Hi-fi meter", ""}, &hifiSlot},
 };
 static const size_t VISUALIZER_COUNT = sizeof(VISUALIZERS) / sizeof(VISUALIZERS[0]);
 

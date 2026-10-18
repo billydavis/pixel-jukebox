@@ -228,7 +228,7 @@ try:
     check("starts from rotation mode", wait_for(lambda s: s["mode"] == "rotation" and s["slot"]["name"], 25))
     code, body = call("GET", "/mode")
     names = [v["name"] for v in body.get("visualizers", [])]
-    check("mode lists the visualizers", code == 200 and names == ["spectrum", "vu", "scope", "fire"], names)
+    check("mode lists the visualizers", code == 200 and names == ["spectrum", "vu", "scope", "fire", "rings", "starfield", "stereo", "hifi"], names)
     for name in names:
         code, body = call("PUT", "/mode", {"mode": "sound", "visualizer": name})
         shown = wait_for(lambda s: s["mode"] == "sound" and s["slot"]["name"] == name)

@@ -513,7 +513,11 @@ otherwise.
     { "name": "spectrum", "label": "Spectrum bars" },
     { "name": "vu", "label": "VU meter" },
     { "name": "scope", "label": "Oscilloscope" },
-    { "name": "fire", "label": "Fire" }
+    { "name": "fire", "label": "Fire" },
+    { "name": "rings", "label": "Pulse rings" },
+    { "name": "starfield", "label": "Starfield" },
+    { "name": "stereo", "label": "Stereo scope" },
+    { "name": "hifi", "label": "Hi-fi meter" }
   ]
 }
 ```

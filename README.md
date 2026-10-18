@@ -43,7 +43,7 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 | **Offline play** | With a microSD card in the slot, every artwork played is saved to it (up to 1,500 pieces or 1 GB). When Makapix or the Wi-Fi is unreachable, the board shuffles through those copies instead, and goes back to fresh art when the connection returns. No card, no cache; the card is never formatted by the board |
 | **Transitions** | Thirteen effects between slots, such as mosaic, melt, dissolve and slide. Random by default, or pick one, or turn them off. They never eat into a slot's time on screen |
 | **Button** | BOOT button: short press skips to the next slot, long press holds the current one, a 5-second hold starts Wi-Fi setup |
-| **Sound mode** | Switch from the artwork to a visualizer driven by the onboard microphones: spectrum bars, VU meter, oscilloscope or fire. It stays on until you switch back, and scales itself to how loud the room is |
+| **Sound mode** | Switch from the artwork to a visualizer driven by the onboard microphones: spectrum bars, VU meter, oscilloscope, fire, pulse rings, starfield, stereo scope or a retro hi-fi meter. The fire, rings and starfield follow the beat rather than just the loudness. It stays on until you switch back, and scales itself to how loud the room is |
 | **Control page** | Open `http://pixel-jukebox.local` on a phone or PC: see the artwork and artist, go back, skip, hold, set brightness |
 | **REST API** | Status, skip, hold and brightness over HTTP, found on the network as `pixel-jukebox.local` |
 | **Wi-Fi setup** | With no network configured, the board starts its own hotspot and a page for choosing one. No code editing needed |

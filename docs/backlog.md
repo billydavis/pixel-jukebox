@@ -51,7 +51,7 @@ Priority is a suggestion until it has been agreed.
 
 | # | Item | Size | Priority | Notes |
 |---|---|---|---|---|
-| 23 | More visualizers: waterfall, pulse ring, artwork that moves to the beat | S each | 5 | |
+| 23 | More visualizers | S each | 5 | Done in 0.30.0: pulse rings, starfield, stereo scope, hi-fi meter, and a fire that follows the beat (`beat_follower.h`). Left: artwork that dances to the beat (passed over for now). A waterfall was tried and dropped: too faint to read on the panel |
 | 24 | Built-in effects: falling code, rainbow, Game of Life | S each | 5 | |
 | 25 | Per-slot settings, for example clock colours | S-M | 5 | |
 

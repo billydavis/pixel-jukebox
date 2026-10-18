@@ -91,3 +91,78 @@ class FireSlot : public VisualizerSlot {
   uint8_t heat[PANEL_RES_Y + 2][PANEL_RES_X]; // two hidden rows of fuel at the bottom
   BeatFollower beats;
 };
+
+// Rings that burst out from the middle on each beat, coloured by the pitch
+// that is loudest at the time, over a glow that follows the overall level.
+class RingsSlot : public VisualizerSlot {
+ public:
+  const char *name() const override { return "rings"; }
+
+ protected:
+  void reset() override;
+  void draw(const AudioFrame &frame) override;
+
+ private:
+  struct Ring {
+    float radius;
+    float hue;
+    float strength; // 0 when unused
+  };
+  static const int MAX_RINGS = 12;
+  Ring rings[MAX_RINGS];
+  BeatFollower beats;
+  int sinceRing;
+};
+
+// Flying through stars that speed up with the music and streak on the beat.
+class StarfieldSlot : public VisualizerSlot {
+ public:
+  const char *name() const override { return "starfield"; }
+
+ protected:
+  void reset() override;
+  void draw(const AudioFrame &frame) override;
+
+ private:
+  struct Star {
+    float x, y, z; // x and y from -1 to 1, z from 1 (far) to 0 (here)
+  };
+  static const int STARS = 90;
+  void respawn(Star &star, bool anywhere);
+  Star stars[STARS];
+  BeatFollower beats;
+};
+
+// The two microphones plotted against each other (a goniometer): sound from
+// straight ahead draws an upright line, and the wider the stereo, the wider
+// the shape. In a quiet room it is a small dot in the middle.
+class StereoSlot : public VisualizerSlot {
+ public:
+  const char *name() const override { return "stereo"; }
+
+ protected:
+  void reset() override;
+  void draw(const AudioFrame &frame) override;
+
+ private:
+  BeatFollower beats;
+};
+
+// A 1980s hi-fi graphic equaliser: sixteen columns of chunky LED segments,
+// green, amber and red, with peak dots that hang and then drop.
+class HifiSlot : public VisualizerSlot {
+ public:
+  const char *name() const override { return "hifi"; }
+
+ protected:
+  void reset() override;
+  void draw(const AudioFrame &frame) override;
+
+ private:
+  static const int COLUMNS = 16;
+  float level[COLUMNS]; // in segments
+  float peak[COLUMNS];
+  uint8_t peakHold[COLUMNS];
+  int8_t drawnLit[COLUMNS];
+  int8_t drawnPeak[COLUMNS];
+};

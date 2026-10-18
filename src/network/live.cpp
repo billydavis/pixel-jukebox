@@ -19,7 +19,7 @@
 #include "network/makapix.h"
 #include "storage/card.h"
 
-static const uint32_t TASK_STACK_BYTES = 9216; // a handshake peaked at about 5.8 KB
+static const uint32_t TASK_STACK_BYTES = 6144; // peaked at 3.7 KB, handshakes included (TLS memory is in PSRAM)
 static const BaseType_t TASK_CORE = 0;
 static const uint16_t SOCKET_TIMEOUT_S = 10; // how long PubSubClient waits for the broker to answer
 static const uint32_t CONNECTED_POLL_MS = 50;
@@ -28,7 +28,7 @@ static const uint16_t KEEP_ALIVE_S = 60;
 static const uint32_t HEARTBEAT_MS = 60000;      // a status every minute, as the protocol asks
 static const uint32_t CERT_RETRY_MS = 60000;     // after failing to get certificates
 static const uint32_t DAY_MS = 24UL * 60 * 60 * 1000;
-static const size_t MQTT_BUFFER_BYTES = 2048;    // commands are small; a larger one (a playset) is dropped
+static const size_t MQTT_BUFFER_BYTES = 1024;    // commands are a few hundred bytes; a larger one (a playset) is dropped
 static const time_t TRUSTED_AFTER = 1700000000;  // before this the clock is not set
 
 enum class State { Off, Night, Waiting, Connecting, Connected, Retrying };
