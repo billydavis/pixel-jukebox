@@ -316,6 +316,35 @@ try:
         check(f"transition rejects {json.dumps(bad)}", code == 400 and "error" in body, body)
     check("rejected values changed nothing", call("GET", "/transition")[1]["transition"] == names[-1])
 
+    section("What is on screen")
+    code, body = call("GET", "/status")
+    check("status names what has the screen",
+          body.get("screen") in ("rotation", "request", "sound", "nightClock", "dark") and "channelOverride" in body,
+          {k: body.get(k) for k in ("screen", "channelOverride")})
+    code, body = call("POST", "/back")
+    check("back is queued", code == 202 and body.get("queued") == "back", body)
+    code, body = call("POST", "/show/abc")
+    check("show refuses a post id that is not a number", code == 404, body)
+    code, body = call("PUT", "/channel", {"channel": "hashtag:#Cats"})
+    check("a channel override can be set, in canonical form",
+          code == 200 and body.get("channel") == "hashtag:cats" and body.get("from") == "api", body)
+    check("status shows the override",
+          (call("GET", "/status")[1].get("channelOverride") or {}).get("channel") == "hashtag:cats")
+    for bad in ({"channel": "nope:x"}, {"channel": ""}, {}):
+        code, body = call("PUT", "/channel", bad)
+        check(f"channel override rejects {json.dumps(bad)}", code == 400, body)
+    code, body = call("DELETE", "/channel")
+    check("the override can be cleared", code == 200 and body.get("channel") is None, body)
+
+    section("Live connection")
+    code, live_state = call("GET", "/live")
+    check("live reports its state",
+          code == 200 and live_state.get("state") in ("connected", "connecting", "retrying", "waiting", "off"),
+          live_state)
+    code, body = call("PUT", "/live", {"enabled": "yes"})
+    check("live rejects a non-boolean", code == 400, body)
+    check("diagnostics include the live connection", "live" in call("GET", "/diagnostics")[1])
+
     section("Firmware update")
     code, body = call("GET", "/diagnostics")
     firmware = body.get("firmware", {})

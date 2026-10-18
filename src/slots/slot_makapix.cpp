@@ -248,7 +248,7 @@ bool MakapixSlot::start() {
   if (requestedPost) {
     uint32_t postId = requestedPost;
     requestedPost = 0;
-    return showFromCard(postId);
+    return showRequested(postId);
   }
   if (!feed) {
     useChannel("all");
@@ -332,21 +332,49 @@ bool MakapixSlot::startPlaying() {
   return true;
 }
 
-// One artwork asked for from the gallery. The preloaded one stays waiting for
-// the next turn.
-bool MakapixSlot::showFromCard(uint32_t postId) {
-  LoadedArtwork requested;
-  CachedArtwork cached;
-  if (!artCacheTakePost(postId, cached)) {
-    Serial.printf("Post %u is no longer on the card\n", (unsigned)postId);
+// The artwork downloaded and checked, or false. Saved to the card too.
+static bool fetchPost(uint32_t postId, LoadedArtwork &loaded) {
+  if (WiFi.status() != WL_CONNECTED || !makapix::isRegistered()) {
     return false;
   }
-  requested.artwork.postId = cached.postId;
-  requested.artwork.ownerHandle = cached.owner;
-  requested.artwork.dwellMs = cached.dwellMs;
-  requested.artwork.fromCache = true;
-  requested.data = cached.data;
-  requested.size = cached.size;
+  makapix::Artwork artwork;
+  String problem;
+  if (!makapix::getPost(postId, artwork, problem)) {
+    Serial.printf("Post %u cannot be shown: %s\n", (unsigned)postId, problem.c_str());
+    return false;
+  }
+  size_t size = 0;
+  uint8_t *data = downloadGif(artwork.gifUrl, size);
+  if (!data) {
+    return false;
+  }
+  if (size < 6 || memcmp(data, "GIF8", 4) != 0) {
+    Serial.printf("Not a GIF: %s\n", artwork.gifUrl.c_str());
+    free(data);
+    return false;
+  }
+  telemetryNoteImage(size);
+  artCacheStore(artwork.postId, artwork.ownerHandle, artwork.dwellMs, data, size);
+  loaded = {artwork, data, size};
+  return true;
+}
+
+// One artwork asked for (the gallery, Back, or makapix.club), from the card
+// when it is there, otherwise from Makapix; that takes a moment, while the
+// last picture stays up. The preloaded one stays waiting for the next turn.
+bool MakapixSlot::showRequested(uint32_t postId) {
+  LoadedArtwork requested;
+  CachedArtwork cached;
+  if (artCacheTakePost(postId, cached)) {
+    requested.artwork.postId = cached.postId;
+    requested.artwork.ownerHandle = cached.owner;
+    requested.artwork.dwellMs = cached.dwellMs;
+    requested.artwork.fromCache = true;
+    requested.data = cached.data;
+    requested.size = cached.size;
+  } else if (!fetchPost(postId, requested)) {
+    return false;
+  }
   if (!play(requested)) {
     return false;
   }

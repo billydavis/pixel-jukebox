@@ -31,6 +31,8 @@ static SemaphoreHandle_t lock;
 static std::vector<RotationEntry> rotation;
 static size_t position = 0;
 static uint8_t turnsTaken = 0;
+static String channelOverride; // empty: each slot plays its own channel
+static String overrideFrom;
 
 namespace {
 struct Guard {
@@ -156,6 +158,8 @@ bool rotationSet(const std::vector<RotationEntry> &requested, String &error) {
   }
   Guard guard;
   rotation = entries;
+  channelOverride = ""; // a rotation just chosen plays as chosen
+  overrideFrom = "";
   // rotationAdvance() runs when the slot on screen ends; start it at the top.
   position = rotation.size() - 1;
   turnsTaken = rotation[position].turns;
@@ -177,9 +181,34 @@ Slot *rotationCurrent() {
   skipPaused();
   Slot *slot = findSlot(rotation[position].slot);
   if (slot == &makapixSlot) {
-    makapixSlot.useChannel(rotation[position].channel);
+    makapixSlot.useChannel(channelOverride.isEmpty() ? rotation[position].channel : channelOverride);
   }
   return slot;
+}
+
+bool rotationSetChannelOverride(const String &spec, const char *from, String &error) {
+  String canonical;
+  if (!spec.isEmpty()) {
+    channels::Channel channel;
+    std::string problem;
+    if (!channels::parse(spec.c_str(), channel, problem)) {
+      error = problem.c_str();
+      return false;
+    }
+    canonical = channels::format(channel).c_str();
+  }
+  Guard guard;
+  channelOverride = canonical;
+  overrideFrom = canonical.isEmpty() ? "" : from;
+  return true;
+}
+
+String rotationChannelOverride(String *from) {
+  Guard guard;
+  if (from) {
+    *from = overrideFrom;
+  }
+  return channelOverride;
 }
 
 void rotationAdvance() {

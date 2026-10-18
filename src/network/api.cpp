@@ -17,10 +17,12 @@
 #include "app/mode.h"
 #include "app/night.h"
 #include "app/rotation.h"
+#include "channels.h"
 #include "app/status.h"
 #include "app/telemetry.h"
 #include "app/transition.h"
 #include "network/auth.h"
+#include "network/live.h"
 #include "network/makapix.h"
 #include "network/reporter.h"
 #include "network/web_assets.h"
@@ -228,8 +230,18 @@ static void handleStatus() {
     doc["artwork"] = nullptr;
   }
 
+  doc["screen"] = status.screen.isEmpty() ? "rotation" : status.screen;
   doc["mode"] = modeIsSound() ? "sound" : "rotation";
   doc["visualizer"] = modeVisualizer();
+  String overrideFrom;
+  String override = rotationChannelOverride(&overrideFrom);
+  if (override.isEmpty()) {
+    doc["channelOverride"] = nullptr;
+  } else {
+    JsonObject channel = doc["channelOverride"].to<JsonObject>();
+    channel["channel"] = override;
+    channel["from"] = overrideFrom;
+  }
   NightNow night = nightNow();
   doc["brightness"] = night.brightness;
   JsonObject nightState = doc["night"].to<JsonObject>();
@@ -252,6 +264,7 @@ static void handleDiagnostics() {
   artCacheReport(doc["cache"].to<JsonObject>());
   reporterReportViews(doc["views"].to<JsonObject>());
   reporterReportLikes(doc["likes"].to<JsonObject>());
+  liveReport(doc["live"].to<JsonObject>());
   JsonObject firmware = doc["firmware"].to<JsonObject>();
   firmware["version"] = FIRMWARE_VERSION;
   firmwareUpdateReport(firmware);
@@ -436,11 +449,91 @@ static void handleShowArt() {
     sendError(404, "That artwork is not on the card");
     return;
   }
-  if (modeIsSound()) {
-    sendError(409, "The panel is in sound mode; switch to rotation to show artwork");
+  sendQueued(commandSend(CommandType::ShowArtwork, postId), "show");
+}
+
+// Any Makapix post, by id: from the card when it is there, otherwise fetched.
+// Queued like the rest; whether it could be shown appears in GET /status.
+static void handleShowPost() {
+  uint32_t postId = pathPostId();
+  if (!postId) {
+    sendError(404, "Not a postId");
     return;
   }
   sendQueued(commandSend(CommandType::ShowArtwork, postId), "show");
+}
+
+// --- the live connection to makapix.club ---------------------------------------------
+
+static void sendLive() {
+  JsonDocument doc;
+  liveReport(doc.to<JsonObject>());
+  sendJson(200, doc);
+}
+
+static void handleGetLive() { sendLive(); }
+
+// {"enabled": false} says goodbye to the broker and stays off across restarts.
+static void handlePutLive() {
+  JsonDocument body;
+  if (!readBody(body)) {
+    return;
+  }
+  if (!body["enabled"].is<bool>()) {
+    sendError(400, "enabled must be true or false");
+    return;
+  }
+  liveSetEnabled(body["enabled"].as<bool>());
+  sendLive();
+}
+
+static void handleBack() { sendQueued(commandSend(CommandType::Back), "back"); }
+
+// --- one channel for every artwork slot, for now ------------------------------------
+
+static void sendChannelOverride(int status) {
+  JsonDocument doc;
+  String from;
+  String spec = rotationChannelOverride(&from);
+  if (spec.isEmpty()) {
+    doc["channel"] = nullptr;
+    doc["label"] = nullptr;
+    doc["from"] = nullptr;
+  } else {
+    channels::Channel channel;
+    std::string error;
+    channels::parse(spec.c_str(), channel, error);
+    doc["channel"] = spec;
+    doc["label"] = channels::label(channel).c_str();
+    doc["from"] = from;
+  }
+  sendJson(status, doc);
+}
+
+static void handleGetChannel() { sendChannelOverride(200); }
+
+// {"channel": "hashtag:cat"}. Starts with the next artwork turn.
+static void handlePutChannel() {
+  JsonDocument body;
+  if (!readBody(body)) {
+    return;
+  }
+  if (!body["channel"].is<const char *>() || String(body["channel"].as<const char *>()).isEmpty()) {
+    sendError(400, "channel must be a channel string, such as \"promoted\" or \"hashtag:cat\"");
+    return;
+  }
+  String error;
+  if (!rotationSetChannelOverride(body["channel"].as<String>(), "api", error)) {
+    sendError(400, error.c_str());
+    return;
+  }
+  sendChannelOverride(200);
+}
+
+static void handleDeleteChannel() {
+  String error;
+  rotationSetChannelOverride("", "", error);
+  sendChannelOverride(200);
 }
 
 static void handleRemoveArt() {
@@ -899,6 +992,13 @@ void apiBegin() {
   server.on(API_BASE "/status", HTTP_GET, guarded(handleStatus));
   server.on(API_BASE "/diagnostics", HTTP_GET, guarded(handleDiagnostics));
   server.on(API_BASE "/next", HTTP_POST, guarded(handleNext));
+  server.on(API_BASE "/back", HTTP_POST, guarded(handleBack));
+  server.on(API_BASE "/live", HTTP_GET, guarded(handleGetLive));
+  server.on(API_BASE "/live", HTTP_PUT, guarded(handlePutLive));
+  server.on(API_BASE "/channel", HTTP_GET, guarded(handleGetChannel));
+  server.on(API_BASE "/channel", HTTP_PUT, guarded(handlePutChannel));
+  server.on(API_BASE "/channel", HTTP_DELETE, guarded(handleDeleteChannel));
+  server.on(UriBraces(API_BASE "/show/{}"), HTTP_POST, guarded(handleShowPost));
   server.on(API_BASE "/hold", HTTP_POST, guarded(handleHold));
   server.on(API_BASE "/brightness", HTTP_GET, guarded(handleGetBrightness));
   server.on(API_BASE "/brightness", HTTP_PUT, guarded(handlePutBrightness));

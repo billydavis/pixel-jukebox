@@ -87,6 +87,13 @@ effect before the reply, which is `200` with the new state.
 | `DELETE` | `/card/art` | Delete every saved artwork |
 | `POST` | `/restart` | Restart the board |
 | `POST` | `/next` | Skip to the next slot |
+| `POST` | `/back` | Show the artwork before the current one |
+| `POST` | `/show/{postId}` | Show any Makapix post for one turn |
+| `GET` | `/channel` | The channel playing in place of the rotation's, if any |
+| `PUT` | `/channel` | Play one channel in every artwork slot, for now |
+| `DELETE` | `/channel` | Go back to the rotation's own channels |
+| `GET` | `/live` | The live connection to makapix.club |
+| `PUT` | `/live` | Turn the live connection on or off |
 | `POST` | `/hold` | Hold or release the current slot |
 | `GET` | `/brightness` | Read the brightness |
 | `PUT` | `/brightness` | Set the brightness |
@@ -125,8 +132,10 @@ effect before the reply, which is `200` with the new state.
     "liked": false,
     "channel": "Promoted"
   },
+  "screen": "rotation",
   "mode": "rotation",
   "visualizer": "spectrum",
+  "channelOverride": null,
   "brightness": 32,
   "night": { "active": false, "panel": "playing", "overridden": false },
   "panel": { "photo": false, "refreshHz": 100 }
@@ -146,7 +155,9 @@ effect before the reply, which is `200` with the new state.
 | `artwork.source` | `makapix` when downloaded for this turn, `card` when played from the board's offline copy, because Makapix or the Wi-Fi could not be reached or because it was asked for from the gallery |
 | `artwork.liked` | Whether the artwork has been liked from this panel; see `PUT /likes/{postId}` |
 | `artwork.channel` | The channel it came from, as `channelLabel` in `GET /slots`; `null` when from the card |
+| `screen` | What has the panel this turn: `rotation`, `request` (one artwork asked for), `sound`, `nightClock` or `dark`. See [What is on screen](#what-is-on-screen) |
 | `mode` | `rotation` or `sound` |
+| `channelOverride` | `null`, or `{"channel": "hashtag:cat", "from": "makapix.club"}` while one channel plays in place of the rotation's; see `PUT /channel` |
 | `visualizer` | The visualizer sound mode uses, whether or not it is showing now |
 | `brightness` | 0-255, as showing now: the night schedule may have lowered it |
 | `night` | Whether it is night by the schedule, what the panel is doing (`playing`, `clock` or `off`) and whether someone has taken over for a while; see `GET /night` |
@@ -189,6 +200,7 @@ sizes are in bytes.
 | `artwork` | Artworks downloaded since startup and the size of the largest |
 | `case` | Temperature and humidity inside the case, from the board's SHTC3 sensor, read once a minute; `lowestC` and `highestC` since start-up. The board and the panel warm the air around the sensor, so this is how hot the electronics run, not the room: expect several degrees above it, and humidity correspondingly lower. `null` until the first reading; `present` is `false` if the sensor did not answer |
 | `firmware` | `version`; `slot`, the flash slot it runs from (`app0` or `app1`); `newAndOnProbation`, true for a just-installed firmware that is not yet kept (see `POST /update`); `updating`, true while an upload is being written |
+| `live` | The live connection to makapix.club, as `GET /live` |
 | `crash` | Whether a crash record is stored, and if so which task crashed and why. Details from `GET /crash` |
 | `clock.source` | Where the time came from: `network` (internet time, checked about hourly), `clock chip` (the board's PCF85063, read at start-up, until the network answers) or `not set`. `utc` is `null` until the time is known |
 | `clock.chip` | The clock chip. `keptTimeAtStart` is `false` after the power was off, unless a backup battery is fitted. It is set from the network each time that answers; `driftSecondsAtLastSet` is how far it had wandered by then (a second either way is rounding: it counts whole seconds) |
@@ -421,7 +433,9 @@ since a saved artwork never changes. `404` when it is not on the card.
 Shows a saved artwork on the panel as soon as the current slot gives way, with
 the usual transition, for the artwork's own time. The rotation then carries on
 where it was. Releases a hold. No body. Reply: `202 {"queued":"show"}`.
-`404` when it is not on the card; `409` in sound mode.
+`404` when it is not on the card. In sound mode the artwork has its turn and
+then the visualizer comes back. `POST /show/{postId}` does the same for any
+Makapix post, on the card or not.
 
 ### `DELETE /card/art/{postId}`
 
@@ -693,6 +707,104 @@ before anything is written. `400` for an empty body, a body sent as a form,
 or a file that is not firmware for this board (nothing is changed), `409`
 while an update is in progress or on probation. USB uploads keep working and are
 the way back if the panel ever stops answering.
+
+## What is on screen
+
+Several things can take over the panel from the rotation. One set of rules
+decides between them (`lib/jukebox_core/screen_rules.h`), and `GET /status`
+names the winner as `screen`:
+
+| `screen` | When | Next | Hold |
+|---|---|---|---|
+| `request` | An artwork was asked for: the gallery, `POST /back`, `POST /show/{postId}`, or makapix.club. Comes first, and wakes a dark panel. One turn, then whatever was on carries on | Ends it | Yes |
+| `dark` | The night schedule has the panel off | Wakes it | No |
+| `sound` | Sound mode is on | Next visualizer | No |
+| `nightClock` | A clock-only night | Ends the turn | Yes |
+| `rotation` | Otherwise | Next slot | Yes |
+
+A channel set with `PUT /channel` (or from makapix.club) is not a separate
+screen: the rotation keeps its order and its clock, and every artwork slot
+plays that channel until it is cleared, the rotation is changed, or the board
+restarts.
+
+### `POST /back`
+
+Shows the artwork before the current one, for one turn; pressing it again goes
+further back (up to 16). No body. Reply: `202 {"queued":"back"}`. Nothing
+happens when there is nothing to go back to.
+
+### `POST /show/{postId}`
+
+Shows any Makapix post for one turn: from the card when it is there, otherwise
+fetched from Makapix (and then saved to the card). The last picture stays up
+while it downloads. No body. Reply: `202 {"queued":"show"}`. A post that does
+not exist, is hidden, or is bigger than the panel is skipped, and the panel
+carries on; the serial log says why.
+
+### `GET /channel`
+
+```json
+{ "channel": "hashtag:cat", "label": "#cat", "from": "api" }
+```
+
+All three are `null` when every artwork slot plays its own channel. `from` is
+`makapix.club` when the website chose it, `api` otherwise.
+
+### `PUT /channel`
+
+`{"channel": "hashtag:cat"}`, in the form used by `PUT /slots`. Every artwork
+slot plays it from its next turn, in place of its own channel. Not saved: a
+restart, `DELETE /channel` or `PUT /slots` goes back to the rotation's
+channels. Reply: as `GET /channel`. `400` for something that is not a channel.
+
+### `DELETE /channel`
+
+Back to the rotation's own channels. Reply: as `GET /channel`.
+
+## Live on makapix.club
+
+The panel keeps a connection to Makapix's MQTT broker (`makapix.club:8883`,
+mutual TLS with the panel's own certificate). With it, the website shows the
+panel as online with the artwork it is showing (sent on every change and every
+minute, and `offline` when the connection drops), and the website can control
+it:
+
+| From makapix.club | The panel |
+|---|---|
+| Next (`swap_next`) | As `POST /next` |
+| Back (`swap_back`) | As `POST /back` |
+| Send to player (`show_artwork`) | As `POST /show/{postId}` |
+| Play a channel (`play_channel`): all, promoted, an artist, a hashtag, liked by someone | Leaves sound mode and plays it as `PUT /channel`, at once |
+| Play a playset (`play_playset`) | Not supported yet: received and ignored |
+
+Art, likes and view reports still go over HTTPS. The certificate is fetched
+with the panel's token the first time, kept on the board, and renewed by the
+panel when it has 30 days left or when the broker turns it away three times in
+a row (at most once a day). After a drop the panel reconnects after 1 s, then
+2, 4 ... up to 5 minutes.
+
+### `GET /live`
+
+```json
+{ "enabled": true, "state": "connected", "connectedSeconds": 140, "reconnects": 0,
+  "commandsReceived": 2, "lastCommand": { "type": "swap_next", "secondsAgo": 12, "actedOn": true },
+  "certificateExpires": "2029-10-13" }
+```
+
+| Field | Meaning |
+|---|---|
+| `state` | `connected`, `connecting`, `retrying`, `waiting` (for Wi-Fi or for the panel to be linked) or `off` |
+| `reconnects` | Connections made since start-up after the first |
+| `lastCommand` | The last command from the website; `actedOn` is false for one the panel does not support |
+| `certificateExpires` | When the panel's MQTT certificate runs out (UTC date) |
+| `problem` | Present while it cannot connect, saying why |
+
+### `PUT /live`
+
+`{"enabled": false}` tells the broker the panel is going offline and
+disconnects; it stays off across restarts. `{"enabled": true}` connects again.
+On by default. Reply: as `GET /live`. `400` unless `enabled` is `true` or
+`false`.
 
 ## The PIN
 

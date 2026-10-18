@@ -3,6 +3,8 @@
 #include <Update.h>
 #include <esp_ota_ops.h>
 
+#include "config.h"
+
 // How long a new firmware must have its API up before it is kept, and how long
 // it gets to reach that point. With the router down the old firmware comes
 // back after the limit, which is harmless: it was working.
@@ -22,7 +24,7 @@ void firmwareUpdateBegin() {
   const esp_partition_t *running = esp_ota_get_running_partition();
   esp_ota_img_states_t state;
   onProbation = esp_ota_get_state_partition(running, &state) == ESP_OK && state == ESP_OTA_IMG_PENDING_VERIFY;
-  Serial.printf("Firmware: %s in %s%s\n", esp_ota_get_app_description()->version, running->label,
+  Serial.printf("Firmware: %s in %s%s\n", FIRMWARE_VERSION, running->label,
                 onProbation ? ", new: kept once the API has been up for 30 s" : "");
 #ifdef OTA_ROLLBACK_TEST
   // A deliberately broken update, to prove the way back works: build with

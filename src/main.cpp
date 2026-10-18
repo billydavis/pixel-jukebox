@@ -20,6 +20,7 @@
 #include "network/auth.h"
 #include "network/api.h"
 #include "network/connection.h"
+#include "network/live.h"
 #include "network/reporter.h"
 #include "pins.h"
 #include "app/rotation.h"
@@ -28,6 +29,7 @@
 #include "storage/art_cache.h"
 #include "storage/card.h"
 #include "app/transition.h"
+#include "screen_rules.h"
 #include "audio/audio.h"
 #include "slots/slot_makapix.h"
 
@@ -37,8 +39,10 @@ static const uint32_t COMMAND_POLL_MS = 5;
 
 static size_t skippedInARow = 0;
 static uint16_t *outgoing = nullptr; // the frame a transition starts from
-static uint32_t requestedPost = 0;   // an artwork asked for from the gallery
-static bool nightClockShowing = false; // the clock is on because of the night schedule
+static uint32_t requestedPost = 0;   // an artwork asked for (gallery, Back, makapix.club)
+static bool requestFromBack = false; // that request came from Back: not a new step in the history
+static screen::Source lastSource = screen::Source::Rotation;
+static screen::History history;
 static const uint32_t NIGHT_CHECK_MS = 500;
 
 // The slot has no card-detect switch, so a card is only looked for at start-up.
@@ -68,23 +72,33 @@ static void drawHoldMarker() {
   display->fillRect(PANEL_RES_X - 3, 1, 2, 5, white);
 }
 
-// True when the night schedule wants something other than `slot` on screen.
-static bool nightWantsChange(Slot *slot) {
-  NightNow now = nightNow();
-  if (now.off) {
-    return true;
-  }
-  if (modeIsSound()) {
-    return false;
-  }
-  if (now.clockOnly) {
-    return slot != rotationClockSlot();
-  }
-  return nightClockShowing; // the clock-only night is over
+// What screen_rules decides from: the night schedule, the mode, a request.
+static screen::Inputs screenInputs(bool requestPending) {
+  NightNow night = nightNow();
+  screen::Inputs inputs;
+  inputs.nightOff = night.off;
+  inputs.nightClock = night.clockOnly;
+  inputs.sound = modeIsSound();
+  inputs.requestPending = requestPending;
+  return inputs;
 }
 
-// Runs a started slot until it finishes or a command ends it.
-static void runSlot(Slot *slot) {
+// Back: the artwork before the current one, shown for a turn. False when
+// there is none.
+static bool requestPrevious() {
+  uint32_t postId = history.back();
+  if (!postId) {
+    return false;
+  }
+  Serial.printf("Command: back to post %u\n", (unsigned)postId);
+  requestedPost = postId;
+  requestFromBack = true;
+  return true;
+}
+
+// Runs a started slot until it finishes or a command ends it. `source` is
+// what put it on screen, which decides what Next and Hold mean.
+static void runSlot(Slot *slot, screen::Source source) {
   bool held = false;
   uint32_t nightCheckedAt = millis();
   for (;;) {
@@ -102,7 +116,7 @@ static void runSlot(Slot *slot) {
           case CommandType::Next:
             Serial.println("Command: next");
             nightWake(); // only does anything on a clock-only night
-            if (modeIsSound()) {
+            if (screen::nextChangesVisualizer(source)) {
               modeNextVisualizer();
             }
             statusSetHeld(false);
@@ -112,12 +126,18 @@ static void runSlot(Slot *slot) {
             statusSetHeld(false);
             slot->stop();
             return;
-          // A visualizer already stays put, so hold only applies to the rotation.
           case CommandType::ToggleHold:
-            wantHeld = !held && !modeIsSound();
+            wantHeld = !held && screen::holdAllowed(source);
             break;
           case CommandType::SetHold:
-            wantHeld = command.value != 0 && !modeIsSound();
+            wantHeld = command.value != 0 && screen::holdAllowed(source);
+            break;
+          case CommandType::Back:
+            if (requestPrevious()) {
+              statusSetHeld(false);
+              slot->stop();
+              return;
+            }
             break;
           case CommandType::WifiSetup:
             connectionEnterSetup();
@@ -126,9 +146,6 @@ static void runSlot(Slot *slot) {
             restartBoard();
             break;
           case CommandType::ShowArtwork:
-            if (modeIsSound()) {
-              break;
-            }
             Serial.printf("Command: show post %u\n", (unsigned)command.value);
             requestedPost = command.value;
             statusSetHeld(false);
@@ -158,7 +175,7 @@ static void runSlot(Slot *slot) {
       }
       if (millis() - nightCheckedAt >= NIGHT_CHECK_MS) {
         nightCheckedAt = millis();
-        if (nightWantsChange(slot)) {
+        if (screen::shouldGiveWay(source, screenInputs(false))) {
           statusSetHeld(false);
           slot->stop();
           return;
@@ -184,8 +201,10 @@ static void handleCommandsWhileIdle() {
       connectionEnterSetup();
     } else if (command.type == CommandType::Restart) {
       restartBoard();
-    } else if (command.type == CommandType::ShowArtwork && !modeIsSound()) {
+    } else if (command.type == CommandType::ShowArtwork) {
       requestedPost = command.value;
+    } else if (command.type == CommandType::Back) {
+      requestPrevious();
     }
   }
 }
@@ -208,6 +227,12 @@ static void nightDark() {
         case CommandType::Next:
           nightWake();
           return;
+        case CommandType::Back:
+          if (requestPrevious()) {
+            nightWake();
+            return;
+          }
+          break;
         case CommandType::SetBrightness:
           nightSetBrightness(command.value);
           return;
@@ -271,6 +296,7 @@ void setup() {
   rotationBegin();
   MEMORY_AT("rotation");
   reporterBegin(); // after rotationBegin(), which starts the Makapix client
+  liveBegin();
   MEMORY_AT("reporter");
   modeBegin();
   MEMORY_AT("mode");
@@ -294,41 +320,46 @@ void loop() {
   }
   clockChipMaintain();
   nightTick();
-  NightNow night = nightNow();
-  if (night.off) {
-    nightClockShowing = false;
+
+  // Who has the panel this turn: screen_rules decides between the night
+  // schedule, sound mode, a request and the rotation.
+  bool nightOff = nightNow().off;
+  screen::Source source = screen::choose(screenInputs(requestedPost != 0));
+  statusSetScreen(screen::name(source));
+  if (source == screen::Source::Dark) {
+    lastSource = source;
     nightDark();
     return;
   }
+  if (source == screen::Source::Request && nightOff) {
+    nightWake(); // a request lights a dark panel for a while
+  }
 
-  // Sound mode shows one visualizer until the mode changes; otherwise the
-  // rotation decides. Outside sound mode the microphones are switched off,
-  // which gives their buffers back to internal RAM.
-  bool sound = modeIsSound();
-  if (!sound && audioRunning()) {
+  // Outside sound mode the microphones are switched off, which gives their
+  // buffers back to internal RAM. A request shown in sound mode leaves them on.
+  if (!modeIsSound() && audioRunning()) {
     audioEnd();
     Serial.println("Audio stopped");
   }
-  // An artwork asked for from the gallery plays between turns of the rotation,
-  // which then carries on where it was.
-  MakapixSlot *requested = nullptr;
-  if (!sound && requestedPost) {
-    requested = rotationArtworkSlot();
-    requested->request(requestedPost);
+  // A requested artwork plays for one turn; then whatever was on carries on
+  // where it was.
+  bool fromBack = false;
+  if (source == screen::Source::Request) {
+    rotationArtworkSlot()->request(requestedPost);
     requestedPost = 0;
+    fromBack = requestFromBack;
+    requestFromBack = false;
   }
-  // On a clock-only night the clock takes the place of the rotation.
-  bool nightClock = !sound && !requested && night.clockOnly;
-  Slot *slot = sound       ? modeSoundSlot()
-               : requested ? requested
-               : nightClock ? rotationClockSlot()
-                            : rotationCurrent();
+  Slot *slot = source == screen::Source::Sound        ? modeSoundSlot()
+               : source == screen::Source::Request    ? rotationArtworkSlot()
+               : source == screen::Source::NightClock ? rotationClockSlot()
+                                                      : rotationCurrent();
 
   // For a transition, the slot draws its first frame off the panel while the
   // old picture stays up, then the two are blended. Sound mode switches at
   // once, and the night clock does not blend into itself every ten seconds.
-  bool animate = !sound && outgoing && transitionEnabled() && !(nightClock && nightClockShowing);
-  nightClockShowing = nightClock;
+  bool animate = outgoing && transitionEnabled() && screen::transitionAllowed(source, lastSource);
+  lastSource = source;
   if (animate) {
     memcpy(outgoing, display->pixels(), PANEL_RES_X * PANEL_RES_Y * sizeof(uint16_t));
     display->setLive(false);
@@ -348,11 +379,15 @@ void loop() {
     skippedInARow = 0;
     statusSetSlot(slot->name());
     Serial.printf("Slot: %s\n", slot->name());
-    runSlot(slot);
+    PlayerStatus now = statusGet();
+    if (now.hasArtwork && !fromBack) {
+      history.shown(now.postId);
+    }
+    runSlot(slot, source);
     statusSetSlot("");
-  } else if (requested) {
-    // Removed from the card since it was asked for: carry on with the rotation.
-  } else if (sound) {
+  } else if (source == screen::Source::Request) {
+    // Not on the card and not available from Makapix: carry on as before.
+  } else if (source == screen::Source::Sound) {
     // The microphones are unavailable, so go back to the rotation.
     Serial.println("Sound mode could not start");
     String error;
@@ -370,7 +405,7 @@ void loop() {
     delay(SKIPPED_SLOT_MS);
     handleCommandsWhileIdle();
   }
-  if (!sound && !requested && !nightClock) {
+  if (screen::advancesRotation(source)) {
     rotationAdvance();
   }
 }

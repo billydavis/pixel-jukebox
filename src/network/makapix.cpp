@@ -265,6 +265,41 @@ QueryStatus nextPage(const channels::Channel &channel, PageState &page, std::vec
   return QueryStatus::Ok;
 }
 
+bool getPost(uint32_t postId, Artwork &artwork, String &problem) {
+  JsonDocument body;
+  body["request_type"] = "get_post";
+  body["post_id"] = postId;
+  JsonArray fields = body["include_fields"].to<JsonArray>();
+  fields.add("dwell_time_ms");
+  fields.add("owner_handle");
+  fields.add("width");
+  fields.add("height");
+  String payload;
+  serializeJson(body, payload);
+  String response;
+  int status = request("POST", "/player/rpc", payload, response);
+  JsonDocument doc;
+  if (status <= 0 || deserializeJson(doc, response)) {
+    problem = "Makapix could not be reached";
+    return false;
+  }
+  if (status != 200 || !doc["success"].as<bool>()) {
+    problem = doc["error"] | "Makapix would not supply it";
+    return false;
+  }
+  JsonObject post = doc["post"];
+  if ((post["width"] | 0) > PANEL_RES_X || (post["height"] | 0) > PANEL_RES_Y) {
+    problem = "it is bigger than the panel";
+    return false;
+  }
+  artwork.postId = post["post_id"] | postId;
+  artwork.ownerHandle = post["owner_handle"] | "";
+  artwork.gifUrl = gifUrlFor(post["art_url"].as<String>());
+  artwork.dwellMs = post["dwell_time_ms"] | 30000;
+  artwork.fromCache = false;
+  return true;
+}
+
 // The emoji Makapix's own like button uses.
 static const char *HEART = "\xE2\x9D\xA4\xEF\xB8\x8F"; // U+2764 U+FE0F
 
@@ -325,6 +360,72 @@ SendStatus setLiked(uint32_t postId, bool liked, uint32_t &retryAfter) {
   }
   return result;
 }
+
+static bool readCertificates(const String &response, Certificates &out, String &problem) {
+  JsonDocument filter;
+  filter["ca_pem"] = true;
+  filter["cert_pem"] = true;
+  filter["key_pem"] = true;
+  filter["broker"] = true;
+  JsonDocument doc;
+  if (deserializeJson(doc, response, DeserializationOption::Filter(filter))) {
+    problem = "Makapix sent certificates that could not be read";
+    return false;
+  }
+  out.ca = doc["ca_pem"] | "";
+  out.cert = doc["cert_pem"] | "";
+  out.key = doc["key_pem"] | "";
+  out.host = doc["broker"]["host"] | "makapix.club";
+  out.port = doc["broker"]["port"] | 8883;
+  if (out.ca.isEmpty() || out.cert.isEmpty() || out.key.isEmpty()) {
+    problem = "Makapix sent no certificates";
+    return false;
+  }
+  return true;
+}
+
+bool fetchCertificates(Certificates &out, String &problem) {
+  if (playerKey.isEmpty()) {
+    problem = "the panel is not linked to Makapix";
+    return false;
+  }
+  String response;
+  int status = request("GET", "/player/" + playerKey + "/credentials", "", response);
+  if (status != 200) {
+    problem = status == 429 ? "Makapix asked to wait before asking for certificates again"
+                            : "could not get certificates from Makapix (HTTP " + String(status) + ")";
+    return false;
+  }
+  return readCertificates(response, out, problem);
+}
+
+bool renewCertificates(Certificates &out, bool &notYet, String &problem) {
+  notYet = false;
+  String response;
+  int status = request("POST", "/player/renew-cert", "", response);
+  if (status == 400) {
+    notYet = true;
+    problem = "Makapix says the certificate is not due for renewal yet";
+    return false;
+  }
+  if (status != 200) {
+    problem = "could not renew the certificate (HTTP " + String(status) + ")";
+    return false;
+  }
+  // renew-cert has no broker field; keep what the caller had.
+  String host = out.host;
+  uint16_t port = out.port;
+  if (!readCertificates(response, out, problem)) {
+    return false;
+  }
+  if (!host.isEmpty()) {
+    out.host = host;
+    out.port = port;
+  }
+  return true;
+}
+
+String key() { return playerKey; }
 
 void forget() {
   prefs.remove("player_key");

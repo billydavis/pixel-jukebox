@@ -128,4 +128,22 @@ const char *makapixName(Kind kind) {
   }
 }
 
+bool fromMakapix(const std::string &channelName, const std::string &userHandle, const std::string &hashtag,
+                 Channel &channel) {
+  std::string spec;
+  if (channelName == "all" || channelName == "promoted") {
+    spec = channelName;
+  } else if (channelName == "by_user" && !userHandle.empty()) {
+    spec = "artist:" + userHandle;
+  } else if (channelName == "reactions" && !userHandle.empty()) {
+    spec = "likedby:" + userHandle;
+  } else if (channelName == "hashtag" && !hashtag.empty()) {
+    spec = "hashtag:" + hashtag;
+  } else {
+    return false;
+  }
+  std::string error;
+  return parse(spec, channel, error);
+}
+
 } // namespace channels

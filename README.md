@@ -38,12 +38,13 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 | **Clock chip** | The board's clock chip keeps the time through restarts, so the clock and view reports have it before Wi-Fi is up. It is set from internet time whenever that answers. A backup battery keeps the time through power cuts too: a non-rechargeable 3 V coin cell (CR2032 or CR1220) on the 2-pin JST-SH 1.0 mm connector J4, pin 1 positive. The board does not charge it |
 | **Pausing slots** | An eye on each rotation row pauses a slot without removing it, like hiding a layer in an image editor: it keeps its place, turns and channel and is skipped until shown again. Up to 12 slots |
 | **Channels** | Each artwork slot in the rotation can play its own Makapix channel: everything, featured art, your own art, one artist, a hashtag, or the art you have liked. For example two featured pieces, one tagged #cat, one you liked, then the clock |
+| **Live on makapix.club** | The panel shows as online on the website with the artwork it is showing, and the website can press Next and Back, send it a particular artwork, or have it play a channel (an artist, a hashtag, featured art). A switch in Settings turns it off |
 | **Likes and views** | A heart on the control page likes the artwork on Makapix as the panel's owner, and every artwork shown is reported as a view so artists see how often their work is seen. Both wait for the connection when offline; view reports can be turned off |
 | **Offline play** | With a microSD card in the slot, every artwork played is saved to it (up to 1,500 pieces or 1 GB). When Makapix or the Wi-Fi is unreachable, the board shuffles through those copies instead, and goes back to fresh art when the connection returns. No card, no cache; the card is never formatted by the board |
 | **Transitions** | Thirteen effects between slots, such as mosaic, melt, dissolve and slide. Random by default, or pick one, or turn them off. They never eat into a slot's time on screen |
 | **Button** | BOOT button: short press skips to the next slot, long press holds the current one, a 5-second hold starts Wi-Fi setup |
 | **Sound mode** | Switch from the artwork to a visualizer driven by the onboard microphones: spectrum bars, VU meter, oscilloscope or fire. It stays on until you switch back, and scales itself to how loud the room is |
-| **Control page** | Open `http://pixel-jukebox.local` on a phone or PC: see the artwork and artist, skip, hold, set brightness |
+| **Control page** | Open `http://pixel-jukebox.local` on a phone or PC: see the artwork and artist, go back, skip, hold, set brightness |
 | **REST API** | Status, skip, hold and brightness over HTTP, found on the network as `pixel-jukebox.local` |
 | **Wi-Fi setup** | With no network configured, the board starts its own hotspot and a page for choosing one. No code editing needed |
 | **Registration** | Shows a 6-character code on the panel; enter it on makapix.club and the board stores its token |
@@ -199,7 +200,7 @@ The firmware is grouped by area, one folder each. Every folder holds a handful o
 | `src/display/` | Drawing to the panel, and GIF playback |
 | `src/audio/` | Speaker, microphones and the sound analysis behind the visualizers |
 | `src/input/` | Onboard sensors: motion, and the case temperature and humidity |
-| `src/network/` | Wi-Fi and its setup hotspot, the API and its PIN, the Makapix client, likes and view reports |
+| `src/network/` | Wi-Fi and its setup hotspot, the API and its PIN, the Makapix client, the live connection to makapix.club, likes and view reports |
 | `src/storage/` | The microSD card and the artwork saved on it |
 | `lib/jukebox_core/` | Logic with no hardware in it (rules, maths, parsing), so it can be unit tested on a PC |
 | `test/test_core/` | The unit tests for `lib/jukebox_core` |

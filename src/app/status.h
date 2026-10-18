@@ -13,11 +13,13 @@ struct PlayerStatus {
   String gifUrl; // HTTPS, for clients that want to show the artwork; empty when from the card
   bool fromCache = false;
   String channel; // label of the channel it came from; empty when from the card
+  String screen;  // what has the panel: screen::name() of the current source
 };
 
 void statusBegin();
 void statusSetSlot(const char *name);
 void statusSetHeld(bool held);
+void statusSetScreen(const char *name);
 void statusSetArtwork(uint32_t postId, const String &owner, const String &gifUrl, bool fromCache,
                       const String &channel = "");
 void statusClearArtwork();

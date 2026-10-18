@@ -44,6 +44,10 @@ LinkStatus pollCredentials();
 QueryStatus nextPage(const channels::Channel &channel, PageState &page, std::vector<Artwork> &artworks,
                      String &problem);
 
+// One post, by id, for showing on request. False with `problem` when it
+// cannot be shown: gone, hidden, too big for the panel, or Makapix unreachable.
+bool getPost(uint32_t postId, Artwork &artwork, String &problem);
+
 // Tells Makapix an artwork was shown. `isoTime` is UTC; 1970-01-01T00:00:00Z
 // when the clock is not set. `requested`: asked for by the user, not picked
 // by the rotation. At most one report every 5 seconds is accepted.
@@ -56,6 +60,29 @@ SendStatus reportView(uint32_t postId, const String &isoTime, bool requested, co
 // Adds or removes a heart on an artwork, on behalf of the panel's owner.
 // `retryAfter` as for reportView.
 SendStatus setLiked(uint32_t postId, bool liked, uint32_t &retryAfter);
+
+// The panel's MQTT credentials: its own client certificate and key, the CA
+// the broker's certificate is checked against, and where the broker is.
+struct Certificates {
+  String ca;
+  String cert;
+  String key;
+  String host;
+  uint16_t port = 0;
+};
+
+// From the credentials endpoint used when linking. The certificates come back
+// every time (only the token is one-time). False with `problem` otherwise.
+bool fetchCertificates(Certificates &out, String &problem);
+
+// A fresh client certificate and the current CA, authorised by the token.
+// Makapix allows it within its renewal window or once the old one has
+// expired, and answers 400 otherwise; `notYet` is set then.
+bool renewCertificates(Certificates &out, bool &notYet, String &problem);
+
+// The player key, the panel's permanent Makapix identity (empty until it has
+// one). Used as the MQTT client id and user name.
+String key();
 
 // Drops the stored credentials so the device registers again.
 void forget();

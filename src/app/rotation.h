@@ -37,6 +37,15 @@ std::vector<RotationEntry> rotationGet();
 // are stored in their canonical form ("artist:@Fab" becomes "artist:Fab").
 bool rotationSet(const std::vector<RotationEntry> &entries, String &error);
 
+// One channel played by every artwork slot for now, in place of their own:
+// set from makapix.club (play_channel) or the API. Not saved, so a restart
+// goes back to the rotation's channels; so does changing the rotation.
+// `from` says who asked ("makapix.club", "api"). An empty spec clears it.
+// False with `error` for a spec that is not a channel.
+bool rotationSetChannelOverride(const String &spec, const char *from, String &error);
+// The spec in force, or empty; `from` says who set it.
+String rotationChannelOverride(String *from = nullptr);
+
 // The slot whose turn it is, then move on to the next turn.
 Slot *rotationCurrent();
 void rotationAdvance();

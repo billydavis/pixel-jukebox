@@ -37,4 +37,10 @@ std::string label(const Channel &channel);
 // The Makapix query_posts channel name.
 const char *makapixName(Kind kind);
 
+// A play_channel command from makapix.club ("all", "promoted", "by_user" or
+// "reactions" with a user handle, "hashtag" with a tag) as one of ours. False
+// for anything else, or when the handle or tag it needs is missing.
+bool fromMakapix(const std::string &channelName, const std::string &userHandle, const std::string &hashtag,
+                 Channel &channel);
+
 } // namespace channels

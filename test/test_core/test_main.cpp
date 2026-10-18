@@ -14,9 +14,11 @@
 #include "gif_pad.h"
 #include "html_escape.h"
 #include "likes_book.h"
+#include "live_rules.h"
 #include "night_rules.h"
 #include "pin_rules.h"
 #include "rotation_rules.h"
+#include "screen_rules.h"
 #include "rtc_time.h"
 #include "shtc3_math.h"
 #include "spectrum_math.h"
@@ -1136,6 +1138,129 @@ static void test_pin_compares_bytes() {
   TEST_ASSERT_FALSE(pin::sameBytes(a, c, 4));
 }
 
+// ---- screen_rules ------------------------------------------------------------
+
+static screen::Inputs inputs(bool nightOff, bool nightClock, bool sound, bool request) {
+  screen::Inputs in;
+  in.nightOff = nightOff;
+  in.nightClock = nightClock;
+  in.sound = sound;
+  in.requestPending = request;
+  return in;
+}
+
+static void test_screen_order_of_who_wins() {
+  using screen::Source;
+  TEST_ASSERT_TRUE(screen::choose(inputs(false, false, false, false)) == Source::Rotation);
+  TEST_ASSERT_TRUE(screen::choose(inputs(false, true, false, false)) == Source::NightClock);
+  TEST_ASSERT_TRUE(screen::choose(inputs(false, true, true, false)) == Source::Sound);
+  TEST_ASSERT_TRUE(screen::choose(inputs(true, false, true, false)) == Source::Dark);
+  TEST_ASSERT_TRUE(screen::choose(inputs(true, true, true, true)) == Source::Request); // wakes the panel
+  TEST_ASSERT_TRUE(screen::choose(inputs(false, false, true, true)) == Source::Request);
+  TEST_ASSERT_EQUAL_STRING("nightClock", screen::name(Source::NightClock));
+}
+
+static void test_screen_giving_way() {
+  using screen::Source;
+  // A request runs its turn even if night falls meanwhile.
+  TEST_ASSERT_FALSE(screen::shouldGiveWay(Source::Request, inputs(true, false, false, false)));
+  // The rotation gives way to the night clock, the night clock to the morning.
+  TEST_ASSERT_TRUE(screen::shouldGiveWay(Source::Rotation, inputs(false, true, false, false)));
+  TEST_ASSERT_TRUE(screen::shouldGiveWay(Source::NightClock, inputs(false, false, false, false)));
+  TEST_ASSERT_FALSE(screen::shouldGiveWay(Source::NightClock, inputs(false, true, false, false)));
+  // Sound only gives way to dark.
+  TEST_ASSERT_FALSE(screen::shouldGiveWay(Source::Sound, inputs(false, true, true, false)));
+  TEST_ASSERT_TRUE(screen::shouldGiveWay(Source::Sound, inputs(true, false, true, false)));
+  // A new request does not cut the running turn short; it is picked up next.
+  TEST_ASSERT_FALSE(screen::shouldGiveWay(Source::Rotation, inputs(false, false, false, true)));
+}
+
+static void test_screen_what_next_and_hold_mean() {
+  using screen::Source;
+  TEST_ASSERT_TRUE(screen::nextChangesVisualizer(Source::Sound));
+  TEST_ASSERT_FALSE(screen::nextChangesVisualizer(Source::Request));
+  TEST_ASSERT_FALSE(screen::holdAllowed(Source::Sound));
+  TEST_ASSERT_TRUE(screen::holdAllowed(Source::Request));
+  TEST_ASSERT_TRUE(screen::holdAllowed(Source::NightClock));
+  TEST_ASSERT_TRUE(screen::advancesRotation(Source::Rotation));
+  TEST_ASSERT_FALSE(screen::advancesRotation(Source::Request));
+  TEST_ASSERT_FALSE(screen::transitionAllowed(Source::Sound, Source::Rotation));
+  TEST_ASSERT_FALSE(screen::transitionAllowed(Source::NightClock, Source::NightClock));
+  TEST_ASSERT_TRUE(screen::transitionAllowed(Source::NightClock, Source::Rotation));
+  TEST_ASSERT_TRUE(screen::transitionAllowed(Source::Request, Source::Sound));
+}
+
+static void test_screen_history_walks_back() {
+  screen::History history;
+  TEST_ASSERT_EQUAL_UINT32(0, history.back());
+  history.shown(10);
+  TEST_ASSERT_EQUAL_UINT32(0, history.back()); // nothing before the first
+  history.shown(20);
+  history.shown(20); // the same one again is not a new step
+  history.shown(30);
+  TEST_ASSERT_EQUAL_UINT32(20, history.back());
+  TEST_ASSERT_EQUAL_UINT32(10, history.back());
+  TEST_ASSERT_EQUAL_UINT32(0, history.back());
+  history.shown(40); // after going back, new art carries on from there
+  TEST_ASSERT_EQUAL_UINT32(10, history.back());
+}
+
+static void test_screen_history_keeps_the_latest() {
+  screen::History history;
+  for (uint32_t id = 1; id <= 40; id++) {
+    history.shown(id);
+  }
+  TEST_ASSERT_EQUAL(screen::History::MAX, history.size());
+  TEST_ASSERT_EQUAL_UINT32(39, history.back());
+}
+
+static void test_channels_from_makapix_commands() {
+  channels::Channel channel;
+  TEST_ASSERT_TRUE(channels::fromMakapix("all", "", "", channel));
+  TEST_ASSERT_EQUAL_STRING("all", channels::format(channel).c_str());
+  TEST_ASSERT_TRUE(channels::fromMakapix("promoted", "", "", channel));
+  TEST_ASSERT_EQUAL_STRING("promoted", channels::format(channel).c_str());
+  TEST_ASSERT_TRUE(channels::fromMakapix("by_user", "PixelMaster", "", channel));
+  TEST_ASSERT_EQUAL_STRING("artist:PixelMaster", channels::format(channel).c_str());
+  TEST_ASSERT_TRUE(channels::fromMakapix("reactions", "Fab", "", channel));
+  TEST_ASSERT_EQUAL_STRING("likedby:Fab", channels::format(channel).c_str());
+  TEST_ASSERT_TRUE(channels::fromMakapix("hashtag", "", "PixelArt", channel));
+  TEST_ASSERT_EQUAL_STRING("hashtag:pixelart", channels::format(channel).c_str());
+  TEST_ASSERT_FALSE(channels::fromMakapix("by_user", "", "", channel));   // no handle
+  TEST_ASSERT_FALSE(channels::fromMakapix("hashtag", "", "", channel));   // no tag
+  TEST_ASSERT_FALSE(channels::fromMakapix("trending", "", "", channel));  // not one we know
+}
+
+// ---- live_rules ---------------------------------------------------------------
+
+static void test_live_backs_off_to_five_minutes() {
+  TEST_ASSERT_EQUAL_UINT32(1, live::retryDelaySeconds(0));
+  TEST_ASSERT_EQUAL_UINT32(1, live::retryDelaySeconds(1));
+  TEST_ASSERT_EQUAL_UINT32(2, live::retryDelaySeconds(2));
+  TEST_ASSERT_EQUAL_UINT32(256, live::retryDelaySeconds(9));
+  TEST_ASSERT_EQUAL_UINT32(300, live::retryDelaySeconds(10));
+  TEST_ASSERT_EQUAL_UINT32(300, live::retryDelaySeconds(1000));
+}
+
+static void test_live_counts_days_to_expiry() {
+  const int64_t oct18 = 1792281600; // 2026-10-18T00:00:00Z
+  TEST_ASSERT_EQUAL(0, live::daysUntil(2026, 10, 18, oct18));
+  TEST_ASSERT_EQUAL(0, live::daysUntil(2026, 10, 18, oct18 + 86399));
+  TEST_ASSERT_EQUAL(1, live::daysUntil(2026, 10, 19, oct18 + 3600));
+  TEST_ASSERT_EQUAL(-1, live::daysUntil(2026, 10, 17, oct18));
+  TEST_ASSERT_EQUAL(1090, live::daysUntil(2029, 10, 12, oct18)); // a 3-year certificate
+  TEST_ASSERT_EQUAL(366, live::daysUntil(2028, 2, 29, 1803772800)); // from 2027-02-28, past 2028-02-29
+}
+
+static void test_live_renews_when_due_or_refused() {
+  TEST_ASSERT_FALSE(live::shouldRenew(400, true, 0, false));
+  TEST_ASSERT_TRUE(live::shouldRenew(30, true, 0, false));
+  TEST_ASSERT_TRUE(live::shouldRenew(-5, true, 0, false)); // already expired
+  TEST_ASSERT_FALSE(live::shouldRenew(10, false, 0, false)); // no clock: wait for the broker to say
+  TEST_ASSERT_TRUE(live::shouldRenew(400, true, 3, false));
+  TEST_ASSERT_FALSE(live::shouldRenew(10, true, 5, true)); // once a day at most
+}
+
 static int runTests() {
   UNITY_BEGIN();
   RUN_TEST(test_gif_pad_grows_a_small_gif);
@@ -1245,6 +1370,15 @@ static int runTests() {
   RUN_TEST(test_pin_sessions_save_and_restore);
   RUN_TEST(test_pin_reads_cookies);
   RUN_TEST(test_pin_compares_bytes);
+  RUN_TEST(test_screen_order_of_who_wins);
+  RUN_TEST(test_screen_giving_way);
+  RUN_TEST(test_screen_what_next_and_hold_mean);
+  RUN_TEST(test_screen_history_walks_back);
+  RUN_TEST(test_screen_history_keeps_the_latest);
+  RUN_TEST(test_channels_from_makapix_commands);
+  RUN_TEST(test_live_backs_off_to_five_minutes);
+  RUN_TEST(test_live_counts_days_to_expiry);
+  RUN_TEST(test_live_renews_when_due_or_refused);
   return UNITY_END();
 }
 

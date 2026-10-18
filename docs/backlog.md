@@ -11,9 +11,9 @@ Priority is a suggestion until it has been agreed.
 | 1 | ~~Like button on the control page~~ | S | Done (0.14.0) | The board passes the like to Makapix (the token never reaches the page) and remembers what has been liked, so the heart shows filled when an artwork comes round again |
 | 2 | ~~View reports~~ | S | Done (0.14.0) | One call per artwork shown; feeds artists' view counts and trending. Views from offline play saved and sent later |
 | 3 | ~~Channels~~ | S-M | Done (0.18.0) | One per artwork slot in the rotation: everything, promoted, mine, an artist, a hashtag, liked by a name |
-| 4 | **Playsets** | M | 4 | Weighted mixes of channels set up on makapix.club; can include the card |
-| 5 | **Live presence and remote commands (MQTT)** | L | 3 | "Online" on Makapix with the artwork showing, and next / previous / show this / switch channel from the website. Do #35 with it |
-| 35 | One "what's on screen" layer for overrides | M | with #5 | Sound mode, night clock-only and off, and "show this artwork" each take over the screen with their own special cases in `main.cpp` (Hold and Show refused in sound mode, Next meaning something else). MQTT's "show this post" would be a fourth. Make them all overrides of the rotation in one place first. From a review of `/mode`, 2026-10-18 |
+| 4 | **Playsets** | M | 4 | Weighted mixes of channels set up on makapix.club; can include the card. The live connection already receives `play_playset` from the website and ignores it; this would act on it |
+| 5 | ~~Live presence and remote commands (MQTT)~~ | L | Done (0.29.0) | Online on makapix.club with the artwork showing; Next, Back, send to player and play channel from the website. Certificate fetched and renewed by the panel. Playsets are #4 |
+| 35 | ~~One "what's on screen" layer for overrides~~ | M | Done (0.29.0) | `lib/jukebox_core/screen_rules.h`; show works in sound mode now, and Back and show-any-post came with it. Original note: | Sound mode, night clock-only and off, and "show this artwork" each take over the screen with their own special cases in `main.cpp` (Hold and Show refused in sound mode, Next meaning something else). MQTT's "show this post" would be a fourth. Make them all overrides of the rotation in one place first. From a review of `/mode`, 2026-10-18 |
 | 6 | Comments on the control page | S | 5 | Low value on a 64x64 panel |
 
 ## Panel and hardware

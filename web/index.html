@@ -80,7 +80,10 @@ p{margin:0}
 .key:disabled,.icon:disabled{opacity:.4;cursor:default;transform:none}
 .key:disabled{box-shadow:4px 4px 0 var(--edge)}
 @media (hover:hover){.key:not(:disabled):hover{filter:brightness(1.08)}}
-.keys{display:grid;grid-template-columns:1fr 1.4fr;gap:var(--s3)}
+.keys{display:grid;grid-template-columns:auto 1fr 1.4fr;gap:var(--s3)}
+.ovr{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);padding:var(--s3);background:var(--sunk)}
+.ovr .what b{display:block}
+.ovr .what small{font:12px/1.4 var(--mono);color:var(--dim)}
 .icon{display:inline-grid;place-items:center;min-width:44px;min-height:44px;padding:0;border:0;border-radius:0;
   background:none;color:var(--ink);cursor:pointer}
 .icon svg{width:22px;height:22px}
@@ -164,7 +167,7 @@ input::placeholder{color:var(--dim)}
 }
 
 /* ---- mini-player and tab bar (phone) --------------------------------------------- */
-.mini{position:sticky;top:0;z-index:20;display:none;grid-template-columns:44px minmax(0,1fr) auto auto;align-items:center;
+.mini{position:sticky;top:0;z-index:20;display:none;grid-template-columns:44px minmax(0,1fr) auto auto auto;align-items:center;
   gap:var(--s3);margin:0 calc(-1 * var(--s4)) var(--s4);padding:var(--s2) var(--s4);background:var(--panel);box-shadow:0 4px 0 var(--edge)}
 .mini.show{display:grid}
 .thumb{position:relative;width:44px;height:44px;background:var(--led);overflow:hidden;display:grid;place-items:center}
@@ -227,6 +230,7 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
     <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
     <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><rect x="14" y="5" width="4" height="4"/><rect x="6" y="15" width="4" height="4"/></symbol>
     <symbol id="i-next" viewBox="0 0 24 24" fill="currentColor"><path d="M5 5l9 7-9 7zM16 5h3v14h-3z"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24" fill="currentColor"><path d="M19 5l-9 7 9 7zM8 5H5v14h3z"/></symbol>
     <symbol id="i-hold" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></symbol>
     <symbol id="i-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 20s-8-5-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 9c0 6-8 11-8 11z"/></symbol>
     <symbol id="i-heart-on" viewBox="0 0 24 24" fill="currentColor"><path d="M12 20s-8-5-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 9c0 6-8 11-8 11z"/></symbol>
@@ -265,6 +269,7 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
   <div class="mini" id="mini" aria-label="Now playing">
     <div class="thumb"><img id="mart" alt="" hidden><svg aria-hidden="true"><use href="#i-play"/></svg></div>
     <div class="t"><b id="mwho">&nbsp;</b><small id="msub">&nbsp;</small></div>
+    <button class="icon" id="mback" aria-label="Back" disabled><svg aria-hidden="true"><use href="#i-back"/></svg></button>
     <button class="icon" id="mhold" aria-pressed="false" aria-label="Hold" disabled><svg aria-hidden="true"><use href="#i-hold"/></svg></button>
     <button class="icon go" id="mnext" aria-label="Next" disabled><svg aria-hidden="true"><use href="#i-next"/></svg></button>
   </div>
@@ -289,7 +294,12 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
       <button id="msnd" aria-pressed="false" disabled>Sound</button>
     </div>
     <div class="chips" id="viz" role="group" aria-label="Visualizer" hidden></div>
+    <div class="ovr" id="ovr" hidden>
+      <span class="what"><b id="ovrlabel">&nbsp;</b><small id="ovrfrom">&nbsp;</small></span>
+      <button class="key small" id="ovroff">Back to rotation</button>
+    </div>
     <div class="keys" id="rotkeys">
+      <button class="key" id="back" aria-label="Back to the artwork before" disabled><svg aria-hidden="true"><use href="#i-back"/></svg></button>
       <button class="key" id="hold" aria-pressed="false" disabled><svg aria-hidden="true"><use href="#i-hold"/></svg><span id="holdtext">Hold</span></button>
       <button class="key go" id="next" disabled><svg aria-hidden="true"><use href="#i-next"/></svg>Next</button>
     </div>
@@ -405,6 +415,10 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
       <div class="row">
         <span class="what" id="viewslabel"><b>Report views</b><small>Artists see how often their work is shown</small></span>
         <button class="switch" id="views" role="switch" aria-checked="true" aria-labelledby="viewslabel"></button>
+      </div>
+      <div class="row">
+        <span class="what" id="livelabel"><b>Live on makapix.club</b><small>Shows the panel online and lets the website send it art, Next and Back</small></span>
+        <button class="switch" id="live" role="switch" aria-checked="true" aria-labelledby="livelabel"></button>
       </div>
       <dl class="facts" id="mkfacts"></dl>
       <p class="note" id="viewsnote" role="status"></p>
@@ -530,7 +544,7 @@ function render(){
   const app=$('app');
   app.classList.toggle('live',online);app.classList.toggle('lost',!online&&!!st);
   $('link').textContent=online?'Live':st?'Lost contact, retrying':'Connecting';
-  for(const id of['hold','next','bri','mrot','msnd','like','mhold','mnext'])$(id).disabled=!online;
+  for(const id of['back','hold','next','bri','mrot','msnd','like','mback','mhold','mnext'])$(id).disabled=!online;
   $('photo').disabled=!online||photoBusy;
   $('viz').querySelectorAll('button').forEach(b=>b.disabled=!online);
   if(!st)return;
@@ -552,6 +566,12 @@ function render(){
   $('sub').textContent=$('msub').textContent=sub;
 
   const like=$('like');like.hidden=!art;
+  const ovr=st.channelOverride;
+  $('ovr').hidden=!ovr;
+  if(ovr){
+    $('ovrlabel').textContent='Playing '+channelLabel(ovr.channel);
+    $('ovrfrom').textContent=ovr.from=='makapix.club'?'Chosen on makapix.club, in place of your rotation':'In place of your rotation, for now';
+  }
   if(art){
     like.setAttribute('aria-pressed',!!art.liked);
     like.setAttribute('aria-label',(art.liked?'Unlike':'Like')+' on Makapix');
@@ -567,7 +587,7 @@ function render(){
   $('led').classList.toggle('held',held);
   $('hold').setAttribute('aria-pressed',held);$('hold').classList.toggle('on',held);$('holdtext').textContent=held?'Held':'Hold';
   $('mhold').setAttribute('aria-pressed',held);$('mhold').setAttribute('aria-label',held?'Release':'Hold');
-  $('mhold').hidden=$('mnext').hidden=snd;
+  $('mback').hidden=$('mhold').hidden=$('mnext').hidden=snd;
 
   if(!dragging)showBrightness(st.brightness);
   $('nownote').textContent=night.overridden?'Night schedule paused by hand for a while.':
@@ -598,12 +618,20 @@ async function act(method,path,body){
 }
 
 function next(){act('POST','/next');}
+function back(){act('POST','/back');}
+// "hashtag:cat" as people write it.
+function channelLabel(spec){
+  const [k,v]=spec.split(':');
+  return k=='hashtag'?'#'+v:k=='artist'?'@'+v:k=='likedby'?'art liked by @'+v:k=='promoted'?'promoted art':k=='mine'?'your art':'everything';
+}
+$('ovroff').onclick=async()=>{try{await call('DELETE','/channel');}catch(e){}poll();};
 function hold(){
   const held=!(st&&st.slot.held);
   if(st){st.slot.held=held;render();}
   act('POST','/hold',{held});
 }
 $('next').onclick=$('mnext').onclick=next;
+$('back').onclick=$('mback').onclick=back;
 $('hold').onclick=$('mhold').onclick=hold;
 
 let vizList=[];
@@ -901,11 +929,16 @@ $('photo').onclick=async()=>{
   catch(e){$('photonote').textContent='Could not switch. Try again.';}
   setTimeout(()=>{photoBusy=false;$('photonote').textContent='';poll();},12000);
 };
+const LIVE_STATES={connected:'Connected',connecting:'Connecting',retrying:'Trying again',waiting:'Waiting',off:'Off'};
 async function loadMk(){
   try{
-    const [v,l]=await Promise.all([call('GET','/views'),call('GET','/likes')]);
+    const [v,l,live]=await Promise.all([call('GET','/views'),call('GET','/likes'),call('GET','/live')]);
     $('views').setAttribute('aria-checked',v.report);
-    const rows=[['Views sent',v.sentSinceStart+' since start-up']];
+    $('live').setAttribute('aria-checked',live.enabled);
+    const rows=[['Live',(LIVE_STATES[live.state]||live.state)+(live.problem?': '+live.problem:'')]];
+    if(live.lastCommand)rows.push(['From the site',live.lastCommand.type.replace('_',' ')+', '+uptime(live.lastCommand.secondsAgo)+' ago']);
+    if(live.certificateExpires)rows.push(['Certificate','until '+live.certificateExpires]);
+    rows.push(['Views sent',v.sentSinceStart+' since start-up']);
     if(v.waiting)rows.push(['Views waiting',v.waiting+'']);
     rows.push(['Liked',l.count+' artwork'+(l.count==1?'':'s')]);
     if(l.waiting)rows.push(['Likes waiting',l.waiting+'']);
@@ -915,6 +948,12 @@ async function loadMk(){
     $('viewsnote').textContent=v.report?'Views played offline are sent when the connection returns.':'Makapix is not told what the panel shows.';
   }catch(e){$('viewsnote').textContent='Could not read the Makapix settings.';}
 }
+$('live').onclick=async()=>{
+  const on=$('live').getAttribute('aria-checked')!='true';
+  $('live').setAttribute('aria-checked',on);
+  try{await call('PUT','/live',{enabled:on});}catch(e){}
+  setTimeout(loadMk,1500);
+};
 $('views').onclick=async()=>{
   const on=$('views').getAttribute('aria-checked')!='true';
   $('views').setAttribute('aria-checked',on);
@@ -1072,6 +1111,7 @@ addEventListener('keydown',e=>{
   if(locked||e.target.matches('input,select')||e.ctrlKey||e.metaKey||e.altKey)return;
   const k=e.key.toLowerCase();
   if(k=='n'&&!$('next').disabled)next();
+  if(k=='b'&&!$('back').disabled)back();
   if(k=='h'&&!$('hold').disabled)hold();
 });
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)poll();});

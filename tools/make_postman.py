@@ -38,6 +38,14 @@ FOLDERS = [
         ("Hold", "POST", "hold", "Holds the current slot on screen.", {"held": True}, 202),
         ("Release", "POST", "hold", "Releases a held slot.", {"held": False}, 202),
         ("Toggle Hold", "POST", "hold", "With no body, switches between held and released.", None, 202),
+        ("Back", "POST", "back", "Shows the artwork before the current one, for one turn.", None, 202),
+        ("Show Any Post", "POST", "show/{{post_id}}",
+         "Shows any Makapix post for one turn, from the card or fetched from Makapix.", None, 202),
+        ("Get Channel Override", "GET", "channel",
+         "The channel playing in every artwork slot in place of the rotation's own, or nulls.", None, 200),
+        ("Play One Channel", "PUT", "channel",
+         "Every artwork slot plays this channel for now (not saved).", {"channel": "promoted"}, 200),
+        ("Back To The Rotation's Channels", "DELETE", "channel", "Clears the channel override.", None, 200),
     ]),
     ("Mode", [
         ("Get Mode", "GET", "mode",
@@ -147,6 +155,14 @@ FOLDERS = [
         ("Start Wi-Fi Setup", "POST", "wifi/setup",
          "Restarts the board into its setup hotspot (network name Pixel-Jukebox). The board goes offline; "
          "it rejoins the saved network after three minutes if nobody connects.", None, 202),
+    ]),
+    ("Live", [
+        ("Get Live Connection", "GET", "live",
+         "The MQTT connection to makapix.club: state, last command from the website, certificate expiry.",
+         None, 200),
+        ("Live Connection On", "PUT", "live", "Connects to makapix.club (the default).", {"enabled": True}, 200),
+        ("Live Connection Off", "PUT", "live",
+         "Says offline to makapix.club and disconnects; stays off across restarts.", {"enabled": False}, 200),
     ]),
     ("Firmware", [
         ("Update Firmware", "POST", "update",

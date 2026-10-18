@@ -15,7 +15,8 @@ class MakapixSlot : public Slot {
  public:
   void begin();
 
-  // The next start() shows this artwork from the card instead, once.
+  // The next start() shows this artwork instead, once: from the card when it
+  // is there, otherwise fetched from Makapix.
   void request(uint32_t postId) { requestedPost = postId; }
 
   // The channel the next start() plays from, as a channels.h string.
@@ -34,7 +35,7 @@ class MakapixSlot : public Slot {
 
   bool startRegistration();
   bool startPlaying();
-  bool showFromCard(uint32_t postId);
+  bool showRequested(uint32_t postId);
   bool play(const LoadedArtwork &artwork);
   uint32_t updateRegistration();
   uint32_t updatePlaying();

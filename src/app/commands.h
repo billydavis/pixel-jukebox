@@ -12,7 +12,8 @@ enum class CommandType : uint8_t {
   WifiSetup,     // restart into the Wi-Fi setup hotspot
   Reload,        // the mode changed: end the current slot and start the right one
   Restart,       // restart the board, for instance after a card is inserted
-  ShowArtwork,   // value: a postId cached on the card, to show now
+  ShowArtwork,   // value: a postId to show for one turn, from the card or Makapix
+  Back,          // show the artwork before the current one
 };
 
 struct Command {
