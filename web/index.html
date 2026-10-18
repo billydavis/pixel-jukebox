@@ -105,7 +105,7 @@ input[type=range]::-moz-range-progress{height:10px;background:var(--accent)}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:30px;margin-top:-10px;background:var(--ink);box-shadow:3px 3px 0 var(--edge)}
 input[type=range]::-moz-range-thumb{width:22px;height:30px;border:0;border-radius:0;background:var(--ink);box-shadow:3px 3px 0 var(--edge)}
 input[type=range]:disabled{opacity:.4}
-select,input[type=text],input[type=time]{width:100%;min-height:48px;padding:0 var(--s3);border:0;border-radius:0;background:var(--sunk);font-size:16px;color-scheme:dark}
+select,input[type=text],input[type=time],input[type=password]{width:100%;min-height:48px;padding:0 var(--s3);border:0;border-radius:0;background:var(--sunk);font-size:16px;color-scheme:dark}
 input::placeholder{color:var(--dim)}
 .field{display:grid;gap:var(--s2)}
 .field>label{font:12px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
@@ -201,6 +201,18 @@ input::placeholder{color:var(--dim)}
   .grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
   .pick{bottom:var(--s4)}
 }
+/* ---- the PIN: sign-in in place of the page, and its settings ---------------------- */
+.gate{display:none;max-width:420px;margin:0 auto;align-content:start;gap:var(--s4);
+  padding:calc(var(--s3) + env(safe-area-inset-top)) var(--s4) var(--s6)}
+.locked .app{display:none}
+.locked .gate{display:grid}
+.gate .mark{padding:var(--s3) 0 var(--s5)}
+.gate .title{margin:0;font:700 26px/1.15 var(--sans);letter-spacing:0;text-transform:none;color:var(--ink)}
+.gate form{display:grid;gap:var(--s4);margin-top:var(--s2)}
+.gate .key{width:100%}
+input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
+.pins{display:grid;gap:var(--s3)}
+.pinkeys{display:flex;flex-wrap:wrap;gap:var(--s3)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -225,6 +237,21 @@ input::placeholder{color:var(--dim)}
     <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 6l12 12M18 6L6 18"/></symbol>
   </defs>
 </svg>
+
+<main class="gate" id="gate" aria-labelledby="gatetitle">
+  <h1 class="mark">Pixel Jukebox</h1>
+  <h2 class="title" id="gatetitle">Enter the PIN</h2>
+  <p class="lead">This panel has a PIN. Enter it once and this browser stays signed in.</p>
+  <form id="gateform">
+    <div class="field">
+      <label for="gatepin">PIN</label>
+      <input class="pin" id="gatepin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="current-password" required>
+    </div>
+    <button class="key go" id="gatego">Unlock</button>
+  </form>
+  <p class="note" id="gatenote" role="status"></p>
+  <p class="note">Forgot it? Hold the button on the back of the panel for 5 seconds, join the Pixel-Jukebox Wi-Fi network and tick "Also remove the control-page PIN".</p>
+</main>
 
 <div class="app" id="app">
   <header class="top">
@@ -381,6 +408,26 @@ input::placeholder{color:var(--dim)}
       <p class="note" id="viewsnote" role="status"></p>
     </div>
     <div class="section">
+      <h2>PIN</h2>
+      <p class="lead" id="pinlead">&nbsp;</p>
+      <div class="pins">
+        <div class="field" id="pincurbox" hidden>
+          <label for="pincur">Current PIN</label>
+          <input class="pin" id="pincur" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="current-password">
+        </div>
+        <div class="field">
+          <label for="pinnew" id="pinnewlabel">New PIN, 4 to 8 digits</label>
+          <input class="pin" id="pinnew" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="new-password">
+        </div>
+      </div>
+      <div class="pinkeys">
+        <button class="key small go" id="pinset">Set PIN</button>
+        <button class="key small" id="pinoff" hidden>Remove PIN</button>
+        <button class="key small" id="signout" hidden>Sign out</button>
+      </div>
+      <p class="note" id="pinnote" role="status"></p>
+    </div>
+    <div class="section">
       <h2>Wi-Fi</h2>
       <p class="lead" id="wifinote">&nbsp;</p>
       <div><button class="key small" id="wifi">Change Wi-Fi</button></div>
@@ -396,13 +443,14 @@ input::placeholder{color:var(--dim)}
 
 <script>
 const $=id=>document.getElementById(id),API='/api/v1';
-let st=null,timer=0,dragging=false,sendTimer=0,online=false,photoBusy=false;
+let st=null,timer=0,dragging=false,sendTimer=0,online=false,photoBusy=false,locked=false;
 
 async function call(method,path,body){
   const r=await fetch(API+path,{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
   if(!r.ok){
-    const e=new Error(r.status);
+    const e=new Error(r.status);e.status=r.status;
     try{e.reason=(await r.json()).error;}catch(x){}
+    if((r.status==401||r.status==429)&&!path.startsWith('/auth'))lock(e.reason);
     throw e;
   }
   return r.json();
@@ -426,7 +474,7 @@ function twoTap(button,armedText,onArm,act){
 const TABS=['now','rot','art','night','set'];
 const wide=matchMedia('(min-width:900px)');
 let tab='now';
-const loaders={rot:()=>{loadRot();loadTrans();},art:()=>{loadArt(false);loadCard();},night:()=>loadNight(),set:()=>{loadMk();showDevice();}};
+const loaders={rot:()=>{loadRot();loadTrans();},art:()=>{loadArt(false);loadCard();},night:()=>loadNight(),set:()=>{loadMk();loadPin();showDevice();}};
 function showTab(name,focus){
   if(!TABS.includes(name))name='now';
   if(wide.matches&&name=='now')name=store.get('jukebox.tab')||'rot';
@@ -525,7 +573,9 @@ function showBrightness(v){$('bri').value=v;$('briv').textContent=v;$('bri').sty
 
 async function poll(){
   clearTimeout(timer);
+  if(locked)return;
   try{st=await call('GET','/status');online=true;}catch(e){online=false;}
+  if(locked)return;
   render();
   if(!document.hidden)timer=setTimeout(poll,2000);
 }
@@ -881,10 +931,78 @@ twoTap($('restart'),'Tap again to restart',()=>{},done=>{
   setTimeout(()=>{done();$('devnote').textContent='';poll();},15000);
 });
 
+/* ---- the PIN ---------------------------------------------------------------------- */
+// The page itself is open; the API answers 401 until this browser signs in.
+function lock(reason){
+  if(locked)return;
+  locked=true;clearTimeout(timer);
+  document.body.classList.add('locked');
+  $('gatenote').textContent=reason&&reason!='PIN required'?reason+'.':'';
+  setTimeout(()=>$('gatepin').focus(),50);
+}
+$('gateform').onsubmit=async e=>{
+  e.preventDefault();
+  const pin=$('gatepin').value;
+  $('gatego').disabled=true;$('gatenote').textContent='Checking';
+  try{
+    await call('POST','/auth/login',{pin});
+    locked=false;$('gatepin').value='';$('gatenote').textContent='';
+    document.body.classList.remove('locked');
+    showTab(tab);poll();
+  }catch(err){
+    $('gatenote').textContent=err.status==429?'Too many wrong PINs. Wait 30 seconds and try again.':
+      err.status==401?'That is not the PIN.':'The panel did not answer. Try again.';
+    $('gatepin').select();
+  }
+  $('gatego').disabled=false;
+};
+
+let auth=null;
+async function loadPin(){
+  try{auth=await call('GET','/auth');}catch(e){return;}
+  const on=auth.pinSet;
+  $('pinlead').textContent=on?'A PIN protects this page and the API. This browser is signed in.':
+    'Anyone on your Wi-Fi can use this page. A PIN keeps it to people who know it.';
+  $('pincurbox').hidden=!on;$('pinoff').hidden=!on;$('signout').hidden=!on;
+  $('pinset').textContent=on?'Change PIN':'Set PIN';
+  $('pinnewlabel').textContent=on?'New PIN':'New PIN, 4 to 8 digits';
+}
+function pinFail(err){
+  $('pinnote').textContent=err.status==429?'Too many wrong PINs. Wait 30 seconds and try again.':
+    err.status==403?'The current PIN is wrong.':err.reason?err.reason+'.':'The panel did not answer. Try again.';
+}
+$('pinset').onclick=async()=>{
+  const pin=$('pinnew').value,current=$('pincur').value;
+  if(!/^[0-9]{4,8}$/.test(pin)){$('pinnote').textContent='A PIN is 4 to 8 digits.';$('pinnew').focus();return;}
+  if(auth&&auth.pinSet&&!current){$('pinnote').textContent='Enter the current PIN first.';$('pincur').focus();return;}
+  $('pinset').disabled=true;
+  try{
+    await call('PUT','/auth/pin',{pin,current});
+    await call('POST','/auth/login',{pin}); // setting it signed every browser out, this one too
+    $('pincur').value=$('pinnew').value='';
+    $('pinnote').textContent='PIN saved. Other browsers need it next time they open this page.';
+    loadPin();
+  }catch(err){pinFail(err);}
+  $('pinset').disabled=false;
+};
+twoTap($('pinoff'),'Tap again to remove',()=>{},async done=>{
+  if(!$('pincur').value){$('pinnote').textContent='Enter the current PIN first.';$('pincur').focus();done();return;}
+  try{
+    await call('PUT','/auth/pin',{pin:'',current:$('pincur').value});
+    $('pincur').value='';$('pinnote').textContent='PIN removed. Anyone on your Wi-Fi can use this page.';
+    loadPin();
+  }catch(err){pinFail(err);}
+  done();
+});
+$('signout').onclick=async()=>{
+  try{await call('POST','/auth/logout');}catch(e){}
+  lock();
+};
+
 /* ---- keyboard and start-up ------------------------------------------------------------------- */
 addEventListener('keydown',e=>{
   if(e.key=='Escape'&&chosen){unpickArt();return;}
-  if(e.target.matches('input,select')||e.ctrlKey||e.metaKey||e.altKey)return;
+  if(locked||e.target.matches('input,select')||e.ctrlKey||e.metaKey||e.altKey)return;
   const k=e.key.toLowerCase();
   if(k=='n'&&!$('next').disabled)next();
   if(k=='h'&&!$('hold').disabled)hold();

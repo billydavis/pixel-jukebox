@@ -16,6 +16,7 @@
 #include "input/case_climate.h"
 #include "app/mode.h"
 #include "app/night.h"
+#include "network/auth.h"
 #include "network/connection.h"
 #include "network/reporter.h"
 #include "pins.h"
@@ -241,6 +242,7 @@ void setup() {
   MEMORY_AT("cache");
 
   telemetryRegisterTask("display", xTaskGetCurrentTaskHandle(), getArduinoLoopTaskStackSize());
+  authBegin(); // before Wi-Fi: the setup page can remove the PIN
   connectionStart();
   MEMORY_AT("wifi, api");
 

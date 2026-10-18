@@ -8,6 +8,7 @@
 
 #include "display/display.h"
 #include "html_escape.h"
+#include "network/auth.h"
 #include "network/web_assets.h"
 
 #if __has_include("secrets.h")
@@ -144,12 +145,21 @@ static String networkList() {
   return html;
 }
 
+// Only offered when setup was asked for, so only someone at the panel's button
+// (or already signed in) can use it.
+static bool offerPinRemoval = false;
+static bool removePin = false;
+
 static String setupPage(const String &alert, const String &ssid) {
   String page = WEB_SETUP_HTML;
   page.replace("{{ALERT}}",
                alert.isEmpty() ? "" : "<p class=\"alert\" role=\"alert\">" + alert + "</p>");
   page.replace("{{NETWORKS}}", networkList());
   page.replace("{{SSID}}", escapeHtml(ssid));
+  page.replace("{{PINRESET}}", offerPinRemoval && authPinSet()
+                                   ? "<label class=\"show\"><input type=\"checkbox\" name=\"removepin\" "
+                                     "value=\"1\"> Also remove the control-page PIN</label>"
+                                   : "");
   return page;
 }
 
@@ -194,7 +204,8 @@ static String filledPage(const char *page, const String &ssid) {
   return html;
 }
 
-void wifiSetupRun(bool joinFailed) {
+void wifiSetupRun(bool joinFailed, bool requested) {
+  offerPinRemoval = requested;
   static DNSServer dns;
   static WebServer server(80);
 
@@ -251,6 +262,7 @@ void wifiSetupRun(bool joinFailed) {
 
     pendingSsid = ssid;
     pendingPassword = password;
+    removePin = offerPinRemoval && server.arg("removepin") == "1";
     setupState = SetupState::Testing;
     stateSince = millis();
     Serial.printf("Trying Wi-Fi network %s\n", ssid.c_str());
@@ -292,6 +304,9 @@ void wifiSetupRun(bool joinFailed) {
         prefs.putString("wifi_ssid", pendingSsid);
         prefs.putString("wifi_pass", pendingPassword);
         Serial.printf("Joined %s; details saved\n", pendingSsid.c_str());
+        if (removePin) {
+          authRemovePin();
+        }
         showMessage("WiFi", "connected", display->color565(0, 255, 0));
         setupState = SetupState::Joined;
         stateSince = millis();

@@ -171,14 +171,27 @@ FOLDERS = [
         ("Unknown Transition", "PUT", "transition", "Expects 400; the transition is left unchanged.",
          {"transition": "nope"}, 400),
     ]),
+    ("PIN", [
+        ("Get Sign-In State", "GET", "auth",
+         "Whether a PIN is set, whether this client is signed in, and any lockout. Always open.", None, 200),
+        ("Sign In", "POST", "auth/login",
+         "Signs in with the `pin` variable; Postman keeps the session cookie for the requests after it. "
+         "With no PIN set it answers 200 and sets nothing.", {"pin": "{{pin}}"}, 200),
+        ("Sign Out", "POST", "auth/logout", "Ends this client's session.", None, 200),
+        ("Remove PIN", "PUT", "auth/pin",
+         "As written, removes the PIN (it needs the `pin` variable to be the current one). Put 4 to 8 digits "
+         "in `pin` of the body to set or change it instead. Signs every browser out.",
+         {"pin": "", "current": "{{pin}}"}, 200),
+    ]),
 ]
 
 
 def request(name, method, path, description, body, expected):
     segments = API.split("/") + (path.split("/") if path else [])
+    # Ignored while no PIN is set; with one set, fill in the `pin` variable.
     item = {
         "method": method,
-        "header": [],
+        "header": [{"key": "X-Jukebox-Pin", "value": "{{pin}}"}],
         "url": {
             "raw": "http://{{device_ip}}/" + "/".join(segments),
             "protocol": "http",
@@ -188,7 +201,7 @@ def request(name, method, path, description, body, expected):
         "description": description,
     }
     if body is not None:
-        item["header"] = [{"key": "Content-Type", "value": "application/json"}]
+        item["header"].append({"key": "Content-Type", "value": "application/json"})
         item["body"] = {"mode": "raw", "raw": json.dumps(body, indent=2), "options": {"raw": {"language": "json"}}}
     test = [f"pm.test('status is {expected}', function () {{", f"  pm.response.to.have.status({expected});", "});"]
     return {
@@ -218,6 +231,11 @@ collection = {
         "value": "2486",
         "type": "string",
         "description": "A postId from List Saved Art, for the requests on one saved artwork.",
+    }, {
+        "key": "pin",
+        "value": "",
+        "type": "string",
+        "description": "The panel's PIN, if one is set. Sent in the X-Jukebox-Pin header of every request.",
     }],
     "item": [{"name": folder, "item": [request(*entry) for entry in entries]} for folder, entries in FOLDERS],
 }

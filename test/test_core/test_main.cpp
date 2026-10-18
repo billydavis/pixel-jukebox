@@ -15,6 +15,7 @@
 #include "html_escape.h"
 #include "likes_book.h"
 #include "night_rules.h"
+#include "pin_rules.h"
 #include "rotation_rules.h"
 #include "rtc_time.h"
 #include "shtc3_math.h"
@@ -1026,6 +1027,115 @@ static void test_shtc3_recognises_its_id() {
   TEST_ASSERT_FALSE(shtc3::isShtc3(0xFFFF));
 }
 
+// ---- pin_rules ---------------------------------------------------------------
+
+static void test_pin_accepts_four_to_eight_digits() {
+  TEST_ASSERT_TRUE(pin::valid("1234"));
+  TEST_ASSERT_TRUE(pin::valid("12345678"));
+  TEST_ASSERT_FALSE(pin::valid("123"));
+  TEST_ASSERT_FALSE(pin::valid("123456789"));
+  TEST_ASSERT_FALSE(pin::valid("12a4"));
+  TEST_ASSERT_FALSE(pin::valid(" 1234"));
+  TEST_ASSERT_FALSE(pin::valid(""));
+}
+
+static void test_pin_locks_after_five_wrong() {
+  pin::Lockout lockout;
+  bool justLocked = false;
+  for (int i = 0; i < 4; i++) {
+    TEST_ASSERT_FALSE(lockout.attempt(false, 1000, &justLocked));
+    TEST_ASSERT_FALSE(justLocked);
+  }
+  TEST_ASSERT_FALSE(lockout.attempt(false, 1000, &justLocked));
+  TEST_ASSERT_TRUE(justLocked);
+  TEST_ASSERT_EQUAL(30, lockout.lockedSeconds(1000));
+  TEST_ASSERT_EQUAL(1, lockout.lockedSeconds(30500));
+  TEST_ASSERT_FALSE(lockout.attempt(true, 20000)); // even the right PIN waits
+  TEST_ASSERT_EQUAL(0, lockout.lockedSeconds(31000));
+  TEST_ASSERT_TRUE(lockout.attempt(true, 31000));
+}
+
+static void test_pin_right_one_resets_the_count() {
+  pin::Lockout lockout;
+  for (int i = 0; i < 4; i++) {
+    lockout.attempt(false, 0);
+  }
+  TEST_ASSERT_TRUE(lockout.attempt(true, 0));
+  for (int i = 0; i < 4; i++) {
+    lockout.attempt(false, 0);
+  }
+  TEST_ASSERT_EQUAL(0, lockout.lockedSeconds(0));
+}
+
+static void test_pin_lockout_survives_the_clock_wrapping() {
+  pin::Lockout lockout;
+  uint32_t nearWrap = 0xFFFFF000u;
+  for (int i = 0; i < 5; i++) {
+    lockout.attempt(false, nearWrap);
+  }
+  TEST_ASSERT_TRUE(lockout.lockedSeconds(nearWrap + 10000) > 0); // past the wrap
+  TEST_ASSERT_EQUAL(0, lockout.lockedSeconds(nearWrap + 30000));
+}
+
+static void test_pin_sessions_create_and_end() {
+  pin::Sessions sessions;
+  uint8_t random[16];
+  for (int i = 0; i < 16; i++) {
+    random[i] = (uint8_t)(i * 17);
+  }
+  std::string token = sessions.create(random, 0);
+  TEST_ASSERT_EQUAL_STRING("00112233445566778899aabbccddeeff", token.c_str());
+  TEST_ASSERT_TRUE(sessions.touch(token, 5));
+  TEST_ASSERT_FALSE(sessions.touch("00112233445566778899aabbccddeefe", 5));
+  TEST_ASSERT_FALSE(sessions.touch("", 5));
+  sessions.end(token);
+  TEST_ASSERT_FALSE(sessions.touch(token, 6));
+  TEST_ASSERT_EQUAL(0, sessions.count());
+}
+
+static void test_pin_ninth_session_replaces_the_least_recent() {
+  pin::Sessions sessions;
+  std::vector<std::string> tokens;
+  for (int i = 0; i < pin::Sessions::MAX; i++) {
+    uint8_t random[16] = {(uint8_t)i};
+    tokens.push_back(sessions.create(random, (uint32_t)i * 10));
+  }
+  sessions.touch(tokens[0], 100); // the first is used again, so the second is oldest
+  uint8_t random[16] = {0xEE};
+  std::string newest = sessions.create(random, 200);
+  TEST_ASSERT_EQUAL(pin::Sessions::MAX, sessions.count());
+  TEST_ASSERT_TRUE(sessions.touch(tokens[0], 201));
+  TEST_ASSERT_FALSE(sessions.touch(tokens[1], 201));
+  TEST_ASSERT_TRUE(sessions.touch(newest, 201));
+}
+
+static void test_pin_sessions_save_and_restore() {
+  pin::Sessions sessions;
+  uint8_t a[16] = {1}, b[16] = {2};
+  std::string first = sessions.create(a, 0), second = sessions.create(b, 0);
+  std::vector<std::string> saved = sessions.tokens();
+  saved.push_back("not a token");
+  pin::Sessions after;
+  after.restore(saved, 0);
+  TEST_ASSERT_EQUAL(2, after.count());
+  TEST_ASSERT_TRUE(after.touch(first, 1));
+  TEST_ASSERT_TRUE(after.touch(second, 1));
+}
+
+static void test_pin_reads_cookies() {
+  TEST_ASSERT_EQUAL_STRING("abc", pin::cookieValue("jukebox_session=abc", "jukebox_session").c_str());
+  TEST_ASSERT_EQUAL_STRING("abc", pin::cookieValue("x=1; jukebox_session=abc; y=2", "jukebox_session").c_str());
+  TEST_ASSERT_EQUAL_STRING("", pin::cookieValue("old_jukebox_session=abc", "jukebox_session").c_str());
+  TEST_ASSERT_EQUAL_STRING("", pin::cookieValue("jukebox_sessionx=abc", "jukebox_session").c_str());
+  TEST_ASSERT_EQUAL_STRING("", pin::cookieValue("", "jukebox_session").c_str());
+}
+
+static void test_pin_compares_bytes() {
+  uint8_t a[4] = {1, 2, 3, 4}, b[4] = {1, 2, 3, 4}, c[4] = {1, 2, 3, 5};
+  TEST_ASSERT_TRUE(pin::sameBytes(a, b, 4));
+  TEST_ASSERT_FALSE(pin::sameBytes(a, c, 4));
+}
+
 static int runTests() {
   UNITY_BEGIN();
   RUN_TEST(test_gif_pad_grows_a_small_gif);
@@ -1126,6 +1236,15 @@ static int runTests() {
   RUN_TEST(test_shtc3_decodes_a_measurement);
   RUN_TEST(test_shtc3_refuses_a_damaged_measurement);
   RUN_TEST(test_shtc3_recognises_its_id);
+  RUN_TEST(test_pin_accepts_four_to_eight_digits);
+  RUN_TEST(test_pin_locks_after_five_wrong);
+  RUN_TEST(test_pin_right_one_resets_the_count);
+  RUN_TEST(test_pin_lockout_survives_the_clock_wrapping);
+  RUN_TEST(test_pin_sessions_create_and_end);
+  RUN_TEST(test_pin_ninth_session_replaces_the_least_recent);
+  RUN_TEST(test_pin_sessions_save_and_restore);
+  RUN_TEST(test_pin_reads_cookies);
+  RUN_TEST(test_pin_compares_bytes);
   return UNITY_END();
 }
 

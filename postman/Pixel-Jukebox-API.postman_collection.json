@@ -16,6 +16,12 @@
       "value": "2486",
       "type": "string",
       "description": "A postId from List Saved Art, for the requests on one saved artwork."
+    },
+    {
+      "key": "pin",
+      "value": "",
+      "type": "string",
+      "description": "The panel's PIN, if one is set. Sent in the X-Jukebox-Pin header of every request."
     }
   ],
   "item": [
@@ -39,7 +45,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/status",
               "protocol": "http",
@@ -73,7 +84,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/diagnostics",
               "protocol": "http",
@@ -107,7 +123,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1",
               "protocol": "http",
@@ -140,7 +161,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/crash",
               "protocol": "http",
@@ -174,7 +200,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/crash/dump",
               "protocol": "http",
@@ -209,7 +240,12 @@
           ],
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/crash",
               "protocol": "http",
@@ -248,7 +284,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/next",
               "protocol": "http",
@@ -283,6 +324,10 @@
           "request": {
             "method": "POST",
             "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -332,6 +377,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -378,7 +427,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/hold",
               "protocol": "http",
@@ -417,7 +471,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/mode",
               "protocol": "http",
@@ -452,6 +511,10 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -501,6 +564,10 @@
             "method": "PUT",
             "header": [
               {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -548,6 +615,10 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -597,6 +668,10 @@
             "method": "PUT",
             "header": [
               {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -645,6 +720,10 @@
             "method": "PUT",
             "header": [
               {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -692,6 +771,10 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -744,7 +827,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/brightness",
               "protocol": "http",
@@ -779,6 +867,10 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -831,7 +923,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/night",
               "protocol": "http",
@@ -866,6 +963,10 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -915,6 +1016,10 @@
             "method": "PUT",
             "header": [
               {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -963,6 +1068,10 @@
             "method": "PUT",
             "header": [
               {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -1010,6 +1119,10 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -1062,7 +1175,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/panel",
               "protocol": "http",
@@ -1097,6 +1215,10 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -1145,6 +1267,10 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -1197,7 +1323,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/slots",
               "protocol": "http",
@@ -1232,6 +1363,10 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -1281,6 +1416,10 @@
             "method": "PUT",
             "header": [
               {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -1329,6 +1468,10 @@
             "method": "PUT",
             "header": [
               {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -1376,6 +1519,10 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -1428,7 +1575,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/transition",
               "protocol": "http",
@@ -1463,6 +1615,10 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -1512,6 +1668,10 @@
             "method": "PUT",
             "header": [
               {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -1559,6 +1719,10 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -1611,7 +1775,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/likes",
               "protocol": "http",
@@ -1645,7 +1814,12 @@
           ],
           "request": {
             "method": "PUT",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/likes/{{post_id}}",
               "protocol": "http",
@@ -1680,7 +1854,12 @@
           ],
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/likes/{{post_id}}",
               "protocol": "http",
@@ -1715,7 +1894,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/views",
               "protocol": "http",
@@ -1750,6 +1934,10 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -1798,6 +1986,10 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -1850,7 +2042,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/card",
               "protocol": "http",
@@ -1884,7 +2081,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/card/art",
               "protocol": "http",
@@ -1919,7 +2121,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/card/art/{{post_id}}.gif",
               "protocol": "http",
@@ -1955,7 +2162,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/card/art/{{post_id}}/show",
               "protocol": "http",
@@ -1992,7 +2204,12 @@
           ],
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/card/art/{{post_id}}",
               "protocol": "http",
@@ -2028,7 +2245,12 @@
           ],
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/card/art",
               "protocol": "http",
@@ -2063,7 +2285,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/restart",
               "protocol": "http",
@@ -2102,7 +2329,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/wifi/setup",
               "protocol": "http",
@@ -2143,6 +2375,10 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -2192,6 +2428,10 @@
             "method": "POST",
             "header": [
               {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -2239,6 +2479,10 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -2288,6 +2532,10 @@
             "method": "PUT",
             "header": [
               {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -2336,6 +2584,10 @@
             "method": "PUT",
             "header": [
               {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -2382,7 +2634,12 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/nope",
               "protocol": "http",
@@ -2417,6 +2674,10 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -2466,6 +2727,10 @@
             "method": "PUT",
             "header": [
               {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -2512,7 +2777,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
             "url": {
               "raw": "http://{{device_ip}}/api/v1/card/art/999999999/show",
               "protocol": "http",
@@ -2550,6 +2820,10 @@
           "request": {
             "method": "PUT",
             "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
               {
                 "key": "Content-Type",
                 "value": "application/json"
@@ -2599,6 +2873,10 @@
             "method": "PUT",
             "header": [
               {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -2647,6 +2925,10 @@
             "method": "PUT",
             "header": [
               {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -2667,6 +2949,196 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"transition\": \"nope\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "PIN",
+      "item": [
+        {
+          "name": "Get Sign-In State",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/auth",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth"
+              ]
+            },
+            "description": "Whether a PIN is set, whether this client is signed in, and any lockout. Always open."
+          },
+          "response": []
+        },
+        {
+          "name": "Sign In",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/auth/login",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Signs in with the `pin` variable; Postman keeps the session cookie for the requests after it. With no PIN set it answers 200 and sets nothing.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin\": \"{{pin}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Sign Out",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/auth/logout",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Ends this client's session."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove PIN",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/auth/pin",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "pin"
+              ]
+            },
+            "description": "As written, removes the PIN (it needs the `pin` variable to be the current one). Put 4 to 8 digits in `pin` of the body to set or change it instead. Signs every browser out.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin\": \"\",\n  \"current\": \"{{pin}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

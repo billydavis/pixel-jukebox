@@ -31,5 +31,7 @@ bool wifiSetupRequested();
 // Runs the setup hotspot. Never returns: the board restarts once it has joined
 // the chosen network and saved its details, or after a while with nobody
 // connected if it has a network to retry. Nothing is saved for a network it
-// could not join.
-void wifiSetupRun(bool joinFailed);
+// could not join. `requested` is true when someone asked for setup (the
+// button held, or the API by a signed-in user); only then does the page offer
+// to remove the control-page PIN.
+void wifiSetupRun(bool joinFailed, bool requested);

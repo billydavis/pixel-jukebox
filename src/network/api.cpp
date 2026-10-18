@@ -19,6 +19,7 @@
 #include "app/status.h"
 #include "app/telemetry.h"
 #include "app/transition.h"
+#include "network/auth.h"
 #include "network/makapix.h"
 #include "network/reporter.h"
 #include "network/web_assets.h"
@@ -72,6 +73,106 @@ static bool readBody(JsonDocument &doc) {
     return false;
   }
   return true;
+}
+
+// ---- the PIN -------------------------------------------------------------------
+
+static void sendAuthRefusal(AuthResult result) {
+  if (result == AuthResult::Locked) {
+    int seconds = authLockedSeconds();
+    server.sendHeader("Retry-After", String(seconds > 0 ? seconds : 1));
+    sendError(429, "Too many wrong PINs, wait and try again");
+  } else if (result == AuthResult::Wrong) {
+    sendError(401, "Wrong PIN");
+  } else {
+    sendError(401, "PIN required");
+  }
+}
+
+static AuthResult requestAuth() {
+  return authCheck(server.header("Cookie"), server.header("Authorization"), server.header(AUTH_PIN_HEADER));
+}
+
+// Every route but the page itself, the API root and sign-in goes through this.
+static WebServer::THandlerFunction guarded(WebServer::THandlerFunction handler) {
+  return [handler]() {
+    AuthResult result = requestAuth();
+    if (result != AuthResult::Allowed) {
+      sendAuthRefusal(result);
+      return;
+    }
+    handler();
+  };
+}
+
+static void sendAuth(int status, bool signedIn) {
+  JsonDocument doc;
+  doc["pinSet"] = authPinSet();
+  doc["signedIn"] = signedIn;
+  doc["lockedSeconds"] = authLockedSeconds();
+  sendJson(status, doc);
+}
+
+static void handleGetAuth() {
+  // Asking does not count as a guess, so a PIN header is ignored here.
+  sendAuth(200, authCheck(server.header("Cookie"), server.header("Authorization"), "") == AuthResult::Allowed);
+}
+
+static void handleLogin() {
+  JsonDocument body;
+  if (!readBody(body)) {
+    return;
+  }
+  if (!body["pin"].is<const char *>()) {
+    sendError(400, "pin must be a string of digits");
+    return;
+  }
+  String token;
+  AuthResult result = authLogin(body["pin"].as<String>(), token);
+  if (result != AuthResult::Allowed) {
+    sendAuthRefusal(result);
+    return;
+  }
+  if (!token.isEmpty()) {
+    // A year, so a phone stays signed in; HttpOnly keeps the page's script off it.
+    server.sendHeader("Set-Cookie",
+                      AUTH_COOKIE "=" + token + "; Path=/; Max-Age=31536000; SameSite=Strict; HttpOnly");
+  }
+  sendAuth(200, true);
+}
+
+static void handleLogout() {
+  authLogout(server.header("Cookie"), server.header("Authorization"));
+  server.sendHeader("Set-Cookie", AUTH_COOKIE "=; Path=/; Max-Age=0; SameSite=Strict; HttpOnly");
+  sendAuth(200, !authPinSet());
+}
+
+// {"pin": "1234", "current": "0000"}; "pin": "" removes it. Every browser is
+// signed out, this one too: the page signs in again with the new PIN.
+static void handlePutPin() {
+  JsonDocument body;
+  if (!readBody(body)) {
+    return;
+  }
+  if (!body["pin"].is<const char *>()) {
+    sendError(400, "pin must be a string: 4 to 8 digits, or \"\" to remove it");
+    return;
+  }
+  if (!body["current"].isNull() && !body["current"].is<const char *>()) {
+    sendError(400, "current must be a string");
+    return;
+  }
+  AuthResult result;
+  String error;
+  if (!authSetPin(body["pin"].as<String>(), body["current"] | "", result, error)) {
+    if (result == AuthResult::Locked) {
+      sendAuthRefusal(result);
+    } else {
+      sendError(result == AuthResult::Allowed ? 400 : 403, error.c_str());
+    }
+    return;
+  }
+  sendAuth(200, !authPinSet());
 }
 
 static void handlePage() { server.send_P(200, "text/html", WEB_INDEX_HTML); }
@@ -688,42 +789,49 @@ void apiBegin() {
   server.on("/", HTTP_GET, handlePage);
   server.on("/gallery", HTTP_GET, handleGalleryPage);
   server.on(API_BASE, HTTP_GET, handleApiRoot);
-  server.on(API_BASE "/status", HTTP_GET, handleStatus);
-  server.on(API_BASE "/diagnostics", HTTP_GET, handleDiagnostics);
-  server.on(API_BASE "/next", HTTP_POST, handleNext);
-  server.on(API_BASE "/hold", HTTP_POST, handleHold);
-  server.on(API_BASE "/brightness", HTTP_GET, handleGetBrightness);
-  server.on(API_BASE "/brightness", HTTP_PUT, handlePutBrightness);
-  server.on(API_BASE "/night", HTTP_GET, handleGetNight);
-  server.on(API_BASE "/night", HTTP_PUT, handlePutNight);
-  server.on(API_BASE "/panel", HTTP_GET, handleGetPanel);
-  server.on(API_BASE "/panel", HTTP_PUT, handlePutPanel);
-  server.on(API_BASE "/mode", HTTP_GET, handleGetMode);
-  server.on(API_BASE "/mode", HTTP_PUT, handlePutMode);
-  server.on(API_BASE "/transition", HTTP_GET, handleGetTransition);
-  server.on(API_BASE "/transition", HTTP_PUT, handlePutTransition);
-  server.on(API_BASE "/card", HTTP_GET, handleCard);
-  server.on(API_BASE "/card/art", HTTP_GET, handleListArt);
-  server.on(API_BASE "/card/art", HTTP_DELETE, handleClearArt);
-  server.on(UriBraces(API_BASE "/card/art/{}.gif"), HTTP_GET, handleArtImage);
-  server.on(UriBraces(API_BASE "/card/art/{}/show"), HTTP_POST, handleShowArt);
-  server.on(UriBraces(API_BASE "/card/art/{}"), HTTP_DELETE, handleRemoveArt);
-  server.on(API_BASE "/restart", HTTP_POST, handleRestart);
-  server.on(API_BASE "/crash", HTTP_GET, handleGetCrash);
-  server.on(API_BASE "/crash", HTTP_DELETE, handleDeleteCrash);
-  server.on(API_BASE "/crash/dump", HTTP_GET, handleCrashDump);
+  server.on(API_BASE "/status", HTTP_GET, guarded(handleStatus));
+  server.on(API_BASE "/diagnostics", HTTP_GET, guarded(handleDiagnostics));
+  server.on(API_BASE "/next", HTTP_POST, guarded(handleNext));
+  server.on(API_BASE "/hold", HTTP_POST, guarded(handleHold));
+  server.on(API_BASE "/brightness", HTTP_GET, guarded(handleGetBrightness));
+  server.on(API_BASE "/brightness", HTTP_PUT, guarded(handlePutBrightness));
+  server.on(API_BASE "/night", HTTP_GET, guarded(handleGetNight));
+  server.on(API_BASE "/night", HTTP_PUT, guarded(handlePutNight));
+  server.on(API_BASE "/panel", HTTP_GET, guarded(handleGetPanel));
+  server.on(API_BASE "/panel", HTTP_PUT, guarded(handlePutPanel));
+  server.on(API_BASE "/mode", HTTP_GET, guarded(handleGetMode));
+  server.on(API_BASE "/mode", HTTP_PUT, guarded(handlePutMode));
+  server.on(API_BASE "/transition", HTTP_GET, guarded(handleGetTransition));
+  server.on(API_BASE "/transition", HTTP_PUT, guarded(handlePutTransition));
+  server.on(API_BASE "/card", HTTP_GET, guarded(handleCard));
+  server.on(API_BASE "/card/art", HTTP_GET, guarded(handleListArt));
+  server.on(API_BASE "/card/art", HTTP_DELETE, guarded(handleClearArt));
+  server.on(UriBraces(API_BASE "/card/art/{}.gif"), HTTP_GET, guarded(handleArtImage));
+  server.on(UriBraces(API_BASE "/card/art/{}/show"), HTTP_POST, guarded(handleShowArt));
+  server.on(UriBraces(API_BASE "/card/art/{}"), HTTP_DELETE, guarded(handleRemoveArt));
+  server.on(API_BASE "/restart", HTTP_POST, guarded(handleRestart));
+  server.on(API_BASE "/crash", HTTP_GET, guarded(handleGetCrash));
+  server.on(API_BASE "/crash", HTTP_DELETE, guarded(handleDeleteCrash));
+  server.on(API_BASE "/crash/dump", HTTP_GET, guarded(handleCrashDump));
 #ifdef CRASH_TEST
-  server.on("/crash-test", HTTP_POST, handleCrashTest);
+  server.on("/crash-test", HTTP_POST, guarded(handleCrashTest));
 #endif
-  server.on(API_BASE "/likes", HTTP_GET, handleGetLikes);
-  server.on(UriBraces(API_BASE "/likes/{}"), HTTP_PUT, handleLike);
-  server.on(UriBraces(API_BASE "/likes/{}"), HTTP_DELETE, handleUnlike);
-  server.on(API_BASE "/views", HTTP_GET, handleGetViews);
-  server.on(API_BASE "/views", HTTP_PUT, handlePutViews);
-  server.on(API_BASE "/wifi/setup", HTTP_POST, handleWifiSetup);
-  server.on(API_BASE "/slots", HTTP_GET, handleGetSlots);
-  server.on(API_BASE "/slots", HTTP_PUT, handlePutSlots);
+  server.on(API_BASE "/likes", HTTP_GET, guarded(handleGetLikes));
+  server.on(UriBraces(API_BASE "/likes/{}"), HTTP_PUT, guarded(handleLike));
+  server.on(UriBraces(API_BASE "/likes/{}"), HTTP_DELETE, guarded(handleUnlike));
+  server.on(API_BASE "/views", HTTP_GET, guarded(handleGetViews));
+  server.on(API_BASE "/views", HTTP_PUT, guarded(handlePutViews));
+  server.on(API_BASE "/wifi/setup", HTTP_POST, guarded(handleWifiSetup));
+  server.on(API_BASE "/slots", HTTP_GET, guarded(handleGetSlots));
+  server.on(API_BASE "/slots", HTTP_PUT, guarded(handlePutSlots));
+  server.on(API_BASE "/auth", HTTP_GET, handleGetAuth);
+  server.on(API_BASE "/auth/login", HTTP_POST, handleLogin);
+  server.on(API_BASE "/auth/logout", HTTP_POST, handleLogout);
+  server.on(API_BASE "/auth/pin", HTTP_PUT, guarded(handlePutPin));
   server.onNotFound(handleNotFound);
+  // The server keeps only the headers it is told to.
+  static const char *headers[] = {"Cookie", "Authorization", AUTH_PIN_HEADER};
+  server.collectHeaders(headers, sizeof(headers) / sizeof(headers[0]));
   server.begin();
 
   // The TXT record lets a client tell a jukebox from any other web server.

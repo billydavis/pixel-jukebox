@@ -18,15 +18,16 @@ static uint32_t lastAttempt = 0;
 
 // Someone is at the panel setting up Wi-Fi: show the instructions at the day
 // brightness even if the night schedule has it dark.
-static void runSetup(bool fallback) {
+static void runSetup(bool fallback, bool requested) {
   displayApplyBrightness(displayBrightness());
-  wifiSetupRun(fallback);
+  wifiSetupRun(fallback, requested);
 }
 
 void connectionStart() {
   wifiBegin();
-  if (wifiSetupRequested() || !wifiHasCredentials()) {
-    runSetup(false);
+  bool requested = wifiSetupRequested();
+  if (requested || !wifiHasCredentials()) {
+    runSetup(false, requested);
   }
 
   showMessage("WiFi", "joining...", colour::amber());
@@ -47,7 +48,7 @@ void connectionStart() {
     return;
   }
   Serial.println("Could not join the saved network");
-  runSetup(true);
+  runSetup(true, false);
 }
 
 void connectionEnterSetup() {

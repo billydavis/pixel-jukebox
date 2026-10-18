@@ -3,6 +3,9 @@
     python tools/api_smoke_test.py                  # uses pixel-jukebox.local
     python tools/api_smoke_test.py 192.168.4.105
 
+With a PIN set on the panel, put it in the JUKEBOX_PIN environment variable.
+Without one, the PIN checks set a PIN, try it every way, and remove it again.
+
 Checks every endpoint in docs/jukebox-api.md except POST /wifi/setup, which
 would take the board off the network. Settings it changes (brightness, mode,
 rotation, transition) are put back afterwards. Standard library only. Exits non-zero if
@@ -10,6 +13,7 @@ any check fails.
 """
 
 import json
+import os
 import sys
 import time
 import urllib.error
@@ -18,24 +22,34 @@ import urllib.request
 HOST = sys.argv[1] if len(sys.argv) > 1 else "pixel-jukebox.local"
 BASE = f"http://{HOST}/api/v1"
 SETTLE_S = 1.0  # commands are queued; give the display loop time to act
+PIN = os.environ.get("JUKEBOX_PIN", "")
+TEST_PIN = "4821"  # set and removed again by the PIN checks
 
 failures = []
 checks = 0
 
 
-def call(method, path, body=None, raw=None, base=BASE):
+def call_full(method, path, body=None, raw=None, base=BASE, auth=None):
+    """Status, parsed body and response headers. `auth` replaces the usual
+    X-Jukebox-Pin header: {} sends no credentials at all."""
     data = raw if raw is not None else (json.dumps(body).encode() if body is not None else None)
     headers = {"Content-Type": "application/json"} if data is not None else {}
+    headers.update(({"X-Jukebox-Pin": PIN} if PIN else {}) if auth is None else auth)
     request = urllib.request.Request(base + path, data=data, method=method, headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=8) as response:
-            status, payload = response.status, response.read()
+            status, payload, reply_headers = response.status, response.read(), response.headers
     except urllib.error.HTTPError as error:
-        status, payload = error.code, error.read()
+        status, payload, reply_headers = error.code, error.read(), error.headers
     try:
-        return status, json.loads(payload)
+        return status, json.loads(payload), reply_headers
     except json.JSONDecodeError:
-        return status, payload.decode("utf-8", "replace")
+        return status, payload.decode("utf-8", "replace"), reply_headers
+
+
+def call(method, path, body=None, raw=None, base=BASE, auth=None):
+    status, payload, _ = call_full(method, path, body, raw, base, auth)
+    return status, payload
 
 
 def check(name, condition, detail=""):
@@ -299,6 +313,71 @@ try:
         code, body = call("PUT", "/transition", bad)
         check(f"transition rejects {json.dumps(bad)}", code == 400 and "error" in body, body)
     check("rejected values changed nothing", call("GET", "/transition")[1]["transition"] == names[-1])
+
+    section("PIN")
+    code, body = call("GET", "/auth", auth={})
+    check("GET /auth is open and says whether a PIN is set",
+          code == 200 and body.get("pinSet") == bool(PIN) and "lockedSeconds" in body, body)
+    if PIN:
+        check("with the PIN set, a request without it is refused", call("GET", "/status", auth={})[0] == 401)
+        print("  (a PIN is set, so setting, changing and the lockout are not tested)")
+    else:
+        test_pin_set = False
+        try:
+            code, body = call("PUT", "/auth/pin", {"pin": "12a"})
+            check("a PIN with a letter is refused", code == 400, body)
+            code, body = call("PUT", "/auth/pin", {"pin": "123456789"})
+            check("a nine-digit PIN is refused", code == 400, body)
+            code, body = call("PUT", "/auth/pin", {"pin": TEST_PIN})
+            test_pin_set = code == 200 and body.get("pinSet") is True
+            check("a PIN can be set", test_pin_set, body)
+            code, body = call("GET", "/status", auth={})
+            check("with a PIN, a request without credentials gets 401", code == 401 and "error" in body, body)
+            with urllib.request.urlopen(f"http://{HOST}/", timeout=8) as page:
+                page_ok = page.status == 200 and b"gatepin" in page.read()  # read it all: one client at a time
+            check("the control page itself stays open", page_ok)
+            check("the API root stays open", call("GET", "", auth={})[0] == 200)
+            check("the PIN in X-Jukebox-Pin lets a script in",
+                  call("GET", "/status", auth={"X-Jukebox-Pin": TEST_PIN})[0] == 200)
+            check("a wrong X-Jukebox-Pin gets 401", call("GET", "/status", auth={"X-Jukebox-Pin": "0000"})[0] == 401)
+            code, body = call("POST", "/auth/login", {"pin": "0000"}, auth={})
+            check("signing in with a wrong PIN gets 401", code == 401, body)
+            code, body, headers = call_full("POST", "/auth/login", {"pin": TEST_PIN}, auth={})
+            cookie = (headers.get("Set-Cookie") or "").split(";")[0]
+            token = cookie.partition("=")[2]
+            check("signing in sets a session cookie",
+                  code == 200 and cookie.startswith("jukebox_session=") and len(token) == 32
+                  and "HttpOnly" in (headers.get("Set-Cookie") or ""), headers.get("Set-Cookie"))
+            check("the cookie lets a browser in", call("GET", "/status", auth={"Cookie": cookie})[0] == 200)
+            check("the session works as a bearer token too",
+                  call("GET", "/status", auth={"Authorization": "Bearer " + token})[0] == 200)
+            code, body = call("GET", "/auth", auth={"Cookie": cookie})
+            check("GET /auth says the browser is signed in", body.get("signedIn") is True, body)
+
+            for attempt in range(5):
+                code, body, headers = call_full("POST", "/auth/login", {"pin": "0000"}, auth={})
+            check("five wrong PINs lock sign-in with 429 and Retry-After",
+                  code == 429 and int(headers.get("Retry-After") or 0) > 0, (code, body))
+            code, _ = call("POST", "/auth/login", {"pin": TEST_PIN}, auth={})
+            check("while locked even the right PIN is refused", code == 429)
+            check("while locked a signed-in browser carries on",
+                  call("GET", "/status", auth={"Cookie": cookie})[0] == 200)
+            print("  (waiting 31 s for the lock to run out)")
+            time.sleep(31)
+            check("after 30 s the PIN works again",
+                  call("GET", "/status", auth={"X-Jukebox-Pin": TEST_PIN})[0] == 200)
+
+            call("POST", "/auth/logout", auth={"Cookie": cookie})
+            check("signing out ends the session", call("GET", "/status", auth={"Cookie": cookie})[0] == 401)
+            code, body = call("PUT", "/auth/pin", {"pin": "", "current": "0000"}, auth={"X-Jukebox-Pin": TEST_PIN})
+            check("removing the PIN needs the current one", code == 403, body)
+            code, body = call("PUT", "/auth/pin", {"pin": "", "current": TEST_PIN}, auth={"X-Jukebox-Pin": TEST_PIN})
+            test_pin_set = not (code == 200 and body.get("pinSet") is False)
+            check("the PIN can be removed", not test_pin_set, body)
+            check("without a PIN the API is open again", call("GET", "/status", auth={})[0] == 200)
+        finally:
+            if test_pin_set:
+                call("PUT", "/auth/pin", {"pin": "", "current": TEST_PIN}, auth={"X-Jukebox-Pin": TEST_PIN})
 
 finally:
     section("Restoring settings")

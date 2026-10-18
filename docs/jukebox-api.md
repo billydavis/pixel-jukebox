@@ -34,7 +34,8 @@ client of this API.
 
 - Requests and responses are JSON (`Content-Type: application/json`).
 - Errors are `{"error": "<message>"}` with a 4xx or 5xx status.
-- There is no authentication. Anyone on the network can call the API.
+- Open by default. With a PIN set, every route but the base path and the
+  sign-in routes needs a session or the PIN; see [The PIN](#the-pin).
 - No CORS headers are sent, so a web page served from elsewhere cannot call it
   from a browser.
 
@@ -91,6 +92,10 @@ the reply is `503` and nothing is queued.
 | `GET` | `/transition` | The transition played between slots |
 | `PUT` | `/transition` | Choose the transition |
 | `POST` | `/wifi/setup` | Restart into the Wi-Fi setup hotspot |
+| `GET` | `/auth` | Whether a PIN is set and this client is signed in (open) |
+| `POST` | `/auth/login` | Sign in with the PIN (open) |
+| `POST` | `/auth/logout` | Sign this browser out (open) |
+| `PUT` | `/auth/pin` | Set, change or remove the PIN |
 
 ### `GET /status`
 
@@ -651,12 +656,71 @@ The saved network is kept: if nobody connects to the hotspot for three minutes,
 the board restarts and rejoins it. Holding the BOOT button for five seconds does
 the same thing.
 
+## The PIN
+
+There is no PIN until one is set, and the API is open to anyone on the network,
+as it always was. With one set (4 to 8 digits), every route except `GET /api/v1`
+and the `/auth` routes answers `401` unless the request carries one of:
+
+- the `jukebox_session` cookie that `POST /auth/login` sets (what the control
+  page uses),
+- `Authorization: Bearer <session>` with that cookie's value, or
+- the PIN itself in an `X-Jukebox-Pin` header, for scripts. It counts as a
+  guess, like a sign-in.
+
+Five wrong PINs in a row refuse every PIN for 30 seconds: `429` with a
+`Retry-After` header. Browsers already signed in carry on. The PIN is stored as
+a salted SHA-256, never as itself. Up to eight browsers stay signed in, through
+restarts; a ninth signs out the one seen longest ago. The control page itself
+(`GET /`) is open and shows a PIN prompt.
+
+The setup hotspot is not covered (it is a separate, short-lived network). That
+is also the way back from a forgotten PIN: hold the BOOT button for five
+seconds, join `Pixel-Jukebox` and tick "Also remove the control-page PIN" on the
+setup page. The tick box is only offered when setup was asked for (the button,
+or `POST /wifi/setup` by a signed-in client), not when the board fell back to
+setup because it could not join its network.
+
+### `GET /auth`
+
+```json
+{ "pinSet": true, "signedIn": false, "lockedSeconds": 0 }
+```
+
+`signedIn` is true when the request's session is valid, or always when no PIN
+is set. An `X-Jukebox-Pin` header is ignored here, so asking never counts as a
+guess.
+
+### `POST /auth/login`
+
+`{"pin": "1234"}`. Reply: the same document as `GET /auth`, with a
+`Set-Cookie: jukebox_session=...` header (a year, `HttpOnly`,
+`SameSite=Strict`). `401` for a wrong PIN, `429` while locked. With no PIN set
+it answers `200` and sets nothing.
+
+### `POST /auth/logout`
+
+Ends this browser's session and clears the cookie. Reply: the same document as
+`GET /auth`.
+
+### `PUT /auth/pin`
+
+`{"pin": "5678", "current": "1234"}` sets or changes the PIN; `{"pin": "",
+"current": "1234"}` removes it. `current` is only needed when a PIN is set, and
+the request must itself be signed in. Every browser is signed out, the one
+asking too (the control page signs straight back in with the new PIN). Reply:
+the same document as `GET /auth`. `400` for a PIN that is not 4 to 8 digits,
+`403` when `current` is wrong, `429` while locked.
+
 ## Error responses
 
 | Status | When |
 |---|---|
 | `400` | Body is not a JSON object, or a field has the wrong type or range |
+| `401` | A PIN is set and the request has no valid session or PIN |
+| `403` | `PUT /auth/pin` with the wrong current PIN |
 | `404` | Unknown path, or a known path with the wrong method |
+| `429` | Five wrong PINs in a row: wait for `Retry-After` seconds |
 | `503` | The command queue is full |
 
 ## Examples
@@ -667,4 +731,5 @@ curl -X POST http://pixel-jukebox.local/api/v1/next
 curl -X POST -H "Content-Type: application/json" -d '{"held":true}' http://pixel-jukebox.local/api/v1/hold
 curl -X PUT -H "Content-Type: application/json" -d '{"value":32}' http://pixel-jukebox.local/api/v1/brightness
 curl http://pixel-jukebox.local/api/v1/slots
+curl -H "X-Jukebox-Pin: 1234" http://pixel-jukebox.local/api/v1/status   # with a PIN set
 ```
