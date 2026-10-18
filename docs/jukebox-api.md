@@ -258,7 +258,7 @@ to be sent to Makapix.
 |---|---|
 | `count` | Artworks liked |
 | `waiting` | Likes and unlikes not yet sent: offline, or Makapix unreachable |
-| `refusedSinceStart` | Changes Makapix turned down for good, usually because the post was deleted |
+| `refusedSinceStart` | Changes Makapix turned down for good: the post was deleted or hidden, or already has as many reactions as it takes. They are dropped, not retried |
 | `problem` | Present while sending is failing, for example `could not reach Makapix` |
 
 Makapix does not tell a player what its owner has already liked, so a like
@@ -299,7 +299,7 @@ from the clock chip when the network has not answered yet; with no time at all
 | `report` | Whether views are reported. On by default |
 | `waiting` | Views not yet sent |
 | `refusedSinceStart` | Views Makapix turned down for good (a deleted post, say) |
-| `rateLimitedSinceStart` | Views sent too soon after the last and retried |
+| `rateLimitedSinceStart` | Views sent too soon after the last and retried, after as long as Makapix asked (its `Retry-After`) |
 | `droppedSinceStart` | Views lost because 1,000 were already waiting |
 | `problem` | Present while sending is failing |
 

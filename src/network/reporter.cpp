@@ -16,7 +16,7 @@ static const BaseType_t CORE = 0;          // away from the display loop on core
 static const uint32_t VIEW_GAP_MS = 5500;  // Makapix accepts one view every 5 s
 static const uint32_t RETRY_FAILED_MS = 30000;
 static const uint32_t RETRY_UNAUTHORIZED_MS = 60000;
-static const uint32_t RETRY_RATE_LIMITED_MS = 10000;
+static const uint32_t RETRY_RATE_LIMITED_MS = 10000; // when Makapix does not say how long
 static const int REWRITE_EVERY = 10; // views sent between rewrites of the backlog file
 static const time_t CLOCK_SET_AFTER = 1700000000; // 2023: before that, the clock was never set
 static const char *BACKLOG_FILE = CARD_ROOT "/views.log";
@@ -148,6 +148,11 @@ static void waitBeforeRetrying(uint32_t ms, const char *problem) {
   lastProblem = problem;
 }
 
+// Makapix's Retry-After when it gave one, else our own wait.
+static uint32_t rateLimitWaitMs(uint32_t retryAfterSeconds) {
+  return retryAfterSeconds ? retryAfterSeconds * 1000 : RETRY_RATE_LIMITED_MS;
+}
+
 static const char *problemFor(makapix::SendStatus status) {
   return status == makapix::SendStatus::Unauthorized ? "Makapix did not accept the panel's token"
                                                      : "could not reach Makapix";
@@ -163,7 +168,8 @@ static bool sendNextLike() {
       return false;
     }
   }
-  makapix::SendStatus status = makapix::setLiked(postId, liked);
+  uint32_t retryAfter = 0;
+  makapix::SendStatus status = makapix::setLiked(postId, liked, retryAfter);
   MEMORY_CHECK("like sent");
   Guard guard;
   switch (status) {
@@ -178,7 +184,7 @@ static bool sendNextLike() {
       likesRefused++;
       break;
     case makapix::SendStatus::RateLimited:
-      retryAt = millis() + RETRY_RATE_LIMITED_MS;
+      retryAt = millis() + rateLimitWaitMs(retryAfter);
       return true;
     default:
       retryAt = millis() + (status == makapix::SendStatus::Unauthorized ? RETRY_UNAUTHORIZED_MS : RETRY_FAILED_MS);
@@ -202,13 +208,16 @@ static void sendNextView() {
     view = backlog.front();
   }
   lastViewAt = millis();
+  uint32_t retryAfter = 0;
   makapix::SendStatus status = makapix::reportView(view.postId, views::isoTime(view.unixSeconds).c_str(),
-                                                   view.requested, view.channel.c_str(), view.hashtag.c_str());
+                                                   view.requested, view.channel.c_str(), view.hashtag.c_str(),
+                                                   retryAfter);
   MEMORY_CHECK("view sent");
   if (status == makapix::SendStatus::RateLimited) {
     Guard guard;
     viewsRateLimited++;
-    return; // try again after the gap
+    retryAt = millis() + rateLimitWaitMs(retryAfter); // as long as Makapix asked
+    return;
   }
   if (status == makapix::SendStatus::Failed || status == makapix::SendStatus::Unauthorized) {
     waitBeforeRetrying(status == makapix::SendStatus::Unauthorized ? RETRY_UNAUTHORIZED_MS : RETRY_FAILED_MS,

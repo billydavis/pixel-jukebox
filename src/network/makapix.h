@@ -48,11 +48,14 @@ QueryStatus nextPage(const channels::Channel &channel, PageState &page, std::vec
 // when the clock is not set. `requested`: asked for by the user, not picked
 // by the rotation. At most one report every 5 seconds is accepted.
 // `channel` and `hashtag` name where it came from ("all" when empty).
+// On RateLimited, `retryAfter` is the seconds Makapix asked to wait (0 if it
+// did not say).
 SendStatus reportView(uint32_t postId, const String &isoTime, bool requested, const String &channel,
-                      const String &hashtag);
+                      const String &hashtag, uint32_t &retryAfter);
 
 // Adds or removes a heart on an artwork, on behalf of the panel's owner.
-SendStatus setLiked(uint32_t postId, bool liked);
+// `retryAfter` as for reportView.
+SendStatus setLiked(uint32_t postId, bool liked, uint32_t &retryAfter);
 
 // Drops the stored credentials so the device registers again.
 void forget();

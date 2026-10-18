@@ -24,7 +24,24 @@ static String playerKey;
 static String apiToken;
 
 
-static int requestLocked(const char *method, const String &path, const String &body, String &response) {
+// Retry-After in whole seconds (Makapix sends it with 429), clamped to a sane
+// range; 0 when absent or in a form we do not read (an HTTP date).
+static uint32_t retryAfterSeconds(HTTPClient &http) {
+  String value = http.header("Retry-After");
+  value.trim();
+  if (value.isEmpty() || value.length() > 6) {
+    return 0;
+  }
+  for (char c : value) {
+    if (c < '0' || c > '9') {
+      return 0;
+    }
+  }
+  return constrain((uint32_t)value.toInt(), 1u, 600u);
+}
+
+static int requestLocked(const char *method, const String &path, const String &body, String &response,
+                         uint32_t *retryAfter) {
   WiFiClientSecure client;
   client.setCACert(MAKAPIX_ROOT_CAS);
 
@@ -37,6 +54,8 @@ static int requestLocked(const char *method, const String &path, const String &b
   if (apiToken.length()) {
     http.addHeader("Authorization", "Bearer " + apiToken);
   }
+  static const char *wanted[] = {"Retry-After"};
+  http.collectHeaders(wanted, 1);
 
   int status;
   if (body.length()) {
@@ -48,6 +67,9 @@ static int requestLocked(const char *method, const String &path, const String &b
   if (status > 0) {
     response = http.getString();
   }
+  if (retryAfter) {
+    *retryAfter = retryAfterSeconds(http);
+  }
   MEMORY_CHECK("TLS session open");
   http.end();
   return status;
@@ -55,12 +77,13 @@ static int requestLocked(const char *method, const String &path, const String &b
 
 // Every call to Makapix goes through here, from the loader, the reporter and
 // the display loop (registration), so they take turns.
-static int request(const char *method, const String &path, const String &body, String &response) {
+static int request(const char *method, const String &path, const String &body, String &response,
+                   uint32_t *retryAfter = nullptr) {
   xSemaphoreTake(lock, portMAX_DELAY);
   // Card access waits while a TLS request runs: a file being read in another
   // task was found closed under it whenever the two overlapped (see card.h).
   CardLock card;
-  int status = requestLocked(method, path, body, response);
+  int status = requestLocked(method, path, body, response, retryAfter);
   xSemaphoreGive(lock);
   return status;
 }
@@ -255,9 +278,10 @@ static SendStatus sendStatusFor(int status, const String &response) {
   if (status == 429) {
     return SendStatus::RateLimited;
   }
-  // A missing or deleted post, or a request Makapix will never accept as it
-  // stands (too many reactions on one post, say): retrying cannot help.
-  if (status == 400 || status == 404 || status == 410) {
+  // A missing, hidden or deleted post (403, 404, 410), or a request Makapix
+  // will never accept as it stands (400; 409, too many reactions on one post):
+  // retrying cannot help.
+  if (status == 400 || status == 403 || status == 404 || status == 409 || status == 410) {
     Serial.printf("Makapix refused: HTTP %d %s\n", status, response.c_str());
     return SendStatus::Gone;
   }
@@ -265,7 +289,7 @@ static SendStatus sendStatusFor(int status, const String &response) {
 }
 
 SendStatus reportView(uint32_t postId, const String &isoTime, bool requested, const String &channel,
-                      const String &hashtag) {
+                      const String &hashtag, uint32_t &retryAfter) {
   JsonDocument body;
   body["post_id"] = postId;
   body["timestamp"] = isoTime;
@@ -279,10 +303,10 @@ SendStatus reportView(uint32_t postId, const String &isoTime, bool requested, co
   String payload;
   serializeJson(body, payload);
   String response;
-  return sendStatusFor(request("POST", "/player/events/view", payload, response), response);
+  return sendStatusFor(request("POST", "/player/events/view", payload, response, &retryAfter), response);
 }
 
-SendStatus setLiked(uint32_t postId, bool liked) {
+SendStatus setLiked(uint32_t postId, bool liked, uint32_t &retryAfter) {
   JsonDocument body;
   body["request_type"] = liked ? "submit_reaction" : "revoke_reaction";
   body["post_id"] = postId;
@@ -290,7 +314,7 @@ SendStatus setLiked(uint32_t postId, bool liked) {
   String payload;
   serializeJson(body, payload);
   String response;
-  int status = request("POST", "/player/rpc", payload, response);
+  int status = request("POST", "/player/rpc", payload, response, &retryAfter);
   SendStatus result = sendStatusFor(status, response);
   if (result == SendStatus::Ok) {
     JsonDocument doc;
