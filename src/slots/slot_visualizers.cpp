@@ -237,34 +237,49 @@ void FireSlot::reset() {
     buildFirePalette();
   }
   memset(heat, 0, sizeof(heat));
-  energy = 0;
+  beats.reset();
 }
 
-void FireSlot::draw(const AudioFrame &audio) {
-  // Bass feeds the fire quickly and it dies back slowly; embers stay lit in silence.
-  float drive = max(audio.bass, audio.level * 0.6f);
-  energy = drive > energy ? drive : energy * 0.9f;
-  int fuel = 70 + (int)(energy * 185);
-
+// One step of the fire: new fuel at the bottom, then each pixel takes the
+// average of the pixels below it, losing a little heat; a smaller divisor
+// loses less, so the flames reach higher.
+void FireSlot::burn(int fuel, int divisor) {
   for (int row = H; row < H + 2; row++) {
     for (int x = 0; x < W; x++) {
       heat[row][x] = random(fuel / 3, fuel + 1);
     }
   }
-
-  // Each pixel takes the average of the pixels below it, losing a little heat.
-  // Louder sound loses less, so the flames reach higher.
-  int divisor = 137 - (int)(energy * 6);
   for (int y = 0; y < H; y++) {
     for (int x = 0; x < W; x++) {
       int left = heat[y + 1][x > 0 ? x - 1 : x];
       int right = heat[y + 1][x < W - 1 ? x + 1 : x];
       int sum = left + heat[y + 1][x] + right + heat[y + 2][x];
-      uint8_t value = min(255, sum * 32 / divisor);
-      if (value != heat[y][x]) {
-        heat[y][x] = value;
-        display->drawPixel(x, y, firePalette[value]);
-      }
+      heat[y][x] = min(255, sum * 32 / divisor);
+    }
+  }
+}
+
+void FireSlot::draw(const AudioFrame &audio) {
+  // The level is scaled to the room, so steady music keeps it high: it sets
+  // a steady fire. Beats are what make it move (beat_follower.h).
+  float punch = beats.update(audio.bass);
+  float level = audio.level;
+  int fuel = 25 + (int)(level * 110) + (int)(punch * 120);
+  int divisor = 140 - (int)(level * 4) - (int)(punch * 10);
+
+  // Heat climbs about a row per step; two or three steps per audio frame let
+  // a beat reach the top of the panel in well under a second instead of two.
+  int steps = punch > 0.5f ? 3 : 2;
+  for (int i = 0; i < steps; i++) {
+    burn(fuel, divisor);
+  }
+
+  // A beat also flashes the whole fire brighter at once, before the new
+  // flames have had time to climb.
+  int boost = 256 + (int)(punch * 150);
+  for (int y = 0; y < H; y++) {
+    for (int x = 0; x < W; x++) {
+      display->drawPixel(x, y, firePalette[min(255, heat[y][x] * boost >> 8)]);
     }
   }
 }

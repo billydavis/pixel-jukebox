@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "beat_follower.h"
 #include "cache_index.h"
 #include "channels.h"
 #include "crash_cause.h"
@@ -1261,6 +1262,56 @@ static void test_live_renews_when_due_or_refused() {
   TEST_ASSERT_FALSE(live::shouldRenew(10, true, 5, true)); // once a day at most
 }
 
+// ---- beat_follower ------------------------------------------------------------
+
+static void test_beat_steady_loud_music_is_not_a_beat() {
+  BeatFollower beats;
+  for (int i = 0; i < 300; i++) { // ten seconds of the level pinned high
+    beats.update(0.9f);
+  }
+  TEST_ASSERT_TRUE(beats.punch() < 0.01f);
+  TEST_ASSERT_FLOAT_WITHIN(0.02f, 0.9f, beats.average());
+}
+
+static void test_beat_a_kick_stands_out_and_fades() {
+  BeatFollower beats;
+  for (int i = 0; i < 300; i++) {
+    beats.update(0.5f);
+  }
+  float hit = beats.update(0.9f); // a kick drum over steady music
+  TEST_ASSERT_TRUE(hit > 0.9f);
+  float later = hit;
+  for (int i = 0; i < 8; i++) { // a quarter of a second back at the steady level
+    later = beats.update(0.5f);
+  }
+  TEST_ASSERT_TRUE(later < 0.2f);
+}
+
+static void test_beat_small_wobbles_are_ignored() {
+  BeatFollower beats;
+  for (int i = 0; i < 300; i++) {
+    beats.update(i % 2 ? 0.52f : 0.48f);
+  }
+  TEST_ASSERT_TRUE(beats.punch() < 0.01f);
+}
+
+static void test_beat_repeated_beats_each_show() {
+  BeatFollower beats;
+  for (int i = 0; i < 300; i++) {
+    beats.update(0.4f);
+  }
+  int seen = 0;
+  for (int beat = 0; beat < 8; beat++) { // 120 bpm: one beat every 16 frames
+    if (beats.update(0.85f) > 0.5f) {
+      seen++;
+    }
+    for (int i = 0; i < 15; i++) {
+      beats.update(0.4f);
+    }
+  }
+  TEST_ASSERT_EQUAL(8, seen); // the average does not climb so far that later beats vanish
+}
+
 static int runTests() {
   UNITY_BEGIN();
   RUN_TEST(test_gif_pad_grows_a_small_gif);
@@ -1379,6 +1430,10 @@ static int runTests() {
   RUN_TEST(test_live_backs_off_to_five_minutes);
   RUN_TEST(test_live_counts_days_to_expiry);
   RUN_TEST(test_live_renews_when_due_or_refused);
+  RUN_TEST(test_beat_steady_loud_music_is_not_a_beat);
+  RUN_TEST(test_beat_a_kick_stands_out_and_fades);
+  RUN_TEST(test_beat_small_wobbles_are_ignored);
+  RUN_TEST(test_beat_repeated_beats_each_show);
   return UNITY_END();
 }
 

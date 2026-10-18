@@ -1,6 +1,7 @@
 #pragma once
 
 #include "audio/audio_analysis.h"
+#include "beat_follower.h"
 #include "pins.h"
 #include "slots/slot.h"
 
@@ -74,7 +75,8 @@ class ScopeSlot : public VisualizerSlot {
   bool hasTrace;
 };
 
-// Flames that climb with the bass.
+// Flames that leap on the beat: kick drums throw fuel on the fire and flash it
+// brighter, and the overall loudness keeps it burning between beats.
 class FireSlot : public VisualizerSlot {
  public:
   const char *name() const override { return "fire"; }
@@ -84,6 +86,8 @@ class FireSlot : public VisualizerSlot {
   void draw(const AudioFrame &frame) override;
 
  private:
+  void burn(int fuel, int divisor);
+
   uint8_t heat[PANEL_RES_Y + 2][PANEL_RES_X]; // two hidden rows of fuel at the bottom
-  float energy;
+  BeatFollower beats;
 };

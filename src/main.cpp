@@ -168,6 +168,9 @@ static void runSlot(Slot *slot, screen::Source source) {
         }
       }
       nightTick();
+      // A visualizer or a held slot can stay on for hours, so a new firmware
+      // is kept from in here too, not only between slots.
+      firmwareUpdateMaintain(apiRunning());
       if (firmwareUpdateActive()) {
         statusSetHeld(false);
         slot->stop();
