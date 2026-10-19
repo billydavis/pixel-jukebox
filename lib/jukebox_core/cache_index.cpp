@@ -49,15 +49,27 @@ bool Index::apply(const char *line) {
   while (*p == ' ') {
     p++;
   }
+  // The owner is one word (make() sees to that), then perhaps the key.
   char owner[OWNER_CHARS] = {};
   int length = 0;
-  while (*p && *p != '\n' && *p != '\r' && length < OWNER_CHARS - 1) {
-    owner[length++] = *p++;
+  while (*p && *p != ' ' && *p != '\n' && *p != '\r') {
+    if (length < OWNER_CHARS - 1) {
+      owner[length++] = *p;
+    }
+    p++;
   }
   if (length == 0 || postId == 0) {
     return false; // every line is written with an owner; a missing one means a cut-off line
   }
-  return put(make(postId, seq, dwellMs, bytes, owner));
+  while (*p == ' ') {
+    p++;
+  }
+  char key[KEY_CHARS] = {};
+  int keyLength = 0;
+  while (*p && *p != ' ' && *p != '\n' && *p != '\r' && keyLength < KEY_CHARS - 1) {
+    key[keyLength++] = *p++;
+  }
+  return put(make(postId, seq, dwellMs, bytes, owner, key));
 }
 
 bool Index::put(const Entry &entry) {
@@ -120,9 +132,10 @@ uint64_t Index::totalBytes() const {
 }
 
 std::string Index::addLine(const Entry &entry) {
-  char line[96];
-  snprintf(line, sizeof(line), "A %lu %lu %lu %lu %s\n", (unsigned long)entry.postId, (unsigned long)entry.seq,
-           (unsigned long)entry.dwellMs, (unsigned long)entry.bytes, entry.owner);
+  char line[144];
+  snprintf(line, sizeof(line), "A %lu %lu %lu %lu %s%s%s\n", (unsigned long)entry.postId, (unsigned long)entry.seq,
+           (unsigned long)entry.dwellMs, (unsigned long)entry.bytes, entry.owner, entry.key[0] ? " " : "",
+           entry.key);
   return line;
 }
 
@@ -132,7 +145,8 @@ std::string Index::removeLine(uint32_t postId) {
   return line;
 }
 
-Entry Index::make(uint32_t postId, uint32_t seq, uint32_t dwellMs, uint32_t bytes, const char *owner) {
+Entry Index::make(uint32_t postId, uint32_t seq, uint32_t dwellMs, uint32_t bytes, const char *owner,
+                   const char *key) {
   Entry entry = {};
   entry.postId = postId;
   entry.seq = seq;
@@ -148,6 +162,16 @@ Entry Index::make(uint32_t postId, uint32_t seq, uint32_t dwellMs, uint32_t byte
     entry.owner[length++] = '-';
   }
   entry.owner[length] = '\0';
+  // Only hex digits and dashes: anything else is not a storage key.
+  size_t keyLength = key ? strlen(key) : 0;
+  bool good = keyLength > 0 && keyLength < (size_t)KEY_CHARS;
+  for (size_t i = 0; good && i < keyLength; i++) {
+    char c = key[i];
+    good = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') || c == '-';
+  }
+  if (good) {
+    memcpy(entry.key, key, keyLength + 1);
+  }
   return entry;
 }
 

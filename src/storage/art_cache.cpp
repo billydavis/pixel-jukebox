@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "app/telemetry.h"
+#include "config.h"
 #include "cache_index.h"
 #include "gif_pad.h"
 #include "app/memory_trace.h"
@@ -162,12 +163,14 @@ static bool evictOldest() {
   return true;
 }
 
-void artCacheStore(uint32_t postId, const String &owner, uint32_t dwellMs, const uint8_t *data, size_t size) {
+void artCacheStore(uint32_t postId, const String &owner, const String &storageKey, uint32_t dwellMs,
+                   const uint8_t *data, size_t size) {
   if (!catalogue || budget == 0 || size > budget) {
     return;
   }
   Guard guard;
-  cache::Entry entry = cache::Index::make(postId, catalogue->nextSeq(), dwellMs, size, owner.c_str());
+  cache::Entry entry =
+      cache::Index::make(postId, catalogue->nextSeq(), dwellMs, size, owner.c_str(), storageKey.c_str());
 
   // Already cached: only note that it played again.
   if (catalogue->find(postId)) {
@@ -256,7 +259,7 @@ static void markPlayed(cache::Entry entry, uint8_t *data, size_t size, CachedArt
   catalogue->put(entry);
   appendLog(cache::Index::addLine(entry));
   played++;
-  artwork = {entry.postId, entry.owner, entry.dwellMs, data, gifPadSmall(data, size)};
+  artwork = {entry.postId, entry.owner, entry.key, entry.dwellMs, data, gifPadSmall(data, size)};
 }
 
 // Every cached artwork once, in random order, then a fresh order.
@@ -365,6 +368,11 @@ void artCacheList(uint32_t offset, uint32_t limit, JsonObject out) {
     item["owner"] = entry.owner;
     item["bytes"] = entry.bytes;
     item["dwellMs"] = entry.dwellMs;
+    if (entry.key[0]) {
+      item["pageUrl"] = String(MAKAPIX_POST_PAGE_URL) + entry.key;
+    } else {
+      item["pageUrl"] = nullptr;
+    }
   }
 }
 

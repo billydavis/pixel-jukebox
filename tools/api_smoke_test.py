@@ -148,6 +148,9 @@ try:
           code == 200 and "present" in body.get("card", {}) and "enabled" in body.get("cache", {}), body)
 
     code, body = call("GET", "/card/art?limit=2")
+    for item in (body.get("artworks") or []) if code == 200 else []:
+        check("a saved artwork's page link, when known, is on makapix.club",
+              item.get("pageUrl") is None or item["pageUrl"].startswith("https://makapix.club/post/"), item)
     check("saved art lists at most the page asked for",
           code == 200 and isinstance(body.get("artworks"), list) and len(body["artworks"]) <= 2
           and isinstance(body.get("total"), int), body)

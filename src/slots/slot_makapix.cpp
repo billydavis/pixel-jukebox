@@ -84,6 +84,7 @@ static bool loadFromCache(LoadedArtwork &loaded) {
   makapix::Artwork artwork;
   artwork.postId = cached.postId;
   artwork.ownerHandle = cached.owner;
+  artwork.storageKey = cached.storageKey;
   artwork.dwellMs = cached.dwellMs;
   artwork.fromCache = true;
   loaded = {artwork, cached.data, cached.size};
@@ -207,7 +208,7 @@ static LoadStatus loadNext(Feed &feed, LoadedArtwork &loaded) {
       continue;
     }
     telemetryNoteImage(size);
-    artCacheStore(artwork.postId, artwork.ownerHandle, artwork.dwellMs, data, size);
+    artCacheStore(artwork.postId, artwork.ownerHandle, artwork.storageKey, artwork.dwellMs, data, size);
     MEMORY_CHECK("cache store");
     loaded = {artwork, data, size};
     setProblem(feed, "");
@@ -475,7 +476,7 @@ static bool fetchPost(uint32_t postId, LoadedArtwork &loaded) {
     return false;
   }
   telemetryNoteImage(size);
-  artCacheStore(artwork.postId, artwork.ownerHandle, artwork.dwellMs, data, size);
+  artCacheStore(artwork.postId, artwork.ownerHandle, artwork.storageKey, artwork.dwellMs, data, size);
   loaded = {artwork, data, size};
   return true;
 }
@@ -489,6 +490,7 @@ bool MakapixSlot::showRequested(uint32_t postId) {
   if (artCacheTakePost(postId, cached)) {
     requested.artwork.postId = cached.postId;
     requested.artwork.ownerHandle = cached.owner;
+    requested.artwork.storageKey = cached.storageKey;
     requested.artwork.dwellMs = cached.dwellMs;
     requested.artwork.fromCache = true;
     requested.data = cached.data;
@@ -549,7 +551,8 @@ bool MakapixSlot::play(const LoadedArtwork &current) {
     statusSetUpload(current.artwork.uploadId, current.artwork.title);
   } else {
     statusSetArtwork(current.artwork.postId, current.artwork.ownerHandle, shareUrl, current.artwork.fromCache,
-                     current.artwork.fromCache || !feed ? "" : channels::label(feed->channel).c_str());
+                     current.artwork.fromCache || !feed ? "" : channels::label(feed->channel).c_str(),
+                     current.artwork.storageKey);
   }
   playingChannel = nullptr; // set by the caller when it came from a channel
   mode = Mode::Playing;

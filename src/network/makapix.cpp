@@ -314,6 +314,7 @@ QueryStatus nextPage(const channels::Channel &channel, PageState &page, std::vec
     artwork.postId = post["post_id"] | 0;
     artwork.ownerHandle = post["owner_handle"] | "";
     artwork.gifUrl = gifUrlFor(post["art_url"].as<String>());
+    artwork.storageKey = post["storage_key"] | "";
     artwork.dwellMs = post["dwell_time_ms"] | 30000;
     artworks.push_back(artwork);
   }
@@ -353,6 +354,7 @@ bool getPost(uint32_t postId, Artwork &artwork, String &problem) {
   artwork.postId = post["post_id"] | postId;
   artwork.ownerHandle = post["owner_handle"] | "";
   artwork.gifUrl = gifUrlFor(post["art_url"].as<String>());
+  artwork.storageKey = post["storage_key"] | "";
   artwork.dwellMs = post["dwell_time_ms"] | 30000;
   artwork.fromCache = false;
   return true;

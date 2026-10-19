@@ -28,8 +28,9 @@ void statusSetScreen(const char *name) {
 }
 
 void statusSetArtwork(uint32_t postId, const String &owner, const String &gifUrl, bool fromCache,
-                      const String &channel) {
+                      const String &channel, const String &storageKey) {
   Guard guard;
+  current.storageKey = storageKey;
   current.hasArtwork = true;
   current.postId = postId;
   current.owner = owner;
@@ -49,6 +50,7 @@ void statusSetUpload(uint32_t uploadId, const String &name) {
   current.postId = 0;
   current.owner = "";
   current.gifUrl = "";
+  current.storageKey = "";
   current.fromCache = true;
   current.channel = "My uploads";
   current.uploadId = uploadId;
@@ -64,6 +66,7 @@ void statusSetStarter(uint16_t id, const String &title, const String &credit, bo
   current.postId = 0;
   current.owner = "";
   current.gifUrl = "";
+  current.storageKey = "";
   current.fromCache = true;
   current.channel = fallback ? "" : "Starter art";
   current.uploadId = 0;
@@ -79,6 +82,7 @@ void statusClearArtwork() {
   current.postId = 0;
   current.owner = "";
   current.gifUrl = "";
+  current.storageKey = "";
   current.fromCache = false;
   current.uploadId = 0;
   current.uploadName = "";

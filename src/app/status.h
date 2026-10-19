@@ -11,6 +11,7 @@ struct PlayerStatus {
   uint32_t postId = 0;
   String owner;
   String gifUrl; // HTTPS, for clients that want to show the artwork; empty when from the card
+  String storageKey; // gives the post's page on makapix.club; empty when not known
   bool fromCache = false;
   String channel; // label of the channel it came from; empty when from the card
   String screen;  // what has the panel: screen::name() of the current source
@@ -26,7 +27,7 @@ void statusSetSlot(const char *name);
 void statusSetHeld(bool held);
 void statusSetScreen(const char *name);
 void statusSetArtwork(uint32_t postId, const String &owner, const String &gifUrl, bool fromCache,
-                      const String &channel = "");
+                      const String &channel = "", const String &storageKey = "");
 // An upload (storage/uploads.h) in place of a Makapix artwork.
 void statusSetUpload(uint32_t uploadId, const String &name);
 // Starter art (storage/starter_art.h). `fallback`: shown because there was no

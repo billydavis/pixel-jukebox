@@ -140,6 +140,7 @@ effect before the reply, which is `200` with the new state.
     "postId": 647,
     "owner": "Odio",
     "gifUrl": "https://vault.makapix.club/21/32/abc123.gif",
+    "pageUrl": "https://makapix.club/post/586cbe4d-3161-4dbf-8824-9dc8c317b7b8",
     "source": "makapix",
     "liked": false,
     "channel": "Promoted"
@@ -164,6 +165,7 @@ effect before the reply, which is `200` with the new state.
 | `artwork` | The Makapix post on screen; `null` when the slot is not showing artwork (clock, registration code) |
 | `artwork.owner` | The artist's Makapix handle |
 | `artwork.gifUrl` | HTTPS address of the GIF being played, for clients that want to show it. Empty when the artwork is playing from the card |
+| `artwork.pageUrl` | The artwork's page on makapix.club (by its storage key; the site redirects to its short `/p/` address). `null` for art saved to the card before 0.35.0, until it is downloaded again |
 | `artwork.source` | `makapix` when downloaded for this turn, `card` when played from the board's offline copy, because Makapix or the Wi-Fi could not be reached or because it was asked for from the gallery; `upload` and `starter` for art that is not from Makapix (see Uploads and Starter art) |
 | `artwork.liked` | Whether the artwork has been liked from this panel; see `PUT /likes/{postId}` |
 | `artwork.channel` | The channel it came from, as `channelLabel` in `GET /slots`; `null` when from the card |
@@ -433,7 +435,8 @@ parameters: `offset` (default 0) and `limit` (default 24, at most 60).
 ```json
 {
   "artworks": [
-    { "postId": 2486, "owner": "Odio", "bytes": 1593, "dwellMs": 30000 }
+    { "postId": 2486, "owner": "Odio", "bytes": 1593, "dwellMs": 30000,
+      "pageUrl": "https://makapix.club/post/586cbe4d-3161-4dbf-8824-9dc8c317b7b8" }
   ],
   "offset": 0,
   "total": 100
@@ -445,6 +448,7 @@ parameters: `offset` (default 0) and `limit` (default 24, at most 60).
 | `total` | Artworks on the card altogether |
 | `artworks[].bytes` | Size of the GIF on the card |
 | `artworks[].dwellMs` | How long the artist asked for it to be shown |
+| `artworks[].pageUrl` | Its page on makapix.club, or `null` when saved before 0.35.0 |
 
 With no usable card the list is empty and `total` is 0.
 

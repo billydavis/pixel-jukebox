@@ -12,6 +12,7 @@ struct Artwork {
   uint32_t postId;
   String ownerHandle;
   String gifUrl; // plain-HTTP vault URL of the GIF rendition
+  String storageKey; // the post's page is MAKAPIX_POST_PAGE_URL + this
   uint32_t dwellMs;
   bool fromCache = false; // played from the card, not downloaded
   uint32_t uploadId = 0;  // an upload (storage/uploads.h) rather than a Makapix post

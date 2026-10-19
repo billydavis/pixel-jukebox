@@ -404,6 +404,29 @@ static void test_transitions_wipe_only_moves_the_edge() {
 
 // --- cache_index -----------------------------------------------------------
 
+static void test_cache_index_keeps_the_storage_key() {
+  cache::Entry storage[4];
+  cache::Index index(storage, 4);
+  const char *key = "586cbe4d-3161-4dbf-8824-9dc8c317b7b8";
+  cache::Entry entry = cache::Index::make(3898, 3, 30000, 900, "Fab", key);
+  std::string line = cache::Index::addLine(entry);
+  TEST_ASSERT_EQUAL_STRING("A 3898 3 30000 900 Fab 586cbe4d-3161-4dbf-8824-9dc8c317b7b8\n", line.c_str());
+  TEST_ASSERT_TRUE(index.apply(line.c_str()));
+  TEST_ASSERT_EQUAL_STRING(key, index.find(3898)->key);
+  TEST_ASSERT_EQUAL_STRING("Fab", index.find(3898)->owner);
+
+  // A line from before keys were kept: no key, owner as before.
+  TEST_ASSERT_TRUE(index.apply("A 77 1 30000 500 Odio\n"));
+  TEST_ASSERT_EQUAL_STRING("", index.find(77)->key);
+  TEST_ASSERT_EQUAL_STRING("Odio", index.find(77)->owner);
+  TEST_ASSERT_EQUAL_STRING("A 77 1 30000 500 Odio\n", cache::Index::addLine(*index.find(77)).c_str());
+
+  // Something that is not a key is dropped, the rest kept.
+  TEST_ASSERT_TRUE(index.apply("A 78 1 30000 500 Odio <script>\n"));
+  TEST_ASSERT_EQUAL_STRING("", index.find(78)->key);
+  TEST_ASSERT_EQUAL_STRING("", cache::Index::make(1, 1, 1, 1, "x", "not a key").key);
+}
+
 static cache::Entry cacheStorage[8];
 
 static void test_cache_records_survive_a_round_trip() {
@@ -1724,6 +1747,7 @@ static int runTests() {
   RUN_TEST(test_upload_decodes_percent_names);
   RUN_TEST(test_channels_uploads);
   RUN_TEST(test_channels_starter);
+  RUN_TEST(test_cache_index_keeps_the_storage_key);
   RUN_TEST(test_orientation_corners);
   RUN_TEST(test_orientation_maps_every_pixel_once);
   RUN_TEST(test_orientation_degrees_and_packing);

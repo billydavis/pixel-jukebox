@@ -63,6 +63,8 @@ p{margin:0}
 .lost .led img{opacity:.35}
 .meta{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--s3)}
 .meta>div{min-width:0}
+.meta .acts{display:flex;gap:var(--s2);flex:none}
+a.heart{color:inherit}
 .who{font-size:24px;font-weight:700;line-height:1.15;overflow-wrap:anywhere}
 .sub{margin-top:var(--s1);font:13px/1.35 var(--mono);color:var(--dim)}
 
@@ -160,11 +162,11 @@ input::placeholder{color:var(--dim)}
   padding:var(--s3) var(--s4);background:var(--panel);box-shadow:0 0 0 1px var(--line),4px 4px 0 var(--edge)}
 .pick .what{grid-area:what}
 .pick .what b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pick .acts{grid-area:acts;display:grid;grid-template-columns:1fr 1fr;gap:var(--s2)}
+.pick .acts{grid-area:acts;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:var(--s2)}
 .pick .icon{grid-area:shut;align-self:start}
 @media (min-width:600px){
   .pick{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"what acts shut";align-items:center}
-  .pick .acts{grid-template-columns:auto auto}
+  .pick .acts{grid-auto-columns:auto}
 }
 
 /* ---- mini-player and tab bar (phone) --------------------------------------------- */
@@ -242,6 +244,7 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
     <symbol id="i-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M12 19V6M6 11l6-6 6 6"/></symbol>
     <symbol id="i-minus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 12h12"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 12h12M12 6v12"/></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"><path d="M13 5h6v6M19 5l-8 8M17 14v5H5V7h5"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 6l12 12M18 6L6 18"/></symbol>
   </defs>
 </svg>
@@ -289,7 +292,10 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
         <p class="who" id="who">&nbsp;</p>
         <p class="sub" id="sub">&nbsp;</p>
       </div>
-      <button class="icon heart" id="like" aria-pressed="false" aria-label="Like on Makapix" hidden><svg aria-hidden="true"><use id="likeicon" href="#i-heart"/></svg></button>
+      <span class="acts">
+        <a class="icon heart" id="open" target="_blank" rel="noopener" aria-label="Open on makapix.club" title="Open on makapix.club" hidden><svg aria-hidden="true"><use href="#i-out"/></svg></a>
+        <button class="icon heart" id="like" aria-pressed="false" aria-label="Like on Makapix" hidden><svg aria-hidden="true"><use id="likeicon" href="#i-heart"/></svg></button>
+      </span>
     </div>
     <div class="seg" role="group" aria-label="Mode">
       <button id="mrot" aria-pressed="true" disabled>Jukebox</button>
@@ -387,6 +393,7 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
       <span class="what"><b id="pwho">&nbsp;</b><small id="psub">&nbsp;</small></span>
       <span class="acts">
         <button class="key small go" id="pshow">Show now</button>
+        <a class="key small" id="popen" target="_blank" rel="noopener" aria-label="Open on makapix.club" hidden>Makapix</a>
         <button class="key small" id="pdrop">Remove</button>
       </span>
       <button class="icon" id="pclose" aria-label="Close"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
@@ -623,6 +630,8 @@ function render(){
   $('sub').textContent=$('msub').textContent=sub;
 
   const like=$('like');like.hidden=!art||!!art.upload||!!art.starter; // neither is on Makapix
+  // Art saved to the card before its page was known has no link.
+  const open=$('open');open.hidden=!(art&&art.pageUrl);if(art&&art.pageUrl)open.href=art.pageUrl;
   const ovr=st.channelOverride;
   $('ovr').hidden=!ovr;
   if(ovr){
@@ -947,6 +956,7 @@ function pickArt(b,a){
   $('pwho').textContent=a.owner?'@'+a.owner:'Unknown artist';
   $('psub').textContent='Makapix post '+a.postId+', '+size(a.bytes);
   $('pick').hidden=false;$('pdrop').hidden=false;
+  $('popen').hidden=!a.pageUrl;if(a.pageUrl)$('popen').href=a.pageUrl;
   $('pshow').disabled=$('pdrop').disabled=false;
 }
 function unpickArt(){
@@ -1016,7 +1026,7 @@ function pickStarter(b,p){
   b.querySelector('img').src=API+'/starter/'+p.id+'.gif';
   $('pwho').textContent=p.title;
   $('psub').textContent=p.credit;
-  $('pick').hidden=false;$('pdrop').hidden=true; // part of the firmware: nothing to remove
+  $('pick').hidden=false;$('pdrop').hidden=true;$('popen').hidden=true; // part of the firmware: nothing to remove
   $('pshow').disabled=false;
 }
 $('stplay').onclick=async()=>{
@@ -1061,7 +1071,7 @@ function pickUpload(b,u){
   b.setAttribute('aria-pressed','true');
   $('pwho').textContent=u.name;
   $('psub').textContent='Your upload, '+u.width+' × '+u.height+', '+size(u.bytes);
-  $('pick').hidden=false;$('pdrop').hidden=false;
+  $('pick').hidden=false;$('pdrop').hidden=false;$('popen').hidden=true;
   $('pshow').disabled=$('pdrop').disabled=false;
 }
 async function dropUpload(){

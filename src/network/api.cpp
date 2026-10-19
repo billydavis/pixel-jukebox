@@ -262,6 +262,11 @@ static void handleStatus() {
     artwork["postId"] = status.postId;
     artwork["owner"] = status.owner;
     artwork["gifUrl"] = status.gifUrl;
+    if (status.storageKey.isEmpty()) {
+      artwork["pageUrl"] = nullptr; // saved to the card before the page was known
+    } else {
+      artwork["pageUrl"] = String(MAKAPIX_POST_PAGE_URL) + status.storageKey;
+    }
     artwork["source"] = status.fromCache ? "card" : "makapix";
     artwork["liked"] = reporterLiked(status.postId);
     if (status.channel.isEmpty()) {
