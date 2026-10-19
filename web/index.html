@@ -634,6 +634,7 @@ async function poll(){
   if(locked||updating)return;
   try{st=await call('GET','/status');online=true;}catch(e){online=false;}
   if(locked)return;
+  if(online&&!vizList.length)loadViz();
   render();
   if(!document.hidden)timer=setTimeout(poll,2000);
 }
@@ -666,16 +667,27 @@ function setMode(mode,visualizer){
 }
 $('mrot').onclick=()=>setMode('rotation');
 $('msnd').onclick=()=>setMode('sound');
-call('GET','/mode').then(m=>{
-  vizList=m.visualizers;
-  vizList.forEach(v=>{
-    const b=document.createElement('button');
-    b.textContent=v.label;b.dataset.name=v.name;b.setAttribute('aria-pressed','false');
-    b.onclick=()=>setMode('sound',v.name);
-    $('viz').appendChild(b);
-  });
-  render();
-}).catch(()=>{});
+// The visualizer buttons. If the panel was busy or restarting when the page
+// opened, this is tried again after each status update until it works.
+let vizLoading=false;
+async function loadViz(){
+  if(vizLoading||vizList.length)return;
+  vizLoading=true;
+  try{
+    const m=await call('GET','/mode');
+    vizList=m.visualizers;
+    $('viz').textContent='';
+    vizList.forEach(v=>{
+      const b=document.createElement('button');
+      b.textContent=v.label;b.dataset.name=v.name;b.setAttribute('aria-pressed','false');
+      b.onclick=()=>setMode('sound',v.name);
+      $('viz').appendChild(b);
+    });
+    render();
+  }catch(e){}
+  vizLoading=false;
+}
+loadViz();
 
 $('bri').oninput=e=>{
   dragging=true;

@@ -20,6 +20,7 @@ Priority is a suggestion until it has been agreed.
 
 | # | Item | Size | Priority | Notes |
 |---|---|---|---|---|
+| 37 | **Colours look bleached out in photo mode** | M | 1 | Cause found and fixed in 0.32.0 (`docs/colour.md`): the display library gave its low colour bits equal time instead of 1, 2, 4..., worst in photo mode, plus a faint ghost of the row above. Patched in `lib/ESP32-HUB75-MatrixPanel-DMA`. Left: the owner to check both modes on the panel; a white-balance adjustment only if whites still look tinted |
 | 7 | **Tap to like** | S | Blocked | Waiting for the case. Run the `motion-test` build again once mounted, then pick the threshold. Plan: double tap = like, a heart on the panel, a tap to undo |
 | 8 | Auto-rotation from the motion sensor | M | Blocked | Also needs the case, to know how the panel stands |
 | 9 | ~~Keep time with the onboard clock chip~~ | S | Done (0.15.0) | Keeps time through restarts. Through power cuts only with a backup battery on J4 (CR2032 ordered; test by unplugging the panel, then check `keptTimeAtStart`) |
