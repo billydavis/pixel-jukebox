@@ -10,7 +10,9 @@ struct Feed;
 String makapixChannelProblem(const String &spec);
 
 // Plays one Makapix artwork per turn, preloading the next in the background.
-// While the device is not registered it shows the registration code instead.
+// While the device is not registered it shows the registration code instead,
+// every other turn, and starter art in between. With nothing else to play it
+// plays starter art (storage/starter_art.h).
 class MakapixSlot : public Slot {
  public:
   void begin();
@@ -25,6 +27,8 @@ class MakapixSlot : public Slot {
   void request(uint32_t postId) { requestedPost = postId; }
   // The same for an upload (storage/uploads.h).
   void requestUpload(uint32_t uploadId) { requestedUpload = uploadId; }
+  // The same for a piece of starter art (storage/starter_art.h).
+  void requestStarter(uint16_t id) { requestedStarter = id; }
 
   // The channel the next start() plays from, as a channels.h string.
   void useChannel(const String &spec);
@@ -44,6 +48,8 @@ class MakapixSlot : public Slot {
   bool startPlaying();
   bool showRequested(uint32_t postId);
   bool showUpload(uint32_t uploadId);
+  bool showStarter(uint16_t id);
+  bool playStarter();
   bool play(const LoadedArtwork &artwork);
   uint32_t updateRegistration();
   uint32_t updatePlaying();
@@ -52,6 +58,7 @@ class MakapixSlot : public Slot {
   Feed *feed = nullptr; // the channel in use
   uint32_t requestedPost = 0;
   uint32_t requestedUpload = 0;
+  uint16_t requestedStarter = 0;
   uint32_t startedAt = 0;
 
   // Registration
@@ -61,11 +68,14 @@ class MakapixSlot : public Slot {
   uint32_t pollIntervalMs = 0;
   bool linked = false;
   uint32_t linkedAt = 0;
+  bool codeShownLast = false; // the last unlinked turn showed the code, so starter art is next
 
   // Playback
   uint8_t *data = nullptr;
   uint32_t postId = 0;
   uint32_t uploadId = 0; // playing an upload: no view is reported
+  uint16_t starterId = 0; // playing starter art: no view is reported either
+  bool starterFallback = false; // set before play() for status: shown for want of Makapix art
   bool requested = false; // asked for from the gallery
   bool viewNoted = false;
   const channels::Channel *playingChannel = nullptr; // where the artwork came from; null from the card

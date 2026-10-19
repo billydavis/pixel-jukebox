@@ -11,6 +11,7 @@
 #include "app/telemetry.h"
 #include "network/reporter.h"
 #include "storage/art_cache.h"
+#include "storage/starter_art.h"
 #include "storage/uploads.h"
 
 static const uint32_t CODE_VALID_MS = 15 * 60 * 1000;
@@ -19,7 +20,7 @@ static const uint32_t POLL_INTERVAL_MS = 5000;
 static const uint32_t RATE_LIMIT_WAIT_MS = 60000;
 static const uint32_t LINKED_SHOW_MS = 1500;
 static const uint32_t LOAD_WAIT_MS = 15000;
-static const uint32_t UPLOAD_DWELL_MS = 30000; // as long as Makapix's default
+static const uint32_t UPLOAD_DWELL_MS = 30000; // as long as Makapix's default; starter art too
 static const uint32_t IDLE_UPDATE_MS = 100;
 static const uint32_t VIEW_AFTER_MS = 2000; // shown this long, an artwork counts as seen
 static const int MAX_LOAD_ATTEMPTS = 5;
@@ -128,9 +129,44 @@ static LoadStatus loadUpload(Feed &feed, LoadedArtwork &loaded) {
   return LoadStatus::Failed;
 }
 
+// A piece of starter art, copied out of flash into an artwork like any other.
+static bool readStarter(uint16_t id, LoadedArtwork &loaded) {
+  StarterPiece piece;
+  uint8_t *data = nullptr;
+  size_t size = 0;
+  if (!starterArtFind(id, piece) || !starterArtRead(id, data, size)) {
+    return false;
+  }
+  makapix::Artwork artwork;
+  artwork.postId = 0;
+  artwork.dwellMs = UPLOAD_DWELL_MS;
+  artwork.fromCache = true;
+  artwork.starterId = id;
+  artwork.title = piece.title;
+  loaded = {artwork, data, size};
+  return true;
+}
+
+static bool nextStarter(LoadedArtwork &loaded) {
+  uint16_t id;
+  return starterArtNext(id) && readStarter(id, loaded);
+}
+
+static LoadStatus loadStarter(Feed &feed, LoadedArtwork &loaded) {
+  if (nextStarter(loaded)) {
+    setProblem(feed, "");
+    return LoadStatus::Ready;
+  }
+  setProblem(feed, starterArtCount() ? "the starter art could not be read" : "this firmware has no starter art");
+  return LoadStatus::Refused;
+}
+
 static LoadStatus loadNext(Feed &feed, LoadedArtwork &loaded) {
   if (feed.channel.kind == channels::Kind::Uploads) {
     return loadUpload(feed, loaded);
+  }
+  if (feed.channel.kind == channels::Kind::Starter) {
+    return loadStarter(feed, loaded);
   }
   if (WiFi.status() != WL_CONNECTED) {
     return loadFromCache(loaded) ? LoadStatus::Ready : LoadStatus::Failed;
@@ -300,6 +336,11 @@ bool MakapixSlot::start() {
     requestedUpload = 0;
     return showUpload(id);
   }
+  if (requestedStarter) {
+    uint16_t id = requestedStarter;
+    requestedStarter = 0;
+    return showStarter(id);
+  }
   if (requestedPost) {
     uint32_t postId = requestedPost;
     requestedPost = 0;
@@ -308,14 +349,36 @@ bool MakapixSlot::start() {
   if (!feed) {
     useChannel("all");
   }
-  if (feed->channel.kind == channels::Kind::Uploads) {
-    return startPlaying(); // the card is enough: no Wi-Fi or Makapix link needed
+  // With nothing else to show, starter art plays rather than the turn being
+  // skipped: a new panel, offline with an empty card, or a channel that has
+  // nothing right now (its problem is still shown in the rotation editor).
+  if (channels::isLocal(feed->channel.kind)) {
+    // The card or the firmware is enough: no Wi-Fi or Makapix link needed.
+    return startPlaying() || playStarter();
   }
   if (WiFi.status() != WL_CONNECTED) {
     // Offline: the loader can still play from the card.
-    return (loading || feed->ready || artCacheAvailable()) ? startPlaying() : false;
+    return ((loading || feed->ready || artCacheAvailable()) && startPlaying()) || playStarter();
   }
-  return makapix::isRegistered() ? startPlaying() : startRegistration();
+  if (!makapix::isRegistered()) {
+    // Until it is linked, turns go between the code and starter art.
+    codeShownLast = !codeShownLast || !starterArtCount();
+    return (codeShownLast && startRegistration()) || playStarter();
+  }
+  return startPlaying() || playStarter();
+}
+
+bool MakapixSlot::playStarter() {
+  LoadedArtwork starter;
+  if (!nextStarter(starter)) {
+    return false;
+  }
+  starterFallback = true;
+  if (!play(starter)) {
+    starterFallback = false;
+    return false;
+  }
+  return true;
 }
 
 // Shows a registration code for the user to enter on makapix.club. The same
@@ -454,6 +517,16 @@ bool MakapixSlot::showUpload(uint32_t id) {
   return true;
 }
 
+// One piece of starter art asked for from the Art tab, for one turn.
+bool MakapixSlot::showStarter(uint16_t id) {
+  LoadedArtwork starter;
+  if (!readStarter(id, starter) || !play(starter)) {
+    return false;
+  }
+  requested = true;
+  return true;
+}
+
 bool MakapixSlot::play(const LoadedArtwork &current) {
   MEMORY_CHECK("play");
   Serial.printf("Playing post %u (%u bytes%s)\n", (unsigned)current.artwork.postId, (unsigned)current.size,
@@ -468,7 +541,11 @@ bool MakapixSlot::play(const LoadedArtwork &current) {
   if (shareUrl.startsWith("http://")) {
     shareUrl = "https://" + shareUrl.substring(7);
   }
-  if (current.artwork.uploadId) {
+  if (current.artwork.starterId) {
+    StarterPiece piece;
+    starterArtFind(current.artwork.starterId, piece);
+    statusSetStarter(piece.id, piece.title, piece.credit, starterFallback);
+  } else if (current.artwork.uploadId) {
     statusSetUpload(current.artwork.uploadId, current.artwork.title);
   } else {
     statusSetArtwork(current.artwork.postId, current.artwork.ownerHandle, shareUrl, current.artwork.fromCache,
@@ -479,6 +556,8 @@ bool MakapixSlot::play(const LoadedArtwork &current) {
   startedAt = millis();
   postId = current.artwork.postId;
   uploadId = current.artwork.uploadId;
+  starterId = current.artwork.starterId;
+  starterFallback = false;
   requested = false;
   viewNoted = false;
   data = current.data;
@@ -525,8 +604,8 @@ uint32_t MakapixSlot::updateRegistration() {
 uint32_t MakapixSlot::updatePlaying() {
   if (!viewNoted && !failed && millis() - startedAt >= VIEW_AFTER_MS) {
     viewNoted = true;
-    if (uploadId) {
-      // An upload is not a Makapix post: nothing to report.
+    if (uploadId || starterId) {
+      // An upload or starter art is not a Makapix post: nothing to report.
     } else if (playingChannel) {
       const char *hashtag = playingChannel->kind == channels::Kind::Hashtag ? playingChannel->value.c_str() : "";
       reporterNoteView(postId, requested, channels::makapixName(playingChannel->kind), hashtag);

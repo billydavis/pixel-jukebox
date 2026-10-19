@@ -113,6 +113,10 @@ effect before the reply, which is `200` with the new state.
 | `GET` | `/uploads/{id}.gif` | One upload's GIF |
 | `POST` | `/uploads/{id}/show` | Show an upload now |
 | `DELETE` | `/uploads/{id}` | Delete an upload |
+| `GET` | `/starter` | The starter art built into the firmware |
+| `GET` | `/starter/{id}.gif` | One piece of starter art |
+| `POST` | `/starter/{id}/show` | Show a piece of starter art now |
+| `GET` | `/starter/{id}/still.gif` | One frame of a piece, for thumbnails |
 | `GET` | `/auth` | Whether a PIN is set and this client is signed in (open) |
 | `POST` | `/auth/login` | Sign in with the PIN (open) |
 | `POST` | `/auth/logout` | Sign this browser out (open) |
@@ -160,7 +164,7 @@ effect before the reply, which is `200` with the new state.
 | `artwork` | The Makapix post on screen; `null` when the slot is not showing artwork (clock, registration code) |
 | `artwork.owner` | The artist's Makapix handle |
 | `artwork.gifUrl` | HTTPS address of the GIF being played, for clients that want to show it. Empty when the artwork is playing from the card |
-| `artwork.source` | `makapix` when downloaded for this turn, `card` when played from the board's offline copy, because Makapix or the Wi-Fi could not be reached or because it was asked for from the gallery |
+| `artwork.source` | `makapix` when downloaded for this turn, `card` when played from the board's offline copy, because Makapix or the Wi-Fi could not be reached or because it was asked for from the gallery; `upload` and `starter` for art that is not from Makapix (see Uploads and Starter art) |
 | `artwork.liked` | Whether the artwork has been liked from this panel; see `PUT /likes/{postId}` |
 | `artwork.channel` | The channel it came from, as `channelLabel` in `GET /slots`; `null` when from the card |
 | `screen` | What has the panel this turn: `rotation`, `request` (one artwork asked for), `sound`, `nightClock` or `dark`. See [What is on screen](#what-is-on-screen) |
@@ -608,14 +612,18 @@ with different channels.
 | `artist:<name>` | One artist's art, by their Makapix name |
 | `hashtag:<tag>` | Posts carrying a hashtag |
 | `likedby:<name>` | Art someone has reacted to, newest reactions included; with your own name, your likes from the website and the panel |
+| `uploads` | Art uploaded to the card (see Uploads) |
+| `starter` | The starter art built into the firmware (see Starter art) |
 
 Every channel is limited, as before, to art that fits the panel and has a GIF,
 shuffled. A name or tag may be written with its `@` or `#`; it is stored
 without, and hashtags in lower case. Each channel keeps its own place in its
 feed and an artwork ready, so taking turns between channels loses nothing. A
 channel with little art loops through it. Without a connection, every artwork
-slot plays from the card, whatever its channel. View reports say which channel
-an artwork came from.
+slot plays from the card, whatever its channel. When a slot has nothing to
+play at all (offline with nothing on the card, a channel with a `problem`, a
+download that has not arrived), it plays starter art rather than being
+skipped. View reports say which channel an artwork came from.
 
 ### `PUT /slots`
 
@@ -740,6 +748,42 @@ Shows it for one turn, like `POST /show/{postId}`. Reply: `202 {"queued":"showUp
 ### `DELETE /uploads/{id}`
 
 Reply: `200 {"removed": 3}`. `404` for no such upload.
+
+## Starter art
+
+Art built into the firmware, so a new panel has something to show before it
+is linked to Makapix, and any panel has something to show offline with an
+empty card: 28 pieces of 64 x 64 animated GIFs, from CC0 pixel art packs and
+some drawn by code (`tools/make_starter_art.py`; credits in `CREDITS.md`).
+The `starter` channel plays them, shuffled. An artwork slot with nothing else
+to play plays them too, and before the panel is linked its turns go between
+the registration code and starter art. Not Makapix posts: no views or likes.
+The Built-in view of the control page's Art tab shows them all.
+
+While a piece is on screen, `GET /status` has `artwork` as
+`{"postId": null, "source": "starter", "starter": {"id": 7, "title": "Pineapple, doubled", "credit": "Pixel Frog, Pixel Adventure 1"}, "channel": "Starter art"}`.
+`channel` is `null` when it is shown for want of Makapix art.
+
+### `GET /starter`
+
+```json
+{ "count": 28, "bytes": 1146070,
+  "pieces": [ { "id": 1, "title": "Ninja Frog runs", "credit": "Pixel Frog, Pixel Adventure 1" } ] }
+```
+
+### `GET /starter/{id}.gif`
+
+The GIF. `404` for no such piece.
+
+### `GET /starter/{id}/still.gif`
+
+One frame of the piece as a small GIF (about 1.4 KB, against 40 KB for a
+whole piece), for thumbnails. `404` for no such piece.
+
+### `POST /starter/{id}/show`
+
+Shows it for one turn, like `POST /show/{postId}`; the Built-in view of the
+Art tab does this. Reply: `202 {"queued":"showStarter"}`. `404` for no such piece.
 
 ### `POST /update`
 

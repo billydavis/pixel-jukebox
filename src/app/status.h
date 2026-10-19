@@ -16,6 +16,9 @@ struct PlayerStatus {
   String screen;  // what has the panel: screen::name() of the current source
   uint32_t uploadId = 0; // an upload is showing (postId is 0 then)
   String uploadName;
+  uint16_t starterId = 0; // a piece of starter art is showing (postId is 0 then)
+  String starterTitle;
+  String starterCredit;
 };
 
 void statusBegin();
@@ -26,5 +29,8 @@ void statusSetArtwork(uint32_t postId, const String &owner, const String &gifUrl
                       const String &channel = "");
 // An upload (storage/uploads.h) in place of a Makapix artwork.
 void statusSetUpload(uint32_t uploadId, const String &name);
+// Starter art (storage/starter_art.h). `fallback`: shown because there was no
+// Makapix art, rather than from the starter channel.
+void statusSetStarter(uint16_t id, const String &title, const String &credit, bool fallback);
 void statusClearArtwork();
 PlayerStatus statusGet();

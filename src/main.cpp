@@ -28,6 +28,7 @@
 #include "app/telemetry.h"
 #include "storage/art_cache.h"
 #include "storage/card.h"
+#include "storage/starter_art.h"
 #include "storage/uploads.h"
 #include "app/transition.h"
 #include "screen_rules.h"
@@ -43,6 +44,7 @@ static size_t skippedInARow = 0;
 static uint16_t *outgoing = nullptr; // the frame a transition starts from
 static uint32_t requestedPost = 0;   // an artwork asked for (gallery, Back, makapix.club)
 static uint32_t requestedUpload = 0; // an upload asked for from the Art tab
+static uint16_t requestedStarter = 0; // a piece of starter art asked for from the Art tab
 static int requestedTest = -1;       // a test pattern asked for from Settings
 static TestPatternSlot testSlot;
 static bool requestFromBack = false; // that request came from Back: not a new step in the history
@@ -162,6 +164,12 @@ static void runSlot(Slot *slot, screen::Source source) {
             statusSetHeld(false);
             slot->stop();
             return;
+          case CommandType::ShowStarter:
+            Serial.printf("Command: show starter art %u\n", (unsigned)command.value);
+            requestedStarter = command.value;
+            statusSetHeld(false);
+            slot->stop();
+            return;
           case CommandType::ShowTestPattern:
             Serial.printf("Command: test pattern %u\n", (unsigned)command.value);
             requestedTest = command.value;
@@ -249,6 +257,8 @@ static void handleCommandsWhileIdle() {
       requestedPost = command.value;
     } else if (command.type == CommandType::ShowUpload) {
       requestedUpload = command.value;
+    } else if (command.type == CommandType::ShowStarter) {
+      requestedStarter = command.value;
     } else if (command.type == CommandType::ShowTestPattern) {
       requestedTest = command.value;
     } else if (command.type == CommandType::Back) {
@@ -274,6 +284,10 @@ static void nightDark() {
           return;
         case CommandType::ShowUpload:
           requestedUpload = command.value;
+          nightWake();
+          return;
+        case CommandType::ShowStarter:
+          requestedStarter = command.value;
           nightWake();
           return;
         case CommandType::ShowTestPattern:
@@ -344,6 +358,7 @@ void setup() {
   telemetryBootMark("card");
   artCacheBegin();
   uploadsBegin();
+  starterArtBegin();
   MEMORY_AT("cache");
   telemetryBootMark("cache");
 
@@ -393,7 +408,7 @@ void loop() {
   // schedule, sound mode, a request and the rotation.
   bool nightOff = nightNow().off;
   screen::Source source =
-      screen::choose(screenInputs(requestedPost != 0 || requestedUpload != 0 || requestedTest >= 0));
+      screen::choose(screenInputs(requestedPost != 0 || requestedUpload != 0 || requestedStarter != 0 || requestedTest >= 0));
   statusSetScreen(screen::name(source));
   if (source == screen::Source::Dark) {
     lastSource = source;
@@ -420,11 +435,14 @@ void loop() {
       testing = true;
     } else if (requestedUpload) {
       rotationArtworkSlot()->requestUpload(requestedUpload);
+    } else if (requestedStarter) {
+      rotationArtworkSlot()->requestStarter(requestedStarter);
     } else {
       rotationArtworkSlot()->request(requestedPost);
     }
     requestedTest = -1;
     requestedUpload = 0;
+    requestedStarter = 0;
     requestedPost = 0;
     fromBack = requestFromBack;
     requestFromBack = false;

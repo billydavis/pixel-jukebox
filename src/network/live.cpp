@@ -254,7 +254,7 @@ static void publishStatus(bool online) {
   JsonDocument doc;
   doc["player_key"] = makapix::key();
   doc["status"] = online ? "online" : "offline";
-  if (now.hasArtwork) {
+  if (now.hasArtwork && now.postId) { // uploads and starter art are not Makapix posts
     doc["current_post_id"] = now.postId;
   } else {
     doc["current_post_id"] = nullptr;

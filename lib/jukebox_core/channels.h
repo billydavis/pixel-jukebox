@@ -13,13 +13,14 @@
 //   hashtag:<tag>      posts carrying a hashtag
 //   likedby:<name>     art someone has reacted to; with your own name, your likes
 //   uploads            art uploaded to the panel's card (not from Makapix)
+//   starter            the starter art built into the firmware (not from Makapix)
 //
 // Names and tags may start with @ or #, which is dropped. Makapix checks that
 // a name exists; here only the shape is checked.
 
 namespace channels {
 
-enum class Kind { All, Promoted, Mine, Artist, Hashtag, LikedBy, Uploads };
+enum class Kind { All, Promoted, Mine, Artist, Hashtag, LikedBy, Uploads, Starter };
 
 struct Channel {
   Kind kind = Kind::All;
@@ -32,10 +33,15 @@ bool parse(const std::string &spec, Channel &channel, std::string &error);
 // The canonical string: hashtags lower case, no @ or #.
 std::string format(const Channel &channel);
 
-// For people: "Everything", "Promoted", "My art", "@Fab", "#cat", "Liked by @Fab".
+// For people: "Everything", "Promoted", "My art", "@Fab", "#cat", "Liked by @Fab",
+// "My uploads", "Starter art".
 std::string label(const Channel &channel);
 
-// The Makapix query_posts channel name. Uploads are not on Makapix: "all".
+// The Makapix query_posts channel name. Uploads and starter art are not on
+// Makapix: "all".
+
+// True for channels played from the panel itself, which need no Wi-Fi or Makapix.
+bool isLocal(Kind kind);
 const char *makapixName(Kind kind);
 
 // A play_channel command from makapix.club ("all", "promoted", "by_user" or

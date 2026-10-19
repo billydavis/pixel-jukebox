@@ -164,7 +164,7 @@ try:
     code, slots = call("GET", "/slots")
     check("slots list the channel types",
           code == 200 and [c.get("type") for c in slots.get("channels", [])]
-          == ["all", "promoted", "mine", "likedby", "artist", "hashtag", "uploads"], slots.get("channels"))
+          == ["all", "promoted", "mine", "likedby", "artist", "hashtag", "uploads", "starter"], slots.get("channels"))
     check("every artwork slot has a channel",
           all(r.get("channel") for r in slots.get("rotation", []) if r.get("slot") == "makapix"), slots.get("rotation"))
     for bad in ({"slot": "makapix", "turns": 1, "channel": "nope"},
@@ -399,6 +399,44 @@ try:
         check("a removed upload is gone", call("GET", f"/uploads/{upload_id}.gif")[0] == 404)
     else:
         print("  (no card: upload checks skipped)")
+
+    section("Starter art")
+    code, body = call("GET", "/starter")
+    pieces = body.get("pieces") or []
+    check("the starter art is listed, with credits",
+          code == 200 and body.get("count") == len(pieces) > 0
+          and all(p.get("title") and p.get("credit") for p in pieces)
+          and [p["id"] for p in pieces] == list(range(1, len(pieces) + 1)), body)
+    if pieces:
+        with urllib.request.urlopen(f"{BASE}/starter/{len(pieces)}.gif", timeout=10) as response:
+            gif = response.read()
+            check("a piece can be fetched as a GIF",
+                  response.headers.get("Content-Type") == "image/gif" and gif[:4] == b"GIF8" and len(gif) > 100)
+        with urllib.request.urlopen(f"{BASE}/starter/{len(pieces)}/still.gif", timeout=10) as response:
+            still = response.read()
+            check("so can its still, smaller", still[:4] == b"GIF8" and 100 < len(still) < len(gif))
+    for bad in ("0", str(len(pieces) + 1), "abc", "1000"):
+        check(f"no piece {bad}", call("GET", f"/starter/{bad}.gif")[0] == 404)
+        check(f"piece {bad} cannot be shown", call("POST", f"/starter/{bad}/show")[0] == 404)
+        check(f"piece {bad} has no still", call("GET", f"/starter/{bad}/still.gif")[0] == 404)
+    if pieces:
+        code, body = call("POST", "/starter/2/show")
+        check("a piece can be shown", code == 202 and body.get("queued") == "showStarter"
+              and wait_for(lambda s: ((s.get("artwork") or {}).get("starter") or {}).get("id") == 2), body)
+    code, body = call("PUT", "/channel", {"channel": "starter"})
+    check("the starter channel can be played", code == 200, body)
+    shown = False
+    for _ in range(3):  # the clock may have the next turn
+        call("POST", "/next")
+        if wait_for(lambda s: (s.get("artwork") or {}).get("source") == "starter", 20):
+            shown = True
+            break
+    now = status()
+    art = now.get("artwork") or {}
+    check("starter art is on screen, from its channel",
+          shown and art.get("postId") is None and (art.get("starter") or {}).get("title")
+          and art.get("channel") == "Starter art", art)
+    call("DELETE", "/channel")
 
     section("Firmware update")
     code, body = call("GET", "/diagnostics")

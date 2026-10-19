@@ -24,6 +24,12 @@
       "description": "An id from List Uploads, for the requests on one upload."
     },
     {
+      "key": "starter_id",
+      "value": "1",
+      "type": "string",
+      "description": "An id from List Starter Art, 1 up."
+    },
+    {
       "key": "pin",
       "value": "",
       "type": "string",
@@ -3097,6 +3103,224 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"channel\": \"uploads\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Starter art",
+      "item": [
+        {
+          "name": "List Starter Art",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/starter",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "starter"
+              ]
+            },
+            "description": "The starter art built into the firmware, with credits."
+          },
+          "response": []
+        },
+        {
+          "name": "Get A Starter Piece's GIF",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/starter/{{starter_id}}.gif",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "starter",
+                "{{starter_id}}.gif"
+              ]
+            },
+            "description": "One piece of starter art."
+          },
+          "response": []
+        },
+        {
+          "name": "Get A Starter Piece's Still",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/starter/{{starter_id}}/still.gif",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "starter",
+                "{{starter_id}}",
+                "still.gif"
+              ]
+            },
+            "description": "One frame of a piece, for thumbnails."
+          },
+          "response": []
+        },
+        {
+          "name": "Show A Starter Piece",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 202', function () {",
+                  "  pm.response.to.have.status(202);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/starter/{{starter_id}}/show",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "starter",
+                "{{starter_id}}",
+                "show"
+              ]
+            },
+            "description": "Shows a piece of starter art for one turn."
+          },
+          "response": []
+        },
+        {
+          "name": "Play Starter Art",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/channel",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "channel"
+              ]
+            },
+            "description": "Every artwork slot plays the starter art, for now.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"starter\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

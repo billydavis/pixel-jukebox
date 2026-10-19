@@ -23,6 +23,7 @@
 #include "rtc_time.h"
 #include "shtc3_math.h"
 #include "spectrum_math.h"
+#include "starter_pack.h"
 #include "tap_detector.h"
 #include "test_patterns.h"
 #include "transitions.h"
@@ -1381,6 +1382,92 @@ static void test_channels_uploads() {
   TEST_ASSERT_EQUAL_STRING("uploads", channels::format(channel).c_str());
   TEST_ASSERT_EQUAL_STRING("My uploads", channels::label(channel).c_str());
   TEST_ASSERT_FALSE(channels::parse("uploads:x", channel, error));
+  TEST_ASSERT_TRUE(channels::isLocal(channel.kind));
+}
+
+static void test_channels_starter() {
+  channels::Channel channel;
+  std::string error;
+  TEST_ASSERT_TRUE(channels::parse("starter", channel, error));
+  TEST_ASSERT_TRUE(channel.kind == channels::Kind::Starter);
+  TEST_ASSERT_EQUAL_STRING("starter", channels::format(channel).c_str());
+  TEST_ASSERT_EQUAL_STRING("Starter art", channels::label(channel).c_str());
+  TEST_ASSERT_EQUAL_STRING("all", channels::makapixName(channel.kind));
+  TEST_ASSERT_TRUE(channels::isLocal(channel.kind));
+  TEST_ASSERT_TRUE(channels::parse("promoted", channel, error));
+  TEST_ASSERT_FALSE(channels::isLocal(channel.kind));
+}
+
+// ---- starter_pack -------------------------------------------------------------
+
+// A pack as tools/stage_starter_art.py writes it, with GIFs of the given bodies.
+static std::vector<uint8_t> makePack(const std::vector<std::string> &gifs) {
+// Each piece's still is "GIF89s".
+  const std::string still = "GIF89s";
+  std::vector<uint8_t> index = {'P', 'J', 'S', 'A', 2, (uint8_t)gifs.size()};
+  size_t indexSize = 6;
+  for (size_t i = 0; i < gifs.size(); i++) {
+    indexSize += 16 + 1 + 5 + 1 + 3; // title "Piece", credit "Kim"
+  }
+  uint32_t offset = (uint32_t)indexSize;
+  auto u32 = [&index](uint32_t value) {
+    for (int b = 0; b < 4; b++) index.push_back((uint8_t)(value >> (8 * b)));
+  };
+  for (const std::string &gif : gifs) {
+    u32(offset);
+    u32((uint32_t)gif.size());
+    u32(offset + (uint32_t)gif.size());
+    u32((uint32_t)still.size());
+    index.push_back(5);
+    for (char c : std::string("Piece")) index.push_back((uint8_t)c);
+    index.push_back(3);
+    for (char c : std::string("Kim")) index.push_back((uint8_t)c);
+    offset += (uint32_t)(gif.size() + still.size());
+  }
+  for (const std::string &gif : gifs) {
+    index.insert(index.end(), gif.begin(), gif.end());
+    index.insert(index.end(), still.begin(), still.end());
+  }
+  return index;
+}
+
+static void test_starter_pack_reads_pieces() {
+  std::vector<uint8_t> pack = makePack({"GIF89a-one", "GIF89a-second"});
+  std::vector<starterpack::Piece> pieces;
+  TEST_ASSERT_TRUE(starterpack::parse(pack.data(), pack.size(), pieces));
+  TEST_ASSERT_EQUAL(2, (int)pieces.size());
+  TEST_ASSERT_EQUAL_STRING("Piece", pieces[0].title.c_str());
+  TEST_ASSERT_EQUAL_STRING("Kim", pieces[1].credit.c_str());
+  TEST_ASSERT_EQUAL(10, (int)pieces[0].size);
+  TEST_ASSERT_EQUAL(0, memcmp(pack.data() + pieces[1].offset, "GIF89a-second", 13));
+  TEST_ASSERT_EQUAL(6, (int)pieces[1].stillSize);
+  TEST_ASSERT_EQUAL(0, memcmp(pack.data() + pieces[1].stillOffset, "GIF89s", 6));
+}
+
+static void test_starter_pack_refuses_damage() {
+  std::vector<starterpack::Piece> pieces;
+  std::vector<uint8_t> pack = makePack({"GIF89a-one"});
+  TEST_ASSERT_FALSE(starterpack::parse(pack.data(), pack.size() - 1, pieces)); // cut short
+  TEST_ASSERT_TRUE(pieces.empty());
+  std::vector<uint8_t> wrong = pack;
+  wrong[4] = 3; // a later version
+  TEST_ASSERT_FALSE(starterpack::parse(wrong.data(), wrong.size(), pieces));
+  wrong = pack;
+  wrong[wrong.size() - 16] = 'X'; // the piece is not a GIF
+  TEST_ASSERT_FALSE(starterpack::parse(wrong.data(), wrong.size(), pieces));
+  wrong = pack;
+  wrong[wrong.size() - 6] = 'X'; // nor is its still
+  TEST_ASSERT_FALSE(starterpack::parse(wrong.data(), wrong.size(), pieces));
+  wrong = pack;
+  wrong[1] = 'X'; // not a pack
+  TEST_ASSERT_FALSE(starterpack::parse(wrong.data(), wrong.size(), pieces));
+  wrong = pack;
+  wrong[6] = 0; // offset 0: over the index
+  TEST_ASSERT_FALSE(starterpack::parse(wrong.data(), wrong.size(), pieces));
+  TEST_ASSERT_FALSE(starterpack::parse(nullptr, 0, pieces));
+  std::vector<uint8_t> empty = makePack({});
+  TEST_ASSERT_TRUE(starterpack::parse(empty.data(), empty.size(), pieces));
+  TEST_ASSERT_TRUE(pieces.empty());
 }
 
 // ---- test_patterns ------------------------------------------------------------
@@ -1555,6 +1642,9 @@ static int runTests() {
   RUN_TEST(test_upload_file_names_round_trip);
   RUN_TEST(test_upload_decodes_percent_names);
   RUN_TEST(test_channels_uploads);
+  RUN_TEST(test_channels_starter);
+  RUN_TEST(test_starter_pack_reads_pieces);
+  RUN_TEST(test_starter_pack_refuses_damage);
   RUN_TEST(test_pattern_names_round_trip);
   RUN_TEST(test_pattern_dark_steps_climb);
   RUN_TEST(test_pattern_bars_and_ramps);

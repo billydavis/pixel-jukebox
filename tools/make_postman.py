@@ -181,6 +181,16 @@ FOLDERS = [
         ("Play My Uploads", "PUT", "channel", "Every artwork slot plays your uploads, for now.",
          {"channel": "uploads"}, 200),
     ]),
+    ("Starter art", [
+        ("List Starter Art", "GET", "starter", "The starter art built into the firmware, with credits.", None, 200),
+        ("Get A Starter Piece's GIF", "GET", "starter/{{starter_id}}.gif", "One piece of starter art.", None, 200),
+        ("Get A Starter Piece's Still", "GET", "starter/{{starter_id}}/still.gif",
+         "One frame of a piece, for thumbnails.", None, 200),
+        ("Show A Starter Piece", "POST", "starter/{{starter_id}}/show", "Shows a piece of starter art for one turn.",
+         None, 202),
+        ("Play Starter Art", "PUT", "channel", "Every artwork slot plays the starter art, for now.",
+         {"channel": "starter"}, 200),
+    ]),
     ("Firmware", [
         ("Update Firmware", "POST", "update",
          "Installs new firmware. As saved it has no file and expects 400; to really update, attach "
@@ -275,6 +285,11 @@ collection = {
         "value": "1",
         "type": "string",
         "description": "An id from List Uploads, for the requests on one upload.",
+    }, {
+        "key": "starter_id",
+        "value": "1",
+        "type": "string",
+        "description": "An id from List Starter Art, 1 up.",
     }, {
         "key": "pin",
         "value": "",

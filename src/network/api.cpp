@@ -31,6 +31,7 @@
 #include "slots/slot_makapix.h"
 #include "storage/art_cache.h"
 #include "storage/card.h"
+#include "storage/starter_art.h"
 #include "storage/uploads.h"
 #include "upload_rules.h"
 #include "transitions.h"
@@ -233,7 +234,21 @@ static void handleStatus() {
   }
   slot["held"] = status.held;
 
-  if (status.hasArtwork && status.uploadId) {
+  if (status.hasArtwork && status.starterId) {
+    // Starter art: built in, not a Makapix post.
+    JsonObject artwork = doc["artwork"].to<JsonObject>();
+    artwork["postId"] = nullptr;
+    artwork["source"] = "starter";
+    JsonObject starter = artwork["starter"].to<JsonObject>();
+    starter["id"] = status.starterId;
+    starter["title"] = status.starterTitle;
+    starter["credit"] = status.starterCredit;
+    if (status.channel.isEmpty()) {
+      artwork["channel"] = nullptr; // shown for want of Makapix art
+    } else {
+      artwork["channel"] = status.channel;
+    }
+  } else if (status.hasArtwork && status.uploadId) {
     // An upload: not a Makapix post, so no owner, link or like.
     JsonObject artwork = doc["artwork"].to<JsonObject>();
     artwork["postId"] = nullptr;
@@ -877,7 +892,7 @@ static void sendSlots() {
   const char *const TYPES[][3] = {{"all", "Everything", ""},          {"promoted", "Promoted", ""},
                                   {"mine", "My art", ""},             {"likedby", "Liked by", "name"},
                                   {"artist", "An artist", "name"},    {"hashtag", "A hashtag", "hashtag"},
-                                  {"uploads", "My uploads", ""}};
+                                  {"uploads", "My uploads", ""},      {"starter", "Starter art", ""}};
   for (const auto &type : TYPES) {
     JsonObject item = channelTypes.add<JsonObject>();
     item["type"] = type[0];
@@ -1160,6 +1175,62 @@ static void handleUploadImage() {
   free(data);
 }
 
+// --- starter art ---------------------------------------------------------------------
+
+static void handleListStarter() {
+  JsonDocument doc;
+  starterArtReport(doc.to<JsonObject>());
+  JsonArray list = doc["pieces"].to<JsonArray>();
+  for (uint16_t id = 1; id <= starterArtCount(); id++) {
+    StarterPiece piece;
+    starterArtFind(id, piece);
+    JsonObject item = list.add<JsonObject>();
+    item["id"] = piece.id;
+    item["title"] = piece.title;
+    item["credit"] = piece.credit;
+  }
+  sendJson(200, doc);
+}
+
+// The id in /starter/{id}..., or 0.
+static uint16_t pathStarterId() {
+  String text = server.pathArg(0);
+  if (text.isEmpty() || text.length() > 3) {
+    return 0;
+  }
+  for (char c : text) {
+    if (!isdigit(c)) {
+      return 0;
+    }
+  }
+  return text.toInt();
+}
+
+static void sendStarterImage(bool still) {
+  const uint8_t *data;
+  size_t size;
+  uint16_t id = pathStarterId();
+  if (!id || !starterArtBytes(id, data, size, still)) {
+    sendError(404, "No such piece");
+    return;
+  }
+  server.sendHeader("Cache-Control", "max-age=3600"); // the same id may hold other art after an update
+  server.send_P(200, "image/gif", (const char *)data, size);
+}
+
+static void handleStarterImage() { sendStarterImage(false); }
+static void handleStarterStill() { sendStarterImage(true); }
+
+static void handleShowStarter() {
+  uint16_t id = pathStarterId();
+  StarterPiece piece;
+  if (!id || !starterArtFind(id, piece)) {
+    sendError(404, "No such piece");
+    return;
+  }
+  sendQueued(commandSend(CommandType::ShowStarter, id), "showStarter");
+}
+
 static void handleShowUpload() {
   uint32_t id = pathUploadId();
   UploadInfo info;
@@ -1262,6 +1333,11 @@ void apiBegin() {
   server.on(API_BASE "/auth/pin", HTTP_PUT, guarded(handlePutPin));
   server.on(API_BASE "/update", HTTP_POST, handleUpdate, handleUpdateBody); // checks the PIN itself
   server.on(API_BASE "/uploads", HTTP_GET, guarded(handleListUploads));
+  server.on(API_BASE "/starter", HTTP_GET, guarded(handleListStarter));
+  // Before {}.gif, which would match "7/still" as the id.
+  server.on(UriBraces(API_BASE "/starter/{}/still.gif"), HTTP_GET, guarded(handleStarterStill));
+  server.on(UriBraces(API_BASE "/starter/{}.gif"), HTTP_GET, guarded(handleStarterImage));
+  server.on(UriBraces(API_BASE "/starter/{}/show"), HTTP_POST, guarded(handleShowStarter));
   server.on(API_BASE "/uploads", HTTP_POST, handleUpload, handleUploadBody); // checks the PIN itself
   server.on(UriBraces(API_BASE "/uploads/{}.gif"), HTTP_GET, guarded(handleUploadImage));
   server.on(UriBraces(API_BASE "/uploads/{}/show"), HTTP_POST, guarded(handleShowUpload));

@@ -15,6 +15,7 @@ struct Artwork {
   uint32_t dwellMs;
   bool fromCache = false; // played from the card, not downloaded
   uint32_t uploadId = 0;  // an upload (storage/uploads.h) rather than a Makapix post
+  uint16_t starterId = 0; // starter art (storage/starter_art.h) rather than a Makapix post
   String title;           // an upload's name
 };
 

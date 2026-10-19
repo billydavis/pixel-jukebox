@@ -90,7 +90,7 @@ p{margin:0}
 .heart{flex:none;min-width:52px;min-height:52px;background:var(--panel);box-shadow:3px 3px 0 var(--edge)}
 .heart[aria-pressed=true]{background:var(--held)}
 .heart svg{width:26px;height:26px}
-.seg{display:grid;grid-template-columns:1fr 1fr;gap:var(--s1);padding:var(--s1);background:var(--sunk)}
+.seg{display:grid;grid-auto-columns:1fr;grid-auto-flow:column;gap:var(--s1);padding:var(--s1);background:var(--sunk)}
 .seg button{min-height:44px;border:0;border-radius:0;background:none;cursor:pointer;color:var(--dim);
   font:700 13px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase}
 .seg button[aria-pressed=true]{background:var(--panel);color:var(--ink);box-shadow:inset 0 -3px 0 var(--accent)}
@@ -352,6 +352,7 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
       <div class="seg" role="group" aria-label="Collection">
         <button id="vmine" aria-pressed="true" aria-controls="v-mine">My uploads</button>
         <button id="vsaved" aria-pressed="false" aria-controls="v-saved">Saved art</button>
+        <button id="vstarter" aria-pressed="false" aria-controls="v-starter">Built-in</button>
       </div>
       <div class="view" id="v-mine">
         <p class="lead" id="upsum">&nbsp;</p>
@@ -372,6 +373,14 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
           <button class="key small" id="more" hidden>Show more</button>
           <button class="key small" id="clear" hidden>Clear saved art</button>
         </div>
+      </div>
+      <div class="view" id="v-starter" hidden>
+        <p class="lead" id="stsum">&nbsp;</p>
+        <div class="pinkeys">
+          <button class="key small" id="stplay" hidden>Play built-in art</button>
+        </div>
+        <ul class="grid" id="stgrid" aria-label="Built-in art"></ul>
+        <p class="note" id="stnote" role="status"></p>
       </div>
     </div>
     <div class="pick" id="pick" hidden>
@@ -562,7 +571,7 @@ function uptime(s){
   return d?d+'d '+h+'h':h?h+'h '+m+'m':m?m+'m':s+'s';
 }
 function artSrc(art){
-  return art.upload?API+'/uploads/'+art.upload.id+'.gif':art.source=='card'?API+'/card/art/'+art.postId+'.gif':art.gifUrl;
+  return art.starter?API+'/starter/'+art.starter.id+'.gif':art.upload?API+'/uploads/'+art.upload.id+'.gif':art.source=='card'?API+'/card/art/'+art.postId+'.gif':art.gifUrl;
 }
 function setImg(img,src){
   if(src){if(img.dataset.src!=src){img.dataset.src=src;img.src=src;}img.hidden=false;}
@@ -580,7 +589,9 @@ function render(){
 
   const art=st.artwork,slot=st.slot.name,msg=$('msg'),night=st.night||{};
   let who=' ',sub=' ',text='';
-  if(art&&art.upload){
+  if(art&&art.starter){
+    who=art.starter.title;sub=art.starter.credit+(art.channel?' · Starter art':' · Starter art, until there is Makapix art');
+  }else if(art&&art.upload){
     who=art.upload.name;sub='Your upload';
   }else if(art){
     who=art.owner?'@'+art.owner:'Unknown artist';
@@ -592,12 +603,12 @@ function render(){
   else if(slot=='makapix'){text='Code on the panel';who='Waiting to be linked';sub='Enter the code at makapix.club';}
   else{text='Between pieces';}
   setImg($('art'),art?artSrc(art):'');setImg($('mart'),art?artSrc(art):'');
-  if(art)$('art').alt=art.upload?'Your upload '+art.upload.name:'Artwork by '+(art.owner||'an unknown artist');
+  if(art)$('art').alt=art.starter?art.starter.title+', by '+art.starter.credit:art.upload?'Your upload '+art.upload.name:'Artwork by '+(art.owner||'an unknown artist');
   msg.hidden=!!art;msg.textContent=text;msg.className=!art&&slot=='clock'?'clock':'';
   $('who').textContent=$('mwho').textContent=who;
   $('sub').textContent=$('msub').textContent=sub;
 
-  const like=$('like');like.hidden=!art||!!art.upload; // an upload is not on Makapix
+  const like=$('like');like.hidden=!art||!!art.upload||!!art.starter; // neither is on Makapix
   const ovr=st.channelOverride;
   $('ovr').hidden=!ovr;
   if(ovr){
@@ -632,6 +643,8 @@ function render(){
   const playing=art&&!art.upload?String(art.postId):'',playingUp=art&&art.upload?String(art.upload.id):'';
   $('grid').querySelectorAll('.tile').forEach(t=>t.classList.toggle('playing',t.dataset.post==playing));
   $('upgrid').querySelectorAll('.tile').forEach(t=>t.classList.toggle('playing',t.dataset.upload==playingUp));
+  const playingSt=art&&art.starter?String(art.starter.id):'';
+  $('stgrid').querySelectorAll('.tile').forEach(t=>t.classList.toggle('playing',t.dataset.starter==playingSt));
   if(tab=='set')showDevice();
   const testing=slot=='test';
   $('testoff').hidden=!testing;
@@ -659,7 +672,7 @@ function back(){act('POST','/back');}
 // "hashtag:cat" as people write it.
 function channelLabel(spec){
   const [k,v]=spec.split(':');
-  return k=='hashtag'?'#'+v:k=='artist'?'@'+v:k=='likedby'?'art liked by @'+v:k=='promoted'?'promoted art':k=='mine'?'your art':k=='uploads'?'your uploads':'everything';
+  return k=='hashtag'?'#'+v:k=='artist'?'@'+v:k=='likedby'?'art liked by @'+v:k=='promoted'?'promoted art':k=='mine'?'your art':k=='uploads'?'your uploads':k=='starter'?'the starter art':'everything';
 }
 $('ovroff').onclick=async()=>{try{await call('DELETE','/channel');}catch(e){}poll();};
 function hold(){
@@ -854,19 +867,23 @@ function artSummary(){
 
 /* ---- the Art tab: my uploads or saved art, one at a time ------------------------------ */
 let artView=null,savedLoaded=false;
+const ART_VIEWS=['mine','saved','starter'];
 function setArtView(view,focus){
   artView=view;
-  const mine=view=='mine';
-  $('vmine').setAttribute('aria-pressed',mine);$('vsaved').setAttribute('aria-pressed',!mine);
-  $('v-mine').hidden=!mine;$('v-saved').hidden=mine;
+  ART_VIEWS.forEach(v=>{$('v'+v).setAttribute('aria-pressed',v==view);$('v-'+v).hidden=v!=view;});
   unpickArt();
-  if(!mine&&!savedLoaded){savedLoaded=true;loadArt(false);}
-  if(focus)$(mine?'vmine':'vsaved').focus();
+  if(view=='saved'&&!savedLoaded){savedLoaded=true;loadArt(false);}
+  if(view=='starter')loadStarter();
+  if(focus)$('v'+view).focus();
 }
-$('vmine').onclick=()=>setArtView('mine');
-$('vsaved').onclick=()=>setArtView('saved');
-[$('vmine'),$('vsaved')].forEach(b=>b.onkeydown=e=>{
-  if(e.key=='ArrowLeft'||e.key=='ArrowRight'){e.preventDefault();setArtView(artView=='mine'?'saved':'mine',true);}
+ART_VIEWS.forEach(v=>{
+  $('v'+v).onclick=()=>setArtView(v);
+  $('v'+v).onkeydown=e=>{
+    if(e.key!='ArrowLeft'&&e.key!='ArrowRight')return;
+    e.preventDefault();
+    const i=ART_VIEWS.indexOf(artView)+(e.key=='ArrowRight'?1:ART_VIEWS.length-1);
+    setArtView(ART_VIEWS[i%ART_VIEWS.length],true);
+  };
 });
 // Opens on your uploads when there are any; after that, on whichever you chose.
 async function loadArtTab(){
@@ -914,7 +931,7 @@ function pickArt(b,a){
   b.setAttribute('aria-pressed','true');
   $('pwho').textContent=a.owner?'@'+a.owner:'Unknown artist';
   $('psub').textContent='Makapix post '+a.postId+', '+size(a.bytes);
-  $('pick').hidden=false;
+  $('pick').hidden=false;$('pdrop').hidden=false;
   $('pshow').disabled=$('pdrop').disabled=false;
 }
 function unpickArt(){
@@ -926,12 +943,12 @@ $('more').onclick=()=>loadArt(true);
 $('pshow').onclick=async()=>{
   if(!chosen)return;
   try{
-    await call('POST',chosen.upload?'/uploads/'+chosen.a.id+'/show':'/card/art/'+chosen.a.postId+'/show');
+    await call('POST',chosen.starter?'/starter/'+chosen.a.id+'/show':chosen.upload?'/uploads/'+chosen.a.id+'/show':'/card/art/'+chosen.a.postId+'/show');
     $('psub').textContent='Showing on the panel next.';
     clearTimeout(timer);timer=setTimeout(poll,2500);
   }catch(e){
     $('psub').textContent=e.message=='409'?'The panel is in sound mode. Switch to Jukebox first.':
-      e.message=='404'?'No longer on the card.':'Could not reach the panel. Try again.';
+      e.message=='404'?(chosen.starter?'Not in this firmware.':'No longer on the card.'):'Could not reach the panel. Try again.';
   }
 };
 $('pdrop').onclick=async()=>{
@@ -949,6 +966,49 @@ $('pdrop').onclick=async()=>{
   $('artnote').textContent=(a.owner?'@'+a.owner+"'s":'The')+' artwork was removed from the card.';
   if(!artTotal)$('artnote').textContent=await emptyReason();
 };
+/* ---- built-in (starter) art --------------------------------------------------------- */
+let starterLoaded=false;
+function starterTile(p){
+  const li=document.createElement('li'),b=document.createElement('button'),
+    pic=document.createElement('span'),img=document.createElement('img'),cap=document.createElement('span');
+  b.className='tile';b.dataset.starter=p.id;b.setAttribute('aria-pressed','false');
+  pic.className='pic';
+  // A still: the web server is slow, and all 28 animations are 1.1 MB. The one
+  // picked animates.
+  img.src=API+'/starter/'+p.id+'/still.gif';img.loading='lazy';img.width=64;img.height=64;img.alt=p.title;
+  cap.textContent=p.title;
+  pic.appendChild(img);b.append(pic,cap);li.appendChild(b);
+  b.onclick=()=>pickStarter(b,p);
+  b.classList.toggle('playing',!!(st&&st.artwork&&st.artwork.starter&&st.artwork.starter.id==p.id));
+  return li;
+}
+async function loadStarter(){
+  if(starterLoaded)return;
+  try{
+    const r=await call('GET','/starter');
+    starterLoaded=true;
+    const grid=$('stgrid');grid.textContent='';
+    r.pieces.forEach(p=>grid.appendChild(starterTile(p)));
+    $('stplay').hidden=!r.count;
+    $('stsum').textContent=r.count?r.count+' pieces built into the panel, from free pixel art packs and some drawn by code. They play when there is nothing else to show. Tap one to show it now.':
+      'This firmware has no built-in art.';
+  }catch(e){$('stnote').textContent='Could not read the built-in art.';}
+}
+function pickStarter(b,p){
+  if(chosen)chosen.b.setAttribute('aria-pressed','false');
+  chosen={b,a:p,starter:true};
+  b.setAttribute('aria-pressed','true');
+  b.querySelector('img').src=API+'/starter/'+p.id+'.gif';
+  $('pwho').textContent=p.title;
+  $('psub').textContent=p.credit;
+  $('pick').hidden=false;$('pdrop').hidden=true; // part of the firmware: nothing to remove
+  $('pshow').disabled=false;
+}
+$('stplay').onclick=async()=>{
+  try{await call('PUT','/channel',{channel:'starter'});$('stnote').textContent='Playing the built-in art in place of the rotation\'s channels, for now.';poll();}
+  catch(e){$('stnote').textContent='Could not switch. Try again.';}
+};
+
 /* ---- my uploads -------------------------------------------------------------------- */
 let uploads=[];
 function uploadTile(u){
@@ -986,7 +1046,7 @@ function pickUpload(b,u){
   b.setAttribute('aria-pressed','true');
   $('pwho').textContent=u.name;
   $('psub').textContent='Your upload, '+u.width+' × '+u.height+', '+size(u.bytes);
-  $('pick').hidden=false;
+  $('pick').hidden=false;$('pdrop').hidden=false;
   $('pshow').disabled=$('pdrop').disabled=false;
 }
 async function dropUpload(){

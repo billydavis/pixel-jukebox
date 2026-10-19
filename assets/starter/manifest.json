@@ -1,0 +1,226 @@
+[
+  {
+    "file": "01-pa-ninja-frog.gif",
+    "still": "stills/01-pa-ninja-frog.gif",
+    "title": "Ninja Frog runs",
+    "credit": "Pixel Frog, Pixel Adventure 1",
+    "licence": "CC0 1.0",
+    "note": "Run cycle at the pack's 20 fps over a scrolling tiled sky"
+  },
+  {
+    "file": "02-pa-mask-dude.gif",
+    "still": "stills/02-pa-mask-dude.gif",
+    "title": "Mask Dude runs",
+    "credit": "Pixel Frog, Pixel Adventure 1",
+    "licence": "CC0 1.0",
+    "note": "Run cycle at the pack's 20 fps over a scrolling tiled sky"
+  },
+  {
+    "file": "03-pa-pink-man.gif",
+    "still": "stills/03-pa-pink-man.gif",
+    "title": "Pink Man runs",
+    "credit": "Pixel Frog, Pixel Adventure 1",
+    "licence": "CC0 1.0",
+    "note": "Run cycle at the pack's 20 fps over a scrolling tiled sky"
+  },
+  {
+    "file": "04-pa-virtual-guy.gif",
+    "still": "stills/04-pa-virtual-guy.gif",
+    "title": "Virtual Guy runs",
+    "credit": "Pixel Frog, Pixel Adventure 1",
+    "licence": "CC0 1.0",
+    "note": "Run cycle at the pack's 20 fps over a scrolling tiled sky"
+  },
+  {
+    "file": "05-pa-lineup.gif",
+    "still": "stills/05-pa-lineup.gif",
+    "title": "The four heroes",
+    "credit": "Pixel Frog, Pixel Adventure 1",
+    "licence": "CC0 1.0",
+    "note": "All four idle animations at once"
+  },
+  {
+    "file": "06-pa-fruit.gif",
+    "still": "stills/06-pa-fruit.gif",
+    "title": "Fruit bowl",
+    "credit": "Pixel Frog, Pixel Adventure 1",
+    "licence": "CC0 1.0",
+    "note": "Four spinning fruits, 17 frames each"
+  },
+  {
+    "file": "07-pa-pineapple.gif",
+    "still": "stills/07-pa-pineapple.gif",
+    "title": "Pineapple, doubled",
+    "credit": "Pixel Frog, Pixel Adventure 1",
+    "licence": "CC0 1.0",
+    "note": "A 32x32 sprite scaled x2 with sharp pixels"
+  },
+  {
+    "file": "08-pa-saw.gif",
+    "still": "stills/08-pa-saw.gif",
+    "title": "Saw on a chain",
+    "credit": "Pixel Frog, Pixel Adventure 1",
+    "licence": "CC0 1.0",
+    "note": "A spinning trap swinging along its chain"
+  },
+  {
+    "file": "09-dt-fountain.gif",
+    "still": "stills/09-dt-fountain.gif",
+    "title": "Knight meets demon",
+    "credit": "0x72, DungeonTileset II",
+    "licence": "CC0 1.0",
+    "note": "Lava fountain, knight and big demon, all animated"
+  },
+  {
+    "file": "10-dt-heroes.gif",
+    "still": "stills/10-dt-heroes.gif",
+    "title": "Party of four",
+    "credit": "0x72, DungeonTileset II",
+    "licence": "CC0 1.0",
+    "note": "Knight, elf, wizard and lizard idling"
+  },
+  {
+    "file": "11-dt-big.gif",
+    "still": "stills/11-dt-big.gif",
+    "title": "Big trouble",
+    "credit": "0x72, DungeonTileset II",
+    "licence": "CC0 1.0",
+    "note": "Demon and ogre running in place"
+  },
+  {
+    "file": "12-dt-mimic.gif",
+    "still": "stills/12-dt-mimic.gif",
+    "title": "The mimic",
+    "credit": "0x72, DungeonTileset II",
+    "licence": "CC0 1.0",
+    "note": "A chest that bites, scaled x2, with spinning coins"
+  },
+  {
+    "file": "13-dt-crowd.gif",
+    "still": "stills/13-dt-crowd.gif",
+    "title": "Monster crowd",
+    "credit": "0x72, DungeonTileset II",
+    "licence": "CC0 1.0",
+    "note": "Eight small monsters running"
+  },
+  {
+    "file": "14-sl-fox.gif",
+    "still": "stills/14-sl-fox.gif",
+    "title": "Fox on the run",
+    "credit": "ansimuz, Sunny Land",
+    "licence": "CC0 1.0",
+    "note": "Three-layer parallax: sky, island, ground"
+  },
+  {
+    "file": "15-sl-eagle.gif",
+    "still": "stills/15-sl-eagle.gif",
+    "title": "Eagle over the sea",
+    "credit": "ansimuz, Sunny Land",
+    "licence": "CC0 1.0",
+    "note": "Flapping eagle over moving clouds and sea"
+  },
+  {
+    "file": "16-sl-critters.gif",
+    "still": "stills/16-sl-critters.gif",
+    "title": "Frog and opossum",
+    "credit": "ansimuz, Sunny Land",
+    "licence": "CC0 1.0",
+    "note": "A hopping frog while an opossum scurries past"
+  },
+  {
+    "file": "17-sl-items.gif",
+    "still": "stills/17-sl-items.gif",
+    "title": "Gem and cherry",
+    "credit": "ansimuz, Sunny Land",
+    "licence": "CC0 1.0",
+    "note": "Pickup items scaled x2 over drifting clouds"
+  },
+  {
+    "file": "18-kp-meadow.gif",
+    "still": "stills/18-kp-meadow.gif",
+    "title": "Meadow hop",
+    "credit": "Kenney, Pixel Platformer",
+    "licence": "CC0 1.0",
+    "note": "Small platformer scene with a bouncing alien and coin"
+  },
+  {
+    "file": "19-kd-room.gif",
+    "still": "stills/19-kd-room.gif",
+    "title": "Tiny dungeon room",
+    "credit": "Kenney, Tiny Dungeon",
+    "licence": "CC0 1.0",
+    "note": "Wizard, knight and friends; a chest pops open"
+  },
+  {
+    "file": "20-code-plasma.gif",
+    "still": "stills/20-code-plasma.gif",
+    "title": "Plasma",
+    "credit": "Pixel Jukebox",
+    "licence": "Apache 2.0",
+    "note": "Full-panel colour motion"
+  },
+  {
+    "file": "21-code-sunset.gif",
+    "still": "stills/21-code-sunset.gif",
+    "title": "Sunset",
+    "credit": "Pixel Jukebox",
+    "licence": "Apache 2.0",
+    "note": "Smooth gradient and shimmer, shows the colour fix"
+  },
+  {
+    "file": "22-code-wheel.gif",
+    "still": "stills/22-code-wheel.gif",
+    "title": "Colour wheel",
+    "credit": "Pixel Jukebox",
+    "licence": "Apache 2.0",
+    "note": "Every hue and saturation, turning"
+  },
+  {
+    "file": "23-code-cube.gif",
+    "still": "stills/23-code-cube.gif",
+    "title": "Spinning cube",
+    "credit": "Pixel Jukebox",
+    "licence": "Apache 2.0",
+    "note": "3D wireframe, rainbow edges"
+  },
+  {
+    "file": "24-code-ripples.gif",
+    "still": "stills/24-code-ripples.gif",
+    "title": "Ripples",
+    "credit": "Pixel Jukebox",
+    "licence": "Apache 2.0",
+    "note": "Two interfering water ripples"
+  },
+  {
+    "file": "25-code-life.gif",
+    "still": "stills/25-code-life.gif",
+    "title": "Game of Life",
+    "credit": "Pixel Jukebox",
+    "licence": "Apache 2.0",
+    "note": "Conway's cellular automaton, coloured by age"
+  },
+  {
+    "file": "26-code-logo.gif",
+    "still": "stills/26-code-logo.gif",
+    "title": "Pixel Jukebox",
+    "credit": "Pixel Jukebox",
+    "licence": "Apache 2.0",
+    "note": "Logo with a bouncing equaliser"
+  },
+  {
+    "file": "27-code-stars.gif",
+    "still": "stills/27-code-stars.gif",
+    "title": "Starfield",
+    "credit": "Pixel Jukebox",
+    "licence": "Apache 2.0",
+    "note": "Flying through stars"
+  },
+  {
+    "file": "28-code-ramps.gif",
+    "still": "stills/28-code-ramps.gif",
+    "title": "Glow bands",
+    "credit": "Pixel Jukebox",
+    "licence": "Apache 2.0",
+    "note": "Eight hues fading to black, sliding"
+  }
+]

@@ -42,6 +42,8 @@ bool parse(const std::string &spec, Channel &channel, std::string &error) {
     parsed.kind = Kind::Mine;
   } else if (spec == "uploads") {
     parsed.kind = Kind::Uploads;
+  } else if (spec == "starter") {
+    parsed.kind = Kind::Starter;
   } else {
     size_t colon = spec.find(':');
     std::string type = spec.substr(0, colon);
@@ -87,6 +89,8 @@ std::string format(const Channel &channel) {
       return "mine";
     case Kind::Uploads:
       return "uploads";
+    case Kind::Starter:
+      return "starter";
     case Kind::Artist:
       return "artist:" + channel.value;
     case Kind::Hashtag:
@@ -106,6 +110,8 @@ std::string label(const Channel &channel) {
       return "My art";
     case Kind::Uploads:
       return "My uploads";
+    case Kind::Starter:
+      return "Starter art";
     case Kind::Artist:
       return "@" + channel.value;
     case Kind::Hashtag:
@@ -133,6 +139,8 @@ const char *makapixName(Kind kind) {
       return "all";
   }
 }
+
+bool isLocal(Kind kind) { return kind == Kind::Uploads || kind == Kind::Starter; }
 
 bool fromMakapix(const std::string &channelName, const std::string &userHandle, const std::string &hashtag,
                  Channel &channel) {
