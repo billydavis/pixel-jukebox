@@ -24,6 +24,7 @@
 #include "shtc3_math.h"
 #include "spectrum_math.h"
 #include "tap_detector.h"
+#include "test_patterns.h"
 #include "transitions.h"
 #include "upload_rules.h"
 #include "view_queue.h"
@@ -1382,6 +1383,50 @@ static void test_channels_uploads() {
   TEST_ASSERT_FALSE(channels::parse("uploads:x", channel, error));
 }
 
+// ---- test_patterns ------------------------------------------------------------
+
+static void test_pattern_names_round_trip() {
+  for (int i = 0; i < testpattern::COUNT; i++) {
+    testpattern::Pattern pattern;
+    TEST_ASSERT_TRUE(testpattern::fromName(testpattern::name((testpattern::Pattern)i), pattern));
+    TEST_ASSERT_EQUAL(i, (int)pattern);
+  }
+  testpattern::Pattern pattern;
+  TEST_ASSERT_FALSE(testpattern::fromName("nope", pattern));
+}
+
+static void test_pattern_dark_steps_climb() {
+  uint8_t r, g, b, last = 0;
+  // Along the top half and on along the bottom half: 32 steps, each brighter.
+  for (int i = 0; i < 32; i++) {
+    int x = (i % 16) * 4 + 1, y = i < 16 ? 5 : 50;
+    testpattern::colour(testpattern::Pattern::Darks, x, y, r, g, b);
+    TEST_ASSERT_TRUE(r == g && g == b);
+    if (i > 0) {
+      TEST_ASSERT_EQUAL(last + 8, r); // one 5-bit level apart: exact in RGB565
+    }
+    last = r;
+  }
+  testpattern::colour(testpattern::Pattern::Darks, 10, 31, r, g, b);
+  TEST_ASSERT_EQUAL(0, r); // the dark row between the halves
+}
+
+static void test_pattern_bars_and_ramps() {
+  uint8_t r, g, b;
+  testpattern::colour(testpattern::Pattern::Bars, 0, 0, r, g, b);
+  TEST_ASSERT_TRUE(r == 255 && g == 255 && b == 255); // white
+  testpattern::colour(testpattern::Pattern::Bars, 8 * 2 + 3, 40, r, g, b);
+  TEST_ASSERT_TRUE(r == 0 && g == 255 && b == 255); // cyan
+  testpattern::colour(testpattern::Pattern::Bars, 8 * 5, 0, r, g, b);
+  TEST_ASSERT_TRUE(r == 255 && g == 0 && b == 0); // red
+  testpattern::colour(testpattern::Pattern::Bars, 63, 63, r, g, b);
+  TEST_ASSERT_TRUE(r == 0 && g == 0 && b == 0); // black
+  testpattern::colour(testpattern::Pattern::Ramps, 63, 20, r, g, b);
+  TEST_ASSERT_TRUE(r == 248 && g == 0 && b == 0); // the red band, brightest
+  testpattern::colour(testpattern::Pattern::Ramps, 0, 0, r, g, b);
+  TEST_ASSERT_TRUE(r == 0 && g == 0 && b == 0);
+}
+
 static int runTests() {
   UNITY_BEGIN();
   RUN_TEST(test_gif_pad_grows_a_small_gif);
@@ -1510,6 +1555,9 @@ static int runTests() {
   RUN_TEST(test_upload_file_names_round_trip);
   RUN_TEST(test_upload_decodes_percent_names);
   RUN_TEST(test_channels_uploads);
+  RUN_TEST(test_pattern_names_round_trip);
+  RUN_TEST(test_pattern_dark_steps_climb);
+  RUN_TEST(test_pattern_bars_and_ramps);
   return UNITY_END();
 }
 

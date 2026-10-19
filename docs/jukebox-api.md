@@ -93,6 +93,9 @@ effect before the reply, which is `200` with the new state.
 | `PUT` | `/channel` | Play one channel in every artwork slot, for now |
 | `DELETE` | `/channel` | Go back to the rotation's own channels |
 | `GET` | `/live` | The live connection to makapix.club |
+| `GET` | `/test` | The test patterns, and whether one is showing |
+| `PUT` | `/test` | Show a test pattern |
+| `DELETE` | `/test` | Back to art from a test pattern |
 | `PUT` | `/live` | Turn the live connection on or off |
 | `POST` | `/hold` | Hold or release the current slot |
 | `GET` | `/brightness` | Read the brightness |
@@ -821,6 +824,34 @@ channels. Reply: as `GET /channel`. `400` for something that is not a channel.
 ### `DELETE /channel`
 
 Back to the rotation's own channels. Reply: as `GET /channel`.
+
+## Test patterns
+
+For judging the picture: comparing normal and photo mode, checking white
+balance, and spotting brightness steps out of order (`docs/colour.md`). Every
+colour is exact in RGB565, the form artwork reaches the display driver in.
+
+| Pattern | Shows |
+|---|---|
+| `ramps` | Grey, red, green and blue, dark to light, in four bands |
+| `darks` | All 32 grey levels artwork can have, 16 bands to a half: each band should be brighter than the one before |
+| `bars` | White, yellow, cyan, green, magenta, red, blue, black |
+| `white` | All white, for white balance |
+
+### `GET /test`
+
+`{"showing": false, "patterns": [{"name": "ramps", "label": "Ramps"}, ...]}`
+
+### `PUT /test`
+
+`{"pattern": "darks"}`. Shown at once (no transition), even at night, until
+Next, `DELETE /test` or ten minutes. Reply: `202 {"queued":"testPattern"}`.
+`400` for an unknown pattern.
+
+### `DELETE /test`
+
+Back to whatever was on before. Reply: `202 {"queued":"reload"}`, or
+`200 {"showing": false}` when no pattern is up.
 
 ## Live on makapix.club
 

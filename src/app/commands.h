@@ -15,6 +15,7 @@ enum class CommandType : uint8_t {
   ShowArtwork,   // value: a postId to show for one turn, from the card or Makapix
   Back,          // show the artwork before the current one
   ShowUpload,    // value: an upload's id (storage/uploads.h), to show for one turn
+  ShowTestPattern, // value: a testpattern::Pattern, shown until Next or ten minutes
 };
 
 struct Command {

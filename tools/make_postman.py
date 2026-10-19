@@ -156,6 +156,12 @@ FOLDERS = [
          "Restarts the board into its setup hotspot (network name Pixel-Jukebox). The board goes offline; "
          "it rejoins the saved network after three minutes if nobody connects.", None, 202),
     ]),
+    ("Test Patterns", [
+        ("List Test Patterns", "GET", "test", "The patterns, and whether one is showing.", None, 200),
+        ("Show Dark Steps", "PUT", "test", "The 32 grey levels artwork can have; each band should be brighter "
+         "than the one before.", {"pattern": "darks"}, 202),
+        ("Back To Art", "DELETE", "test", "Ends a test pattern.", None, 202),
+    ]),
     ("Live", [
         ("Get Live Connection", "GET", "live",
          "The MQTT connection to makapix.club: state, last command from the website, certificate expiry.",

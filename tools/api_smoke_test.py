@@ -337,6 +337,18 @@ try:
     code, body = call("DELETE", "/channel")
     check("the override can be cleared", code == 200 and body.get("channel") is None, body)
 
+    section("Test patterns")
+    code, body = call("GET", "/test")
+    names = [t["name"] for t in body.get("patterns", [])]
+    check("test patterns are listed", code == 200 and names == ["ramps", "darks", "bars", "white"], names)
+    code, body = call("PUT", "/test", {"pattern": "nope"})
+    check("an unknown pattern is refused", code == 400, body)
+    code, body = call("PUT", "/test", {"pattern": "darks"})
+    check("a test pattern can be shown", code == 202 and wait_for(lambda s: s["slot"]["name"] == "test"), body)
+    check("GET /test says one is showing", call("GET", "/test")[1].get("showing") is True)
+    code, body = call("DELETE", "/test")
+    check("back to art ends it", code == 202 and wait_for(lambda s: s["slot"]["name"] != "test", 25), body)
+
     section("Live connection")
     code, live_state = call("GET", "/live")
     check("live reports its state",

@@ -19,6 +19,7 @@
 #include "app/night.h"
 #include "app/rotation.h"
 #include "channels.h"
+#include "test_patterns.h"
 #include "app/status.h"
 #include "app/telemetry.h"
 #include "app/transition.h"
@@ -528,6 +529,45 @@ static void handlePutLive() {
 }
 
 static void handleBack() { sendQueued(commandSend(CommandType::Back), "back"); }
+
+// --- test patterns -----------------------------------------------------------------
+
+static void handleGetTest() {
+  JsonDocument doc;
+  doc["showing"] = statusGet().slot == "test";
+  JsonArray patterns = doc["patterns"].to<JsonArray>();
+  for (int i = 0; i < testpattern::COUNT; i++) {
+    JsonObject item = patterns.add<JsonObject>();
+    item["name"] = testpattern::name((testpattern::Pattern)i);
+    item["label"] = testpattern::label((testpattern::Pattern)i);
+  }
+  sendJson(200, doc);
+}
+
+// {"pattern": "darks"}: shown until Next, DELETE /test or ten minutes.
+static void handlePutTest() {
+  JsonDocument body;
+  if (!readBody(body)) {
+    return;
+  }
+  testpattern::Pattern pattern;
+  if (!body["pattern"].is<const char *>() || !testpattern::fromName(body["pattern"], pattern)) {
+    sendError(400, "pattern must be one of ramps, darks, bars, white");
+    return;
+  }
+  sendQueued(commandSend(CommandType::ShowTestPattern, (uint32_t)pattern), "testPattern");
+}
+
+// Back to art: ends the pattern, as Next would, without skipping a slot.
+static void handleDeleteTest() {
+  if (statusGet().slot != "test") {
+    JsonDocument doc;
+    doc["showing"] = false;
+    sendJson(200, doc);
+    return;
+  }
+  sendQueued(commandSend(CommandType::Reload), "reload");
+}
 
 // --- one channel for every artwork slot, for now ------------------------------------
 
@@ -1175,6 +1215,9 @@ void apiBegin() {
   server.on(API_BASE "/diagnostics", HTTP_GET, guarded(handleDiagnostics));
   server.on(API_BASE "/next", HTTP_POST, guarded(handleNext));
   server.on(API_BASE "/back", HTTP_POST, guarded(handleBack));
+  server.on(API_BASE "/test", HTTP_GET, guarded(handleGetTest));
+  server.on(API_BASE "/test", HTTP_PUT, guarded(handlePutTest));
+  server.on(API_BASE "/test", HTTP_DELETE, guarded(handleDeleteTest));
   server.on(API_BASE "/live", HTTP_GET, guarded(handleGetLive));
   server.on(API_BASE "/live", HTTP_PUT, guarded(handlePutLive));
   server.on(API_BASE "/channel", HTTP_GET, guarded(handleGetChannel));

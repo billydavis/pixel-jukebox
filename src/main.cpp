@@ -33,6 +33,7 @@
 #include "screen_rules.h"
 #include "audio/audio.h"
 #include "slots/slot_makapix.h"
+#include "slots/slot_test.h"
 
 static const uint32_t MESSAGE_MS = 1500;
 static const uint32_t SKIPPED_SLOT_MS = 200;
@@ -42,6 +43,8 @@ static size_t skippedInARow = 0;
 static uint16_t *outgoing = nullptr; // the frame a transition starts from
 static uint32_t requestedPost = 0;   // an artwork asked for (gallery, Back, makapix.club)
 static uint32_t requestedUpload = 0; // an upload asked for from the Art tab
+static int requestedTest = -1;       // a test pattern asked for from Settings
+static TestPatternSlot testSlot;
 static bool requestFromBack = false; // that request came from Back: not a new step in the history
 static screen::Source lastSource = screen::Source::Rotation;
 static screen::History history;
@@ -159,6 +162,12 @@ static void runSlot(Slot *slot, screen::Source source) {
             statusSetHeld(false);
             slot->stop();
             return;
+          case CommandType::ShowTestPattern:
+            Serial.printf("Command: test pattern %u\n", (unsigned)command.value);
+            requestedTest = command.value;
+            statusSetHeld(false);
+            slot->stop();
+            return;
           case CommandType::SetBrightness:
             Serial.printf("Command: brightness %u\n", command.value);
             nightSetBrightness(command.value);
@@ -240,6 +249,8 @@ static void handleCommandsWhileIdle() {
       requestedPost = command.value;
     } else if (command.type == CommandType::ShowUpload) {
       requestedUpload = command.value;
+    } else if (command.type == CommandType::ShowTestPattern) {
+      requestedTest = command.value;
     } else if (command.type == CommandType::Back) {
       requestPrevious();
     }
@@ -263,6 +274,10 @@ static void nightDark() {
           return;
         case CommandType::ShowUpload:
           requestedUpload = command.value;
+          nightWake();
+          return;
+        case CommandType::ShowTestPattern:
+          requestedTest = command.value;
           nightWake();
           return;
         case CommandType::Next:
@@ -377,7 +392,8 @@ void loop() {
   // Who has the panel this turn: screen_rules decides between the night
   // schedule, sound mode, a request and the rotation.
   bool nightOff = nightNow().off;
-  screen::Source source = screen::choose(screenInputs(requestedPost != 0 || requestedUpload != 0));
+  screen::Source source =
+      screen::choose(screenInputs(requestedPost != 0 || requestedUpload != 0 || requestedTest >= 0));
   statusSetScreen(screen::name(source));
   if (source == screen::Source::Dark) {
     lastSource = source;
@@ -397,18 +413,24 @@ void loop() {
   // A requested artwork plays for one turn; then whatever was on carries on
   // where it was.
   bool fromBack = false;
+  bool testing = false;
   if (source == screen::Source::Request) {
-    if (requestedUpload) {
+    if (requestedTest >= 0) {
+      testSlot.use((testpattern::Pattern)requestedTest);
+      testing = true;
+    } else if (requestedUpload) {
       rotationArtworkSlot()->requestUpload(requestedUpload);
     } else {
       rotationArtworkSlot()->request(requestedPost);
     }
+    requestedTest = -1;
     requestedUpload = 0;
     requestedPost = 0;
     fromBack = requestFromBack;
     requestFromBack = false;
   }
-  Slot *slot = source == screen::Source::Sound        ? modeSoundSlot()
+  Slot *slot = testing                                ? &testSlot
+               : source == screen::Source::Sound        ? modeSoundSlot()
                : source == screen::Source::Request    ? rotationArtworkSlot()
                : source == screen::Source::NightClock ? rotationClockSlot()
                                                       : rotationCurrent();
@@ -416,7 +438,8 @@ void loop() {
   // For a transition, the slot draws its first frame off the panel while the
   // old picture stays up, then the two are blended. Sound mode switches at
   // once, and the night clock does not blend into itself every ten seconds.
-  bool animate = outgoing && transitionEnabled() && screen::transitionAllowed(source, lastSource);
+  // A test pattern appears at once: it is there to be looked at, not admired.
+  bool animate = outgoing && !testing && transitionEnabled() && screen::transitionAllowed(source, lastSource);
   lastSource = source;
   if (animate) {
     memcpy(outgoing, display->pixels(), PANEL_RES_X * PANEL_RES_Y * sizeof(uint16_t));
