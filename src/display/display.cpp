@@ -2,6 +2,7 @@
 
 #include <ESP32-HUB75-MatrixPanel-I2S-DMA.h>
 #include <Preferences.h>
+#include <driver/gpio.h>
 
 #include "pins.h"
 
@@ -135,6 +136,14 @@ bool setupDisplay() {
   display = new Screen(new MatrixPanel_I2S_DMA(config));
   if (!display->begin()) {
     return false;
+  }
+  // The driver sets the panel pins to full strength (40 mA). Their sharp edges
+  // jam the panel's own Wi-Fi: in photo mode (16 MHz clock) every page and
+  // picture came at 15-50 KB/s and pings took up to 700 ms. At 10 mA they come
+  // at 220-390 KB/s; 20 mA was still as bad as 40 (2026-10-19).
+  for (int pin : {R1_PIN, G1_PIN, B1_PIN, R2_PIN, G2_PIN, B2_PIN, A_PIN, B_PIN, C_PIN, D_PIN, E_PIN, LAT_PIN,
+                  OE_PIN, CLK_PIN}) {
+    gpio_set_drive_capability((gpio_num_t)pin, GPIO_DRIVE_CAP_1);
   }
   Serial.printf("Panel: %s mode, %d Hz\n", displayModeName(mode), display->refreshHz());
   brightness = prefs.getUChar("brightness", DEFAULT_BRIGHTNESS);
