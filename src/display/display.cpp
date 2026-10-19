@@ -35,13 +35,19 @@ bool Screen::begin() {
   return shown && hidden;
 }
 
+void Screen::panelPixel(int x, int y, uint16_t colour) {
+  int px, py;
+  orientation::map(turned, W, x, y, px, py);
+  panel->drawPixel(px, py, colour);
+}
+
 void Screen::drawPixel(int16_t x, int16_t y, uint16_t colour) {
   if (x < 0 || y < 0 || x >= W || y >= H) {
     return;
   }
   if (live) {
     shown[y * W + x] = colour;
-    panel->drawPixel(x, y, colour);
+    panelPixel(x, y, colour);
   } else {
     hidden[y * W + x] = colour;
   }
@@ -62,7 +68,9 @@ void Screen::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t colou
     }
   }
   if (live) {
-    panel->fillRect(x0, y0, x1 - x0, y1 - y0, colour);
+    int px = x0, py = y0, pw = x1 - x0, ph = y1 - y0;
+    orientation::mapRect(turned, W, px, py, pw, ph);
+    panel->fillRect(px, py, pw, ph, colour);
   }
 }
 
@@ -108,13 +116,27 @@ void Screen::present(const uint16_t *frame) {
       uint16_t colour = frame[y * W + x];
       if (shown[y * W + x] != colour) {
         shown[y * W + x] = colour;
-        panel->drawPixel(x, y, colour);
+        panelPixel(x, y, colour);
       }
     }
   }
 }
 
+void Screen::setOrientation(const orientation::Orientation &o) {
+  if (o == turned) {
+    return;
+  }
+  turned = o;
+  for (int y = 0; y < H; y++) {
+    for (int x = 0; x < W; x++) {
+      panelPixel(x, y, shown[y * W + x]);
+    }
+  }
+}
+
 static PanelMode mode = PanelMode::Normal;
+static portMUX_TYPE wantedLock = portMUX_INITIALIZER_UNLOCKED;
+static orientation::Orientation wanted; // asked for through the API, maybe not applied yet
 
 bool setupDisplay() {
   prefs.begin("jukebox", false);
@@ -149,7 +171,32 @@ bool setupDisplay() {
   brightness = prefs.getUChar("brightness", DEFAULT_BRIGHTNESS);
   displayApplyBrightness(brightness);
   display->clearScreen();
+  // Before anything is drawn, so even the start-up test pattern is the right way up.
+  orientation::Orientation saved = orientation::unpack(prefs.getUChar("orientation", 0));
+  display->setOrientation(saved);
+  wanted = saved;
+  Serial.printf("Panel: turned %d degrees%s\n", orientation::toDegrees(saved), saved.mirror ? ", mirrored" : "");
   return true;
+}
+
+orientation::Orientation displayOrientation() { return display->getOrientation(); }
+
+void displaySetOrientation(const orientation::Orientation &o) {
+  display->setOrientation(o);
+  prefs.putUChar("orientation", (uint8_t)orientation::pack(o));
+}
+
+orientation::Orientation displayWantedOrientation() {
+  portENTER_CRITICAL(&wantedLock);
+  orientation::Orientation o = wanted;
+  portEXIT_CRITICAL(&wantedLock);
+  return o;
+}
+
+void displayNoteWantedOrientation(const orientation::Orientation &o) {
+  portENTER_CRITICAL(&wantedLock);
+  wanted = o;
+  portEXIT_CRITICAL(&wantedLock);
 }
 
 uint8_t displayBrightness() { return brightness; }

@@ -150,7 +150,7 @@ effect before the reply, which is `200` with the new state.
   "channelOverride": null,
   "brightness": 32,
   "night": { "active": false, "panel": "playing", "overridden": false },
-  "panel": { "photo": false, "refreshHz": 100 }
+  "panel": { "photo": false, "refreshHz": 100, "rotation": 0, "mirror": false }
 }
 ```
 
@@ -387,8 +387,13 @@ the others stay as they are. Saved on the board. Reply: `200` with the
 ### `GET /panel`
 
 ```json
-{ "photo": false, "refreshHz": 100 }
+{ "photo": false, "refreshHz": 100, "rotation": 0, "mirror": false }
 ```
+
+`rotation` (0, 90, 180 or 270, clockwise) and `mirror` (left and right
+swapped, done before turning) say which way up the picture goes, for however
+the panel sits in its case, or for a live stream or a mirror. Everything is
+drawn upright and turned on its way to the panel.
 
 The panel draws each colour as a sequence of on and off times, many times a
 second. Eyes see a steady picture, but a camera's short exposure catches part
@@ -403,11 +408,16 @@ of a cycle and shows dark bands rolling through the picture.
 
 ### `PUT /panel`
 
-`{"photo": true}` or `{"photo": false}`. The driver lays out its memory for one
+Any of `photo`, `rotation` and `mirror`, for example `{"rotation": 90}` or
+`{"mirror": true}`. The orientation changes at once and is saved; reply `200`
+with the `GET /panel` document.
+
+`{"photo": true}` or `{"photo": false}`: the driver lays out its memory for one
 refresh rate when it starts, so the setting is saved and the board restarts to
-use it (about 5 s, the API included). Reply: `202 {"photo":true,"restarting":true}`.
+use it (about 5 s, the API included). Reply: `202 {"photo":true,"rotation":0,"mirror":false,"restarting":true}`.
 Asking for the setting already in use changes nothing: `200` with the `GET /panel`
-document. `400` unless `photo` is `true` or `false`.
+document. `400` with none of the three, or unless `photo` and `mirror` are
+`true` or `false` and `rotation` is 0, 90, 180 or 270.
 
 ### `GET /card`
 

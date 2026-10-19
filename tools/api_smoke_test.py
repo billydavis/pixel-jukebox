@@ -196,9 +196,25 @@ try:
     code, panel = call("GET", "/panel")
     check("the panel says whether photo mode is on, and its refresh rate",
           code == 200 and isinstance(panel.get("photo"), bool) and panel.get("refreshHz", 0) > 0, panel)
-    for bad in ({"photo": "yes"}, {"mode": "photo"}, {}):
+    for bad in ({"photo": "yes"}, {"mode": "photo"}, {}, {"rotation": 45}, {"rotation": 360},
+                {"rotation": "90"}, {"mirror": 1}):
         code, body = call("PUT", "/panel", bad)
-        check(f"photo mode rejects {json.dumps(bad)}", code == 400, body)
+        check(f"the panel rejects {json.dumps(bad)}", code == 400, body)
+    was = {"rotation": panel.get("rotation"), "mirror": panel.get("mirror")}
+    check("the panel says which way up it is",
+          was["rotation"] in (0, 90, 180, 270) and isinstance(was["mirror"], bool), panel)
+    code, body = call("PUT", "/panel", {"rotation": 270, "mirror": not was["mirror"]})
+    check("the picture can be turned and mirrored at once, without a restart",
+          code == 200 and body.get("rotation") == 270 and body.get("mirror") == (not was["mirror"])
+          and not body.get("restarting"), body)
+    code, body = call("PUT", "/panel", {"rotation": 90})
+    check("turning it alone keeps the mirror", body.get("rotation") == 90 and body.get("mirror") == (not was["mirror"]),
+          body)
+    check("status shows the orientation",
+          wait_for(lambda s: s.get("panel", {}).get("rotation") == 90), status().get("panel"))
+    code, body = call("PUT", "/panel", was)
+    check("and it goes back", code == 200 and body.get("rotation") == was["rotation"]
+          and body.get("mirror") == was["mirror"], body)
     code, body = call("PUT", "/panel", {"photo": panel.get("photo", False)})
     check("asking for the setting already in use changes nothing", code == 200 and not body.get("restarting"), body)
     code, now = call("GET", "/status")

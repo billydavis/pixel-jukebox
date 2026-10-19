@@ -82,8 +82,12 @@ FOLDERS = [
         ("Night Schedule Off", "PUT", "night", "Turns the schedule off.", {"enabled": False}, 200),
     ]),
     ("Panel", [
-        ("Get Photo Mode", "GET", "panel",
-         "Whether photo mode is on, and the refresh rate.", None, 200),
+        ("Get Panel Settings", "GET", "panel",
+         "Whether photo mode is on, the refresh rate, and which way up the picture goes.", None, 200),
+        ("Rotate 180", "PUT", "panel", "Turns the picture upside down, at once. Saved.", {"rotation": 180}, 200),
+        ("Mirror On", "PUT", "panel", "Swaps left and right, for a live stream or a mirror. Saved.",
+         {"mirror": True}, 200),
+        ("Upright", "PUT", "panel", "Back to as drawn: no turn, no mirror.", {"rotation": 0, "mirror": False}, 200),
         ("Photo Mode On", "PUT", "panel",
          "Redraws about five times as often, so cameras film the panel without dark bands. "
          "Saved; the board restarts to switch.", {"photo": True}, 202),

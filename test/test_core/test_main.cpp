@@ -17,6 +17,7 @@
 #include "likes_book.h"
 #include "live_rules.h"
 #include "night_rules.h"
+#include "orientation.h"
 #include "pin_rules.h"
 #include "rotation_rules.h"
 #include "screen_rules.h"
@@ -1470,6 +1471,86 @@ static void test_starter_pack_refuses_damage() {
   TEST_ASSERT_TRUE(pieces.empty());
 }
 
+// ---- orientation --------------------------------------------------------------
+
+static orientation::Orientation makeOrientation(int turns, bool mirror) {
+  orientation::Orientation o;
+  o.quarterTurns = (uint8_t)turns;
+  o.mirror = mirror;
+  return o;
+}
+
+// Where the top-left corner and the pixel just right of it end up, on 64 x 64.
+static void assertCorner(int turns, bool mirror, int cornerX, int cornerY, int nextX, int nextY) {
+  int x, y;
+  orientation::map(makeOrientation(turns, mirror), 64, 0, 0, x, y);
+  TEST_ASSERT_EQUAL(cornerX, x);
+  TEST_ASSERT_EQUAL(cornerY, y);
+  orientation::map(makeOrientation(turns, mirror), 64, 1, 0, x, y);
+  TEST_ASSERT_EQUAL(nextX, x);
+  TEST_ASSERT_EQUAL(nextY, y);
+}
+
+static void test_orientation_corners() {
+  assertCorner(0, false, 0, 0, 1, 0);    // as drawn
+  assertCorner(1, false, 63, 0, 63, 1);  // 90 clockwise: the top row runs down the right
+  assertCorner(2, false, 63, 63, 62, 63);
+  assertCorner(3, false, 0, 63, 0, 62);
+  assertCorner(0, true, 63, 0, 62, 0);   // mirrored: the top row runs right to left
+  assertCorner(1, true, 63, 63, 63, 62);
+  assertCorner(2, true, 0, 63, 1, 63);
+  assertCorner(3, true, 0, 0, 0, 1);
+}
+
+// Every one of the eight is a one-to-one mapping onto the panel, and a
+// rectangle maps onto exactly the pixels its own pixels map to.
+static void test_orientation_maps_every_pixel_once() {
+  static const int N = 8;
+  for (int turns = 0; turns < 4; turns++) {
+    for (int m = 0; m < 2; m++) {
+      orientation::Orientation o = makeOrientation(turns, m == 1);
+      bool seen[N][N] = {};
+      for (int y = 0; y < N; y++) {
+        for (int x = 0; x < N; x++) {
+          int px, py;
+          orientation::map(o, N, x, y, px, py);
+          TEST_ASSERT_TRUE(px >= 0 && px < N && py >= 0 && py < N);
+          TEST_ASSERT_FALSE(seen[py][px]);
+          seen[py][px] = true;
+        }
+      }
+      int x = 1, y = 2, w = 5, h = 3;
+      orientation::mapRect(o, N, x, y, w, h);
+      TEST_ASSERT_EQUAL(15, w * h);
+      for (int ry = 2; ry < 5; ry++) {
+        for (int rx = 1; rx < 6; rx++) {
+          int px, py;
+          orientation::map(o, N, rx, ry, px, py);
+          TEST_ASSERT_TRUE(px >= x && px < x + w && py >= y && py < y + h);
+        }
+      }
+    }
+  }
+}
+
+static void test_orientation_degrees_and_packing() {
+  uint8_t turns = 9;
+  TEST_ASSERT_TRUE(orientation::fromDegrees(270, turns));
+  TEST_ASSERT_EQUAL(3, turns);
+  TEST_ASSERT_TRUE(orientation::fromDegrees(0, turns));
+  TEST_ASSERT_EQUAL(0, turns);
+  TEST_ASSERT_FALSE(orientation::fromDegrees(45, turns));
+  TEST_ASSERT_FALSE(orientation::fromDegrees(360, turns));
+  TEST_ASSERT_FALSE(orientation::fromDegrees(-90, turns));
+  for (int t = 0; t < 4; t++) {
+    for (int m = 0; m < 2; m++) {
+      orientation::Orientation o = makeOrientation(t, m == 1);
+      TEST_ASSERT_TRUE(orientation::unpack(orientation::pack(o)) == o);
+      TEST_ASSERT_EQUAL(t * 90, orientation::toDegrees(o));
+    }
+  }
+}
+
 // ---- test_patterns ------------------------------------------------------------
 
 static void test_pattern_names_round_trip() {
@@ -1643,6 +1724,9 @@ static int runTests() {
   RUN_TEST(test_upload_decodes_percent_names);
   RUN_TEST(test_channels_uploads);
   RUN_TEST(test_channels_starter);
+  RUN_TEST(test_orientation_corners);
+  RUN_TEST(test_orientation_maps_every_pixel_once);
+  RUN_TEST(test_orientation_degrees_and_packing);
   RUN_TEST(test_starter_pack_reads_pieces);
   RUN_TEST(test_starter_pack_refuses_damage);
   RUN_TEST(test_pattern_names_round_trip);

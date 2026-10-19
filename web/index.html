@@ -435,6 +435,18 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
       </div>
       <p class="note" id="photonote" role="status"></p>
       <div class="field">
+        <span class="cap" id="rotlabel">Rotation</span>
+        <div class="chips" id="rotate" role="group" aria-labelledby="rotlabel">
+          <button data-deg="0" aria-pressed="false">0°</button><button data-deg="90" aria-pressed="false">90°</button><button data-deg="180" aria-pressed="false">180°</button><button data-deg="270" aria-pressed="false">270°</button>
+        </div>
+        <p class="note">Turns the picture clockwise, for however the panel sits in its case.</p>
+      </div>
+      <div class="row">
+        <span class="what" id="mirrorlabel"><b>Mirror</b><small>Swaps left and right, for a live stream or a mirror</small></span>
+        <button class="switch" id="mirror" role="switch" aria-checked="false" aria-labelledby="mirrorlabel" disabled></button>
+      </div>
+      <p class="note" id="orientnote" role="status"></p>
+      <div class="field">
         <span class="cap" id="testlabel">Test pattern</span>
         <div class="chips" id="tests" role="group" aria-labelledby="testlabel"></div>
         <div><button class="key small" id="testoff" hidden>Back to art</button></div>
@@ -506,7 +518,7 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
 
 <script>
 const $=id=>document.getElementById(id),API='/api/v1';
-let st=null,timer=0,dragging=false,sendTimer=0,online=false,photoBusy=false,locked=false,updating=false;
+let st=null,timer=0,dragging=false,sendTimer=0,online=false,photoBusy=false,locked=false,updating=false,orientUntil=0;
 
 async function call(method,path,body){
   const r=await fetch(API+path,{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
@@ -584,6 +596,8 @@ function render(){
   $('link').textContent=online?'Live':st?'Lost contact, retrying':'Connecting';
   for(const id of['back','hold','next','bri','mrot','msnd','like','mback','mhold','mnext'])$(id).disabled=!online;
   $('photo').disabled=!online||photoBusy;
+  $('mirror').disabled=!online;
+  $('rotate').querySelectorAll('button').forEach(b=>b.disabled=!online);
   $('viz').querySelectorAll('button').forEach(b=>b.disabled=!online);
   if(!st)return;
 
@@ -635,6 +649,7 @@ function render(){
   if(!dragging)showBrightness(st.brightness);
   $('nownote').textContent=night.overridden?'Night schedule paused by hand for a while.':
     night.active?'Night: '+(night.panel=='off'?'the panel is off.':night.panel=='clock'?'clock only.':'dimmed.'):'';
+  if(st.panel&&Date.now()>orientUntil)showOrientation(st.panel.rotation||0,!!st.panel.mirror);
   if(st.panel&&!photoBusy){
     const on=st.panel.photo;
     $('photo').setAttribute('aria-checked',on);
@@ -1147,6 +1162,24 @@ $('nlevel').oninput=e=>{$('nlevelv').textContent=e.target.value;e.target.style.s
 $('nlevel').onchange=e=>saveNight({enabled:true,brightness:+e.target.value});
 
 /* ---- settings ------------------------------------------------------------------------------ */
+/* ---- orientation ------------------------------------------------------------------ */
+function showOrientation(deg,mirror){
+  $('rotate').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.deg==deg));
+  $('mirror').setAttribute('aria-checked',mirror);
+}
+// Shown at once; the next few polls are ignored, so they cannot flick it back.
+async function setOrientation(change){
+  const on=$('rotate').querySelector('[aria-pressed=true]');
+  const was={rotation:on?+on.dataset.deg:0,mirror:$('mirror').getAttribute('aria-checked')=='true'};
+  const now=Object.assign({},was,change);
+  orientUntil=Date.now()+3000;showOrientation(now.rotation,now.mirror);
+  $('orientnote').textContent='';
+  try{const r=await call('PUT','/panel',change);showOrientation(r.rotation,r.mirror);}
+  catch(e){showOrientation(was.rotation,was.mirror);$('orientnote').textContent='Could not change it. Try again.';}
+}
+$('rotate').querySelectorAll('button').forEach(b=>b.onclick=()=>setOrientation({rotation:+b.dataset.deg}));
+$('mirror').onclick=()=>setOrientation({mirror:$('mirror').getAttribute('aria-checked')!='true'});
+
 $('photo').onclick=async()=>{
   const on=$('photo').getAttribute('aria-checked')!='true';
   photoBusy=true;$('photo').disabled=true;$('photo').setAttribute('aria-checked',on);

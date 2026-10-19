@@ -79,6 +79,13 @@ static void drawHoldMarker() {
   display->fillRect(PANEL_RES_X - 3, 1, 2, 5, white);
 }
 
+// Turns or mirrors the picture (a packed orientation.h value) and saves it.
+static void setOrientation(uint32_t packed) {
+  orientation::Orientation o = orientation::unpack(packed);
+  Serial.printf("Command: orientation %d degrees%s\n", orientation::toDegrees(o), o.mirror ? ", mirrored" : "");
+  displaySetOrientation(o);
+}
+
 // What screen_rules decides from: the night schedule, the mode, a request.
 static screen::Inputs screenInputs(bool requestPending) {
   NightNow night = nightNow();
@@ -180,6 +187,9 @@ static void runSlot(Slot *slot, screen::Source source) {
             Serial.printf("Command: brightness %u\n", command.value);
             nightSetBrightness(command.value);
             break;
+          case CommandType::SetOrientation:
+            setOrientation(command.value);
+            break;
         }
         if (wantHeld != held) {
           held = wantHeld;
@@ -225,14 +235,16 @@ static void runSlot(Slot *slot, screen::Source source) {
 static void serviceWhileWaiting() {
   Command command;
   while (commandPeek(command)) {
-    if (command.type != CommandType::SetBrightness && command.type != CommandType::Restart &&
-        command.type != CommandType::WifiSetup) {
+    if (command.type != CommandType::SetBrightness && command.type != CommandType::SetOrientation &&
+        command.type != CommandType::Restart && command.type != CommandType::WifiSetup) {
       return;
     }
     commandReceive(command);
     if (command.type == CommandType::SetBrightness) {
       Serial.printf("Command: brightness %u\n", command.value);
       nightSetBrightness(command.value);
+    } else if (command.type == CommandType::SetOrientation) {
+      setOrientation(command.value);
     } else if (command.type == CommandType::Restart) {
       restartBoard();
     } else {
@@ -249,6 +261,8 @@ static void handleCommandsWhileIdle() {
   while (commandReceive(command)) {
     if (command.type == CommandType::SetBrightness) {
       nightSetBrightness(command.value);
+    } else if (command.type == CommandType::SetOrientation) {
+      setOrientation(command.value);
     } else if (command.type == CommandType::WifiSetup) {
       connectionEnterSetup();
     } else if (command.type == CommandType::Restart) {
@@ -306,6 +320,9 @@ static void nightDark() {
         case CommandType::SetBrightness:
           nightSetBrightness(command.value);
           return;
+        case CommandType::SetOrientation:
+          setOrientation(command.value); // saved; the panel is dark, so nothing shows yet
+          break;
         case CommandType::WifiSetup:
           connectionEnterSetup();
           break;

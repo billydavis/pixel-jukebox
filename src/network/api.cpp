@@ -294,6 +294,9 @@ static void handleStatus() {
   JsonObject panel = doc["panel"].to<JsonObject>();
   panel["photo"] = displayMode() == PanelMode::Photo;
   panel["refreshHz"] = display->refreshHz();
+  orientation::Orientation turned = displayWantedOrientation();
+  panel["rotation"] = orientation::toDegrees(turned);
+  panel["mirror"] = turned.mirror;
   sendJson(200, doc);
 }
 
@@ -761,20 +764,52 @@ static void handleGetPanel() {
   JsonDocument doc;
   doc["photo"] = displayMode() == PanelMode::Photo;
   doc["refreshHz"] = display->refreshHz();
+  orientation::Orientation turned = displayWantedOrientation();
+  doc["rotation"] = orientation::toDegrees(turned);
+  doc["mirror"] = turned.mirror;
   sendJson(200, doc);
 }
 
-// {"photo": true}. Used from the next start-up, so a change restarts the board.
+// Any of {"photo": true, "rotation": 90, "mirror": false}. The orientation
+// changes at once; photo mode is used from the next start-up, so changing it
+// restarts the board.
 static void handlePutPanel() {
   JsonDocument body;
   if (!readBody(body)) {
     return;
   }
-  if (!body["photo"].is<bool>()) {
+  if (body["photo"].isNull() && body["rotation"].isNull() && body["mirror"].isNull()) {
+    sendError(400, "send photo, rotation or mirror");
+    return;
+  }
+  if (!body["photo"].isNull() && !body["photo"].is<bool>()) {
     sendError(400, "photo must be true or false");
     return;
   }
-  PanelMode mode = body["photo"].as<bool>() ? PanelMode::Photo : PanelMode::Normal;
+  orientation::Orientation turned = displayWantedOrientation();
+  if (!body["rotation"].isNull() &&
+      (!body["rotation"].is<int>() || !orientation::fromDegrees(body["rotation"].as<int>(), turned.quarterTurns))) {
+    sendError(400, "rotation must be 0, 90, 180 or 270");
+    return;
+  }
+  if (!body["mirror"].isNull()) {
+    if (!body["mirror"].is<bool>()) {
+      sendError(400, "mirror must be true or false");
+      return;
+    }
+    turned.mirror = body["mirror"];
+  }
+  if (!(turned == displayWantedOrientation())) {
+    if (!commandSend(CommandType::SetOrientation, orientation::pack(turned))) {
+      sendError(503, "Command queue is full, try again");
+      return;
+    }
+    displayNoteWantedOrientation(turned);
+  }
+
+  PanelMode mode = body["photo"].isNull() ? displayMode()
+                   : body["photo"].as<bool>() ? PanelMode::Photo
+                                              : PanelMode::Normal;
   if (mode == displayMode()) {
     handleGetPanel();
     return;
@@ -787,6 +822,8 @@ static void handlePutPanel() {
   }
   JsonDocument doc;
   doc["photo"] = mode == PanelMode::Photo;
+  doc["rotation"] = orientation::toDegrees(turned);
+  doc["mirror"] = turned.mirror;
   doc["restarting"] = true;
   sendJson(202, doc);
 }

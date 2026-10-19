@@ -3,6 +3,8 @@
 #include <Adafruit_GFX.h>
 #include <Arduino.h>
 
+#include "orientation.h"
+
 class MatrixPanel_I2S_DMA;
 
 // Everything is drawn through this. It passes drawing on to the LED panel and
@@ -10,6 +12,9 @@ class MatrixPanel_I2S_DMA;
 // also be taken off the panel for a moment: drawing then goes to a hidden
 // frame, which is how the next slot's first screen is prepared for a
 // transition while the old one is still showing.
+//
+// Everything is drawn upright. The orientation (orientation.h) is applied
+// only on the way to the panel, so the copy that is read back stays upright.
 class Screen : public Adafruit_GFX {
  public:
   explicit Screen(MatrixPanel_I2S_DMA *panel);
@@ -40,8 +45,15 @@ class Screen : public Adafruit_GFX {
   // Puts a whole frame on the panel, repainting only the pixels that differ.
   void present(const uint16_t *frame);
 
+  // Turns or mirrors the picture on the panel and repaints it at once.
+  void setOrientation(const orientation::Orientation &o);
+  orientation::Orientation getOrientation() const { return turned; }
+
  private:
+  void panelPixel(int x, int y, uint16_t colour);
+
   MatrixPanel_I2S_DMA *panel;
+  orientation::Orientation turned;
   uint16_t *shown = nullptr;  // what the panel is showing
   uint16_t *hidden = nullptr; // drawn to while not live
   bool live = true;
@@ -76,6 +88,15 @@ enum class PanelMode : uint8_t { Normal, Photo };
 PanelMode displayMode();
 const char *displayModeName(PanelMode mode);
 void displaySaveMode(PanelMode mode);
+
+// Which way up the picture goes (orientation.h), remembered across restarts.
+// displaySetOrientation() is for the display loop only; it repaints the panel.
+// displayWantedOrientation() is the last one asked for, which the API reports
+// while the display loop has still to apply it.
+orientation::Orientation displayOrientation();
+void displaySetOrientation(const orientation::Orientation &o);
+orientation::Orientation displayWantedOrientation();
+void displayNoteWantedOrientation(const orientation::Orientation &o);
 
 void drawTestPattern();
 void runColourCheck();
