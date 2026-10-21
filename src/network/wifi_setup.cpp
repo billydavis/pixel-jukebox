@@ -298,6 +298,8 @@ void wifiSetupRun(bool joinFailed, bool requested) {
   });
 
   // Phones probe assorted addresses to detect a sign-in page; send them all here.
+  server.on("/favicon.png", HTTP_GET, []() { sendFavicon(server); });
+  server.on("/favicon.ico", HTTP_GET, []() { sendFavicon(server); });
   server.onNotFound([]() { redirect(server, "/"); });
   server.begin();
 

@@ -1322,6 +1322,9 @@ void apiBegin() {
   started = true;
 
   server.on("/", HTTP_GET, handlePage);
+  // Open, like the page itself. Browsers also ask for /favicon.ico on their own.
+  server.on("/favicon.png", HTTP_GET, []() { sendFavicon(server); });
+  server.on("/favicon.ico", HTTP_GET, []() { sendFavicon(server); });
   server.on("/gallery", HTTP_GET, handleGalleryPage);
   server.on(API_BASE, HTTP_GET, handleApiRoot);
   server.on(API_BASE "/status", HTTP_GET, guarded(handleStatus));
