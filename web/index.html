@@ -12,10 +12,10 @@
   --ink:oklch(0.94 0.015 270);--dim:oklch(0.74 0.04 270);
   --accent:oklch(0.84 0.13 170);--accent-ink:oklch(0.27 0.05 180);
   --held:oklch(0.58 0.2 355);--led:oklch(0.14 0.02 270);
-  --sunk:oklch(0.18 0.035 270);--line:oklch(0.31 0.045 270);
+  --sunk:oklch(0.18 0.035 270);--line:oklch(0.35 0.05 270);
   --mono:ui-monospace,"Cascadia Mono","SF Mono",Menlo,Consolas,monospace;
   --sans:system-ui,-apple-system,"Segoe UI",sans-serif;
-  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s45:20px;--s5:24px;--s6:32px;--s7:48px;
   --tabbar:64px;
   --ease:cubic-bezier(.22,1,.36,1);
 }
@@ -25,7 +25,8 @@ html{-webkit-text-size-adjust:100%}
 body{margin:0;min-height:100dvh;background:var(--bg);color:var(--ink);font:16px/1.45 var(--sans)}
 :focus-visible{outline:3px solid var(--accent);outline-offset:3px}
 button,select,input{font:inherit;color:inherit}
-h2{margin:0;font:700 13px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+h2{display:flex;align-items:center;gap:10px;margin:0;font:700 15px/1.2 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink)}
+h2::before{content:"";flex:none;width:8px;height:8px;background:var(--accent)}
 p{margin:0}
 
 /* ---- frame ------------------------------------------------------------------ */
@@ -42,17 +43,20 @@ p{margin:0}
 
 /* ---- panels ----------------------------------------------------------------- */
 .panel{display:none}
-.panel.on{display:grid;align-content:start;gap:var(--s5);animation:in 180ms var(--ease)}
+.panel.on{display:grid;align-content:start;gap:var(--s6);animation:in 180ms var(--ease)}
 @keyframes in{from{opacity:0}to{opacity:1}}
-.section{display:grid;gap:var(--s3)}
-.section+.section{padding-top:var(--s5);border-top:1px solid var(--line)}
+.section{display:grid;gap:var(--s45)}
+.section>h2{margin-bottom:var(--s1)}
+.section+.section{padding-top:var(--s6);border-top:1px solid var(--line)}
 h3{margin:0;font:700 12px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
 details.adv>summary{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);min-height:44px;cursor:pointer;list-style:none}
+details.adv>summary .what{gap:var(--s2)}
+details.adv[open]>summary{margin-bottom:var(--s2)}
 details.adv>summary::-webkit-details-marker{display:none}
 details.adv .chev{width:20px;height:20px;flex:none;transform:rotate(180deg);transition:transform .2s cubic-bezier(.25,1,.5,1)}
 details.adv[open] .chev{transform:none}
-details.adv .sub{display:grid;gap:var(--s3);padding-top:var(--s4);border-top:1px solid var(--line)}
-.note{min-height:1.4em;font:12px/1.5 var(--mono);color:var(--dim)}
+details.adv .sub{display:grid;gap:var(--s4);padding-top:var(--s5);margin-top:var(--s2);border-top:1px solid var(--line)}
+.note{min-height:1.4em;max-width:62ch;font:14px/1.45 var(--sans);color:var(--dim)}
 .lead{max-width:62ch;font-size:15px;line-height:1.45}
 
 /* ---- now playing ------------------------------------------------------------ */
@@ -131,7 +135,7 @@ select.secs{width:auto;min-height:32px;padding:0 var(--s2);margin-left:var(--s1)
 .row{display:flex;align-items:center;justify-content:space-between;gap:var(--s4);min-height:48px}
 .what{display:grid;gap:2px;min-width:0}
 .what b{font-weight:600}
-.what small{font:12px/1.35 var(--mono);color:var(--dim)}
+.what small{font:14px/1.4 var(--sans);color:var(--dim)}
 .switch{position:relative;flex:none;width:60px;height:34px;padding:0;border:0;border-radius:0;cursor:pointer;background:var(--sunk);
   box-shadow:inset 0 0 0 2px var(--line);transition:background-color 150ms}
 .switch::after{content:"";position:absolute;top:5px;left:5px;width:24px;height:24px;background:var(--dim);
@@ -226,7 +230,8 @@ select.secs{width:auto;min-height:32px;padding:0 var(--s2);margin-left:var(--s1)
 .locked .app{display:none}
 .locked .gate{display:grid}
 .gate .mark{padding:var(--s3) 0 var(--s5)}
-.gate .title{margin:0;font:700 26px/1.15 var(--sans);letter-spacing:0;text-transform:none;color:var(--ink)}
+.gate .title{display:block;margin:0;font:700 26px/1.15 var(--sans);letter-spacing:0;text-transform:none;color:var(--ink)}
+.gate .title::before{display:none}
 .gate form{display:grid;gap:var(--s4);margin-top:var(--s2)}
 .gate .key{width:100%}
 input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
@@ -577,7 +582,7 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
       <div><button class="key small" id="wifi">Change Wi-Fi</button></div>
     </div>
     <details class="section adv" id="adv">
-      <summary><span class="what"><b>Advanced</b><small>Firmware, card, device details, restart and reset</small></span><svg class="chev" aria-hidden="true"><use href="#i-up"/></svg></summary>
+      <summary><span class="what"><h2>Advanced</h2><small>Firmware, card, device details, restart and reset</small></span><svg class="chev" aria-hidden="true"><use href="#i-up"/></svg></summary>
       <div class="sub">
         <h3>Firmware</h3>
         <p class="lead" id="fwlead">&nbsp;</p>
