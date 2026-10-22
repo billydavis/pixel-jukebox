@@ -46,6 +46,12 @@ p{margin:0}
 @keyframes in{from{opacity:0}to{opacity:1}}
 .section{display:grid;gap:var(--s3)}
 .section+.section{padding-top:var(--s5);border-top:1px solid var(--line)}
+h3{margin:0;font:700 12px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+details.adv>summary{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);min-height:44px;cursor:pointer;list-style:none}
+details.adv>summary::-webkit-details-marker{display:none}
+details.adv .chev{width:20px;height:20px;flex:none;transform:rotate(180deg);transition:transform .2s cubic-bezier(.25,1,.5,1)}
+details.adv[open] .chev{transform:none}
+details.adv .sub{display:grid;gap:var(--s3);padding-top:var(--s4);border-top:1px solid var(--line)}
 .note{min-height:1.4em;font:12px/1.5 var(--mono);color:var(--dim)}
 .lead{max-width:62ch;font-size:15px;line-height:1.45}
 
@@ -570,28 +576,37 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
       <p class="lead" id="wifinote">&nbsp;</p>
       <div><button class="key small" id="wifi">Change Wi-Fi</button></div>
     </div>
-    <div class="section">
-      <h2>Firmware</h2>
-      <p class="lead" id="fwlead">&nbsp;</p>
-      <div class="pinkeys">
-        <label class="key small" for="fwfile">Choose firmware.bin</label>
-        <input id="fwfile" type="file" accept=".bin,application/octet-stream" hidden>
-        <button class="key small go" id="fwgo" disabled>Update</button>
+    <details class="section adv" id="adv">
+      <summary><span class="what"><b>Advanced</b><small>Firmware, card, device details, restart and reset</small></span><svg class="chev" aria-hidden="true"><use href="#i-up"/></svg></summary>
+      <div class="sub">
+        <h3>Firmware</h3>
+        <p class="lead" id="fwlead">&nbsp;</p>
+        <div class="pinkeys">
+          <label class="key small" for="fwfile">Choose firmware.bin</label>
+          <input id="fwfile" type="file" accept=".bin,application/octet-stream" hidden>
+          <button class="key small go" id="fwgo" disabled>Update</button>
+        </div>
+        <div class="bar" id="fwbar" hidden><i id="fwfill"></i></div>
+        <p class="note" id="fwnote" role="status">Build with pio run, then pick .pio/build/waveshare-s3-rgb-matrix/firmware.bin.</p>
       </div>
-      <div class="bar" id="fwbar" hidden><i id="fwfill"></i></div>
-      <p class="note" id="fwnote" role="status">Build with pio run, then pick .pio/build/waveshare-s3-rgb-matrix/firmware.bin.</p>
-    </div>
-    <div class="section">
-      <h2>Card</h2>
-      <dl class="facts" id="cardfacts"></dl>
-      <p class="note" id="cardnote" role="status"></p>
-    </div>
-    <div class="section">
-      <h2>Device</h2>
-      <dl class="facts" id="devfacts"></dl>
-      <div><button class="key small" id="restart">Restart panel</button></div>
-      <p class="note" id="devnote" role="status"></p>
-    </div>
+      <div class="sub">
+        <h3>Card</h3>
+        <dl class="facts" id="cardfacts"></dl>
+        <p class="note" id="cardnote" role="status"></p>
+      </div>
+      <div class="sub">
+        <h3>Device</h3>
+        <dl class="facts" id="devfacts"></dl>
+        <div><button class="key small" id="restart">Restart panel</button></div>
+        <p class="note" id="devnote" role="status"></p>
+      </div>
+      <div class="sub">
+        <h3>Reset</h3>
+        <p class="lead">Puts every setting back to how it was on a new panel: the rotation, clock, weather and its key, night schedule, display, PIN and the Makapix link (the panel shows a new code to link it again). Wi-Fi and everything on the card stay.</p>
+        <div><button class="key small" id="reset">Reset all settings</button></div>
+        <p class="note" id="resetnote" role="status"></p>
+      </div>
+    </details>
   </section>
 </div>
 
@@ -1331,6 +1346,12 @@ twoTap($('wifi'),'Tap again to restart',armed=>{
   wifiBusy=true;$('wifi').disabled=true;$('wifi').textContent='Restarting';
   $('wifinote').textContent='Join the Pixel-Jukebox network on your phone to choose a new network.';
   call('POST','/wifi/setup').catch(()=>{});
+});
+twoTap($('reset'),'Tap again to reset everything',()=>{},done=>{
+  $('reset').textContent='Resetting';
+  $('resetnote').textContent='Settings reset. The panel is restarting and will show a new Makapix code; this page reconnects by itself.';
+  call('POST','/reset',{confirm:'reset'}).catch(()=>{});
+  setTimeout(()=>{done();$('resetnote').textContent='';location.reload();},15000);
 });
 twoTap($('restart'),'Tap again to restart',()=>{},done=>{
   $('restart').textContent='Restarting';

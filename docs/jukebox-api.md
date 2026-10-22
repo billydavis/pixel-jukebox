@@ -86,6 +86,7 @@ effect before the reply, which is `200` with the new state.
 | `DELETE` | `/card/art/{postId}` | Delete a saved artwork from the card |
 | `DELETE` | `/card/art` | Delete every saved artwork |
 | `POST` | `/restart` | Restart the board |
+| `POST` | `/reset` | Reset every setting but Wi-Fi, then restart |
 | `POST` | `/next` | Skip to the next slot |
 | `POST` | `/back` | Show the artwork before the current one |
 | `POST` | `/show/{postId}` | Show any Makapix post for one turn |
@@ -482,6 +483,19 @@ it is not on the card. If it is on the panel it finishes its turn.
 
 Deletes every saved artwork. Reply: `200 {"removed":100}`. Art is saved again
 as it plays online.
+
+### `POST /reset`
+
+`{"confirm": "reset"}`. Puts every setting back to its default, as on a new
+panel, then restarts: the rotation, the clock and time zone, the weather
+(its key too), the night schedule, the display options and brightness, the
+transition, view reports and the live switch, the PIN, the Makapix link (the
+panel registers again and shows a new code; remove the old player on
+makapix.club) and the likes and views still waiting to be sent. Kept: the
+Wi-Fi details, everything on the card, and the crash record. Reply:
+`202 {"reset":true,"restarting":true}`. `400` without the confirmation, so a
+stray request cannot wipe the panel. On the control page: Settings >
+Advanced > Reset all settings, with two taps.
 
 ### `POST /restart`
 

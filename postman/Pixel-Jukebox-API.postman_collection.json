@@ -2683,6 +2683,45 @@
             "description": "Restarts the board. The card is only looked for at start-up, so do this after inserting one."
           },
           "response": []
+        },
+        {
+          "name": "Reset All Settings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/reset",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reset"
+              ]
+            },
+            "description": "As saved it has no confirmation and expects 400, so running the collection never wipes the panel. To really reset every setting but Wi-Fi, send {\"confirm\": \"reset\"}."
+          },
+          "response": []
         }
       ]
     },

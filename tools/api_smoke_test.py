@@ -529,6 +529,13 @@ try:
           and art.get("channel") == "Starter art", art)
     call("DELETE", "/channel")
 
+    section("Reset")
+    for label, bad in (("no body", None), ("no confirmation", {}), ("the wrong word", {"confirm": "yes"}),
+                       ("true", {"confirm": True})):
+        code, body = call("POST", "/reset", bad)
+        check(f"a reset with {label} is refused", code == 400, body)
+    check("and nothing was reset", call("GET", "/clock")[1].get("timezone") == ck.get("timezone"))
+
     section("Firmware update")
     code, body = call("GET", "/diagnostics")
     firmware = body.get("firmware", {})

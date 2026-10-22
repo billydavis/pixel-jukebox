@@ -154,6 +154,9 @@ FOLDERS = [
         ("Restart Panel", "POST", "restart",
          "Restarts the board. The card is only looked for at start-up, so do this after inserting one.",
          None, 202),
+        ("Reset All Settings", "POST", "reset",
+         "As saved it has no confirmation and expects 400, so running the collection never wipes the panel. "
+         "To really reset every setting but Wi-Fi, send {\"confirm\": \"reset\"}.", None, 400),
     ]),
     ("Wi-Fi", [
         ("Start Wi-Fi Setup", "POST", "wifi/setup",

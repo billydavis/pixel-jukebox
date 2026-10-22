@@ -18,6 +18,7 @@
 #include "app/mode.h"
 #include "app/night.h"
 #include "app/rotation.h"
+#include "app/settings_reset.h"
 #include "app/timezone.h"
 #include "timezones.h"
 #include "channels.h"
@@ -917,6 +918,29 @@ static void handlePutNight() {
 
 static void handleRestart() { sendQueued(commandSend(CommandType::Restart), "restart"); }
 
+// {"confirm": "reset"}: every setting back to its default but Wi-Fi
+// (app/settings_reset.h), then a restart. The confirmation keeps a stray
+// request from wiping the panel.
+static void handleReset() {
+  JsonDocument body;
+  if (!readBody(body)) {
+    return;
+  }
+  if (body["confirm"] != "reset") {
+    sendError(400, "send {\"confirm\": \"reset\"} to reset every setting but Wi-Fi");
+    return;
+  }
+  settingsResetAll();
+  JsonDocument doc;
+  doc["reset"] = true;
+  doc["restarting"] = true;
+  sendJson(202, doc);
+  if (!commandSend(CommandType::Restart)) {
+    delay(200); // let the reply go out
+    ESP.restart();
+  }
+}
+
 static void handleWifiSetup() { sendQueued(commandSend(CommandType::WifiSetup), "wifiSetup"); }
 
 static void sendSlots() {
@@ -1598,6 +1622,7 @@ void apiBegin() {
   server.on(UriBraces(API_BASE "/card/art/{}/show"), HTTP_POST, guarded(handleShowArt));
   server.on(UriBraces(API_BASE "/card/art/{}"), HTTP_DELETE, guarded(handleRemoveArt));
   server.on(API_BASE "/restart", HTTP_POST, guarded(handleRestart));
+  server.on(API_BASE "/reset", HTTP_POST, guarded(handleReset));
   server.on(API_BASE "/crash", HTTP_GET, guarded(handleGetCrash));
   server.on(API_BASE "/crash", HTTP_DELETE, guarded(handleDeleteCrash));
   server.on(API_BASE "/crash/dump", HTTP_GET, guarded(handleCrashDump));
