@@ -193,6 +193,8 @@ FOLDERS = [
          {"color": "custom", "customColor": "#ff8000"}, 200),
         ("24-Hour Clock With Seconds", "PUT", "clock", "24-hour time with the seconds.",
          {"hours": 24, "seconds": True}, 200),
+        ("Clock In London Time", "PUT", "clock", "Sets the time zone, by its name in choices.timezone.",
+         {"timezone": "Europe/London"}, 200),
         ("Show The Clock", "POST", "clock/show", "Shows the clock for one turn, to see how it looks.", None, 202),
     ]),
     ("Weather", [

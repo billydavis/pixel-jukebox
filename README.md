@@ -32,12 +32,12 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 
 | Area | What's included |
 |---|---|
-| **Slots** | Rotates through screens: by default three artworks, then a clock for 10 seconds. The rotation is editable from the control page and saved on the board |
+| **Slots** | Rotates through screens: artwork, the clock and the weather. By default three artworks, then the clock for 10 seconds. The rotation is editable from the control page and saved on the board; how long the clock and weather stay up is set per row |
 | **Night schedule** | Between two times, the panel dims the art, shows only the clock, or turns off, fading over a few minutes each way. Moving the brightness or pressing Next at night takes over for an hour |
 | **Photo mode** | A switch on the control page redraws the panel about five times as often (about 500 Hz), so phones and cameras film it without dark bands rolling through. Dark shades are less smooth, so it is off by default. The panel restarts to switch |
 | **Orientation** | Turn the picture 90, 180 or 270 degrees for however the panel sits in its case, or mirror it for a live stream or a mirror, from Settings. Changes at once and is remembered |
 | **Weather** | A weather slot for the rotation: a pixel-art picture of the current conditions and the temperature where you are, from [WeatherAPI.com](https://www.weatherapi.com/) with a free key of your own. Choose the town, F or C and how often to check in Settings |
-| **Clock** | Digital, Big or Analog, in 12 or 24 hours, with seconds and the date if wanted, in white, amber, mint, or a color that follows the time of day (a dim red at night). Each clock or weather slot in the rotation stays on screen as long as you choose, 5 to 60 seconds |
+| **Clock** | Digital, Big or Analog, in 12 or 24 hours, with seconds and the date if wanted, in white, amber, mint, a color of your own, or one that follows the time of day (a dim red at night). The time zone is chosen in Settings, from 48 common ones with their daylight saving. Each clock or weather slot in the rotation stays on screen as long as you choose, 5 to 60 seconds |
 | **Clock chip** | The board's clock chip keeps the time through restarts, so the clock and view reports have it before Wi-Fi is up. It is set from internet time whenever that answers. A backup battery keeps the time through power cuts too: a non-rechargeable 3 V coin cell (CR2032 or CR1220) on the 2-pin JST-SH 1.0 mm connector J4, pin 1 positive. The board does not charge it |
 | **Pausing slots** | An eye on each rotation row pauses a slot without removing it, like hiding a layer in an image editor: it keeps its place, turns and channel and is skipped until shown again. Up to 12 slots |
 | **Channels** | Each artwork slot in the rotation can play its own Makapix channel: everything, featured art, your own art, one artist, a hashtag, or the art you have liked. For example two featured pieces, one tagged #cat, one you liked, then the clock |
@@ -49,8 +49,8 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 | **Transitions** | Thirteen effects between slots, such as mosaic, melt, dissolve and slide. Random by default, or pick one, or turn them off. They never eat into a slot's time on screen |
 | **Button** | BOOT button: short press skips to the next slot, long press holds the current one, a 5-second hold starts Wi-Fi setup |
 | **Sound mode** | Switch from the artwork to a visualizer driven by the onboard microphones: spectrum bars, VU meter, oscilloscope, fire, pulse rings, starfield, stereo scope or a retro hi-fi meter. The fire, rings and starfield follow the beat rather than just the loudness. It stays on until you switch back, and scales itself to how loud the room is |
-| **Control page** | Open `http://pixel-jukebox.local` on a phone or PC: see the artwork and artist, go back, skip, hold, set brightness |
-| **REST API** | Status, skip, hold and brightness over HTTP, found on the network as `pixel-jukebox.local` |
+| **Control page** | Open `http://pixel-jukebox.local` on a phone or PC: see the artwork and artist, go back, skip, hold, set brightness, and set up everything else (see [Control page](#control-page)) |
+| **REST API** | Everything the control page does, as JSON over HTTP, found on the network as `pixel-jukebox.local` (see [REST API](#rest-api)) |
 | **Wi-Fi setup** | With no network configured, the board starts its own hotspot and a page for choosing one. No code editing needed |
 | **Registration** | Shows a 6-character code on the panel; enter it on makapix.club and the board stores its token |
 | **Artwork feed** | Shuffles every post that is 64 pixels or smaller and has a GIF rendition, 25 at a time |
@@ -60,8 +60,8 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 | **Recovery** | Re-registers if the device is removed on the site; reconnects after a Wi-Fi drop; skips bad files |
 | **Updates over Wi-Fi** | Send new firmware from the PC with `python tools/ota_upload.py`, or the Update button in Settings. It is written alongside the running firmware and only used once it checks out; if it then fails to start properly, the panel goes back to the previous firmware by itself. USB still works |
 | **PIN** | An optional 4 to 8 digit PIN for the control page and the API, set in Settings. Each browser signs in once and stays signed in, through restarts. Five wrong guesses lock sign-in for 30 seconds. Forgot it? Hold the button for 5 seconds and tick "Also remove the control-page PIN" on the Wi-Fi setup page |
-| **Security** | Verifies the makapix.club TLS certificate before sending the device token |
-| **Diagnostics** | Separate builds for a color and power check and a speaker test |
+| **Security** | Verifies the makapix.club and WeatherAPI.com TLS certificates before sending a token or key; the weather key is never sent back out |
+| **Diagnostics** | Separate builds for a color and power check, the speaker, the microphones and the motion sensor (see [Diagnostic builds](#diagnostic-builds)) |
 
 ## Hardware
 
@@ -81,9 +81,9 @@ Pin mapping is in [`include/pins.h`](include/pins.h).
 | Build | PlatformIO, Arduino framework (arduino-esp32 2.x) |
 | Display | ESP32-HUB75-MatrixPanel-DMA, Adafruit GFX |
 | Artwork | AnimatedGIF, decoded from RAM (PSRAM) |
-| Network | Makapix player API over HTTPS, ArduinoJson; images over plain HTTP from the vault |
+| Network | Makapix player API over HTTPS, ArduinoJson; images over plain HTTP from the vault; WeatherAPI.com over HTTPS for the weather |
 | Remote control | Built-in WebServer and mDNS, JSON over HTTP; pages embedded from `web/` at build time |
-| Storage | NVS (Preferences) for Wi-Fi details, the player key and token, brightness and the rotation |
+| Storage | NVS (Preferences) for Wi-Fi details, the player key and token, and every setting; the microSD card for saved and uploaded art; the starter art built into the firmware |
 | Audio | ES7210 microphone ADC and ES8311 speaker codec over I2C and I2S; a built-in FFT for the visualizers |
 
 ## Getting started
@@ -112,6 +112,12 @@ To change networks later, hold the BOOT button for 5 seconds, or use **Change Wi
 
 Once online, the panel shows a 6-character code. Enter it at makapix.club under **Settings > Players > Add Device**. The board shows "linked!" and starts playing.
 
+Until it is linked, the panel takes turns between the code and its built-in starter art, so it has something to show from the first minute. Linking is optional: without it the panel still plays the starter art, your uploads, the clock and the weather.
+
+### Weather (optional)
+
+The weather slot needs a free key from [WeatherAPI.com](https://www.weatherapi.com/), one per app under their terms. Enter it in **Settings > Weather** on the control page, search for your town, then add a **Weather** slot in the Rotation tab. Or put it in `include/secrets.h` as `WEATHERAPI_KEY` before uploading; a key entered in Settings takes priority.
+
 ### Uploading
 
 The board has two USB-C ports: **Power** feeds the board and the panel, **USB** carries data to the PC.
@@ -120,15 +126,15 @@ If an upload fails with "No serial data received", unplug both cables, hold **BO
 
 ### Time zone
 
-The clock's time zone is `TIMEZONE` in [`include/config.h`](include/config.h) (US Central by default).
+Choose it in **Settings > Clock** on the control page; US Central until you do. If your weather town is in another zone, Settings offers to switch to it.
 
 ### Brightness
 
-Brightness (0-255) is set through the API and remembered across restarts; the starting value is `DEFAULT_BRIGHTNESS` in [`src/display/display.cpp`](src/display/display.cpp). Raise it only as far as white stays white; see the color check below.
+Set it with the slider on the control page; it is remembered across restarts, and the night schedule can dim it at night. The starting value on a new board is `DEFAULT_BRIGHTNESS` in [`src/display/display.cpp`](src/display/display.cpp). Raise it only as far as white stays white; see the color check below.
 
 ## Control page
 
-Open `http://pixel-jukebox.local` (or the board's IP address) in a browser on the same network; it is laid out for phones first. **Now** shows what is on the panel and who made it, with a heart to like it, Hold, Next, brightness and a Jukebox / Sound switch. Tabs hold the rest: **Rotation** (which slots play, for how long, paused or not, and the transition between them), **Art** (the card's saved art, with a gallery to show or remove pieces), **Night** (the schedule) and **Settings** (photo mode, view reports, Wi-Fi, restart and device details). On a phone the tabs sit at the bottom with a small now-playing bar above each one; on a wide screen now playing stays on the left. On a keyboard, `N` skips, `H` holds and the arrow keys move between tabs. It is a single file, [`web/index.html`](web/index.html), compiled into the firmware, with no external assets.
+Open `http://pixel-jukebox.local` (or the board's IP address) in a browser on the same network; it is laid out for phones first. **Now** shows what is on the panel and who made it, with a heart to like it, Hold, Next, brightness and a Jukebox / Sound switch. Tabs hold the rest: **Rotation** (which slots play, how many turns and for how long, paused or not, and the transition between them), **Art** (your uploads, the art saved on the card, and the built-in starter art, each with a gallery to show pieces now), **Night** (the schedule) and **Settings** (display: photo mode, rotation, mirror, test patterns; the clock's look and time zone; the weather; Makapix; the PIN; Wi-Fi; firmware updates; the card; device details and restart). On a phone the tabs sit at the bottom with a small now-playing bar above each one; on a wide screen now playing stays on the left. On a keyboard, `N` skips, `H` holds and the arrow keys move between tabs. It is a single file, [`web/index.html`](web/index.html), compiled into the firmware, with no external assets.
 
 ## REST API
 
@@ -201,12 +207,12 @@ The firmware is grouped by area, one folder each. Every folder holds a handful o
 |---|---|
 | `src/` | `main.cpp`: start-up, running each slot, handling commands |
 | `src/app/` | What the panel is doing: the rotation, modes, transitions, night schedule, clock chip, button and command queue, firmware updates, crash records and diagnostics |
-| `src/slots/` | The things that can be on screen: artwork, clock, visualizers. Each implements `slot.h` |
+| `src/slots/` | The things that can be on screen: artwork, clock, weather, visualizers, test patterns. Each implements `slot.h` |
 | `src/display/` | Drawing to the panel, and GIF playback |
 | `src/audio/` | Speaker, microphones and the sound analysis behind the visualizers |
 | `src/input/` | Onboard sensors: motion, and the case temperature and humidity |
-| `src/network/` | Wi-Fi and its setup hotspot, the API and its PIN, the Makapix client, the live connection to makapix.club, likes and view reports |
-| `src/storage/` | The microSD card and the artwork saved on it |
+| `src/network/` | Wi-Fi and its setup hotspot, the API and its PIN, the Makapix client, the live connection to makapix.club, likes and view reports, the weather |
+| `src/storage/` | The microSD card, the artwork saved and uploaded to it, and the built-in starter art |
 | `lib/jukebox_core/` | Logic with no hardware in it (rules, maths, parsing), so it can be unit tested on a PC |
 | `test/test_core/` | The unit tests for `lib/jukebox_core` |
 | `web/` | The control page and Wi-Fi setup pages as plain HTML and CSS, embedded into the firmware at build time |
@@ -218,7 +224,7 @@ A few conventions:
 
 - `#include` paths are written from `src/`, for example `#include "display/display.h"`.
 - Anything that can be tested without the board goes in `lib/jukebox_core/`, with tests.
-- Card access and Makapix requests share one lock (`CardLock` in `src/storage/card.h`); new code that touches either must take it.
+- Card access and every TLS connection (Makapix, the live connection, the weather) share one lock (`CardLock` in `src/storage/card.h`); new code that touches either must take it, for TLS by using `LockedTls` (`src/network/locked_tls.h`).
 - A new API route needs its entry in `docs/jukebox-api.md` and `tools/make_postman.py`; `tools/check_api_docs.py` fails until both have it.
 - Code adapted from p64 keeps its copyright and licence notice (see Acknowledgements).
 
@@ -263,7 +269,7 @@ Behaviour that depends on the hardware is covered by the diagnostic builds above
 
 ## Roadmap
 
-Everything planned, with rough sizes and priorities, is in [docs/backlog.md](docs/backlog.md). Next up: firmware updates over Wi-Fi, and live presence and remote commands from the Makapix site (MQTT). Waiting on the case: tap to like and auto-rotation, using the motion sensor.
+Everything planned, with rough sizes and priorities, is in [docs/backlog.md](docs/backlog.md). The firmware is feature-complete for a first release (October 2026); what is left is deferred or for later: updates from GitHub releases, a chime from the speaker, a unique name for a second panel, Bluetooth, and a better way to like art from the panel itself.
 
 ## Acknowledgements
 

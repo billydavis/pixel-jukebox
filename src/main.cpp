@@ -8,6 +8,7 @@
 #include <Arduino.h>
 
 #include "app/clock_chip.h"
+#include "app/timezone.h"
 #include "app/commands.h"
 #include "app/crash_report.h"
 #include "app/memory_trace.h"
@@ -199,6 +200,10 @@ static void runSlot(Slot *slot, screen::Source source) {
           case CommandType::SetOrientation:
             setOrientation(command.value);
             break;
+          case CommandType::ApplyTimezone:
+            timezoneApply();
+            slot->redraw(); // a clock on screen shows the new time at once
+            break;
         }
         if (wantHeld != held) {
           held = wantHeld;
@@ -245,7 +250,8 @@ static void serviceWhileWaiting() {
   Command command;
   while (commandPeek(command)) {
     if (command.type != CommandType::SetBrightness && command.type != CommandType::SetOrientation &&
-        command.type != CommandType::Restart && command.type != CommandType::WifiSetup) {
+        command.type != CommandType::ApplyTimezone && command.type != CommandType::Restart &&
+        command.type != CommandType::WifiSetup) {
       return;
     }
     commandReceive(command);
@@ -254,6 +260,8 @@ static void serviceWhileWaiting() {
       nightSetBrightness(command.value);
     } else if (command.type == CommandType::SetOrientation) {
       setOrientation(command.value);
+    } else if (command.type == CommandType::ApplyTimezone) {
+      timezoneApply();
     } else if (command.type == CommandType::Restart) {
       restartBoard();
     } else {
@@ -272,6 +280,8 @@ static void handleCommandsWhileIdle() {
       nightSetBrightness(command.value);
     } else if (command.type == CommandType::SetOrientation) {
       setOrientation(command.value);
+    } else if (command.type == CommandType::ApplyTimezone) {
+      timezoneApply();
     } else if (command.type == CommandType::WifiSetup) {
       connectionEnterSetup();
     } else if (command.type == CommandType::Restart) {
@@ -338,6 +348,9 @@ static void nightDark() {
         case CommandType::SetOrientation:
           setOrientation(command.value); // saved; the panel is dark, so nothing shows yet
           break;
+        case CommandType::ApplyTimezone:
+          timezoneApply(); // the night schedule may now say it is day
+          break;
         case CommandType::WifiSetup:
           connectionEnterSetup();
           break;
@@ -367,6 +380,7 @@ void setup() {
   }
   MEMORY_AT("display");
   telemetryBootMark("display");
+  timezoneBegin(); // before the clock chip and the night schedule read the local time
   // The time and the night schedule come before anything is drawn, so a
   // restart at night does not flash the room: the panel starts at the night
   // level (dark when it is off) and skips the test pattern.

@@ -44,9 +44,8 @@ static bool writeRegisters(uint8_t reg, const uint8_t *values, size_t length) {
 static void onNetworkTime(struct timeval *) { networkTimeArrived = true; }
 
 void clockChipBegin() {
-  // Without this the local time is only right once Wi-Fi has connected.
-  setenv("TZ", TIMEZONE, 1);
-  tzset();
+  // The time zone is already in force (timezoneBegin()), so the local time is
+  // right from the chip before Wi-Fi connects.
   sntp_set_time_sync_notification_cb(onNetworkTime);
 
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN, 400000);

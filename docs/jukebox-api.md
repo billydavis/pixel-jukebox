@@ -789,10 +789,13 @@ clock row stays on screen is that row's `seconds`.
   "date": "weekday",
   "color": "timeofday",
   "customColor": "#ff8000",
+  "timezone": "America/Chicago",
+  "localTime": "2026-10-22 18:42",
   "choices": {
     "style": ["digital", "big", "analog"],
     "date": ["off", "weekday", "daymonth", "numeric"],
-    "color": ["white", "amber", "mint", "timeofday", "custom"]
+    "color": ["white", "amber", "mint", "timeofday", "custom"],
+    "timezone": [ { "name": "America/Chicago", "label": "US Central (Chicago)" } ]
   }
 }
 ```
@@ -803,6 +806,8 @@ clock row stays on screen is that row's `seconds`.
 | `hours` | 12 or 24. A 24-hour clock has no AM/PM. The analog dial ignores it |
 | `seconds` | Show the seconds: under the time, or as a second hand |
 | `date` | `off`, `weekday` ("Thu Oct 22"), `daymonth` ("22 Oct") or `numeric` ("10/22"). The analog dial shows only the day |
+| `localTime` | The panel's local time in that zone, to check it; `null` until the time is known |
+| `timezone` | The time zone of the clock and the night schedule, by its IANA name; one of the 48 in `choices.timezone` (the common ones, with daylight saving). US Central until one is chosen. A change takes effect at once |
 | `customColor` | The color used when `color` is `custom`, as `"#rrggbb"`. Very dark colors show coarser on the panel, which has fewer steps near black |
 | `color` | `white`, `amber`, `mint`, `custom` (`customColor`), or `timeofday`: a dim red at night that does not light the room, orange at dawn, white at midday, amber in the evening, changing smoothly |
 
@@ -843,7 +848,7 @@ The key is entered in Settings or with `PUT /weather`, or built in from
   "refreshMinutes": 30,
   "refreshMin": 15,
   "refreshMax": 60,
-  "reading": { "tempC": 15.1, "tempF": 59.2, "condition": "Sunny", "code": 1000, "icon": "clear", "isDay": true, "ageSeconds": 42 },
+  "reading": { "tempC": 15.1, "tempF": 59.2, "condition": "Sunny", "code": 1000, "icon": "clear", "isDay": true, "ageSeconds": 42, "timezone": "America/Chicago" },
   "problem": null,
   "inRotation": true,
   "credit": "Weather by WeatherAPI.com"
@@ -855,6 +860,7 @@ The key is entered in Settings or with `PUT /weather`, or built in from
 | `keySource` | `settings`, `build` (from `secrets.h`) or `none` |
 | `place` | The town, as chosen from `GET /weather/search`; `null` until one is |
 | `reading` | The latest conditions, `null` when there are none under 60 minutes old. `code` is WeatherAPI.com's condition code; `icon` the picture the panel shows for it: `clear`, `partly-cloudy`, `cloudy`, `haze`, `fog`, `drizzle`, `rain`, `snow`, `sleet` or `storm` (clear and partly cloudy have night versions) |
+| `reading.timezone` | The town's time zone, as WeatherAPI.com gives it. Settings offers it for the clock when they differ |
 | `problem` | Why there is no reading: `no WeatherAPI.com key`, `no town chosen`, `the key was refused`, `this month's free calls are used up`..., or `null` |
 | `inRotation` | Whether a weather slot is in the rotation, switched on: without one nothing is fetched |
 

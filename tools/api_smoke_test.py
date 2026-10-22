@@ -441,7 +441,14 @@ try:
           code == 200 and ck.get("style") in ("digital", "big", "analog") and ck.get("hours") in (12, 24)
           and ck.get("choices", {}).get("color") == ["white", "amber", "mint", "timeofday", "custom"]
           and "colour" not in ck, ck)
-    for bad in ({"style": "fancy"}, {"hours": 13}, {"hours": "24"}, {"seconds": "yes"}, {"date": "long"},
+    zones = [z["name"] for z in ck.get("choices", {}).get("timezone", [])]
+    check("the clock lists its time zones, its own among them",
+          len(zones) >= 40 and ck.get("timezone") in zones and "America/Chicago" in zones, ck.get("timezone"))
+    code, body = call("PUT", "/clock", {"timezone": "Europe/London" if ck.get("timezone") != "Europe/London" else "Asia/Tokyo"})
+    check("the time zone can change", code == 200 and body.get("timezone") != ck.get("timezone"), body.get("timezone"))
+    code, body = call("PUT", "/clock", {"timezone": ck.get("timezone")})
+    check("and change back", code == 200 and body.get("timezone") == ck.get("timezone"), body.get("timezone"))
+    for bad in ({"timezone": "Mars/Olympus_Mons"}, {"timezone": 6}, {"style": "fancy"}, {"hours": 13}, {"hours": "24"}, {"seconds": "yes"}, {"date": "long"},
                 {"color": "pink"}, {"customColor": "ff8000"}, {"customColor": "#ff80"}, {"customColor": "#zz8000"}):
         code, body = call("PUT", "/clock", bad)
         check(f"the clock rejects {json.dumps(bad)}", code == 400, body)

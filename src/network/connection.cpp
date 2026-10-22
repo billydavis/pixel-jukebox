@@ -8,6 +8,7 @@
 #include "display/display.h"
 #include "network/wifi_setup.h"
 #include "storage/art_cache.h"
+#include "app/timezone.h"
 
 static const uint32_t JOIN_TIMEOUT_MS = 20000;
 static const int BOOT_ATTEMPTS = 2;
@@ -97,7 +98,7 @@ void connectionMaintain() {
   }
   announced = true;
   Serial.printf("Connected, IP %s\n", WiFi.localIP().toString().c_str());
-  configTzTime(TIMEZONE, NTP_SERVER);
+  configTzTime(timezonePosix(), NTP_SERVER);
   apiBegin();
   showMessage("WiFi OK", WiFi.localIP().toString(), colour::green());
   delay(MESSAGE_MS);

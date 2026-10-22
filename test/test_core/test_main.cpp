@@ -27,6 +27,7 @@
 #include "spectrum_math.h"
 #include "starter_pack.h"
 #include "tap_detector.h"
+#include "timezones.h"
 #include "test_patterns.h"
 #include "transitions.h"
 #include "upload_rules.h"
@@ -1664,6 +1665,25 @@ static void test_clock_time_of_day_colors() {
   TEST_ASSERT_TRUE(dim.r < 128 && dim.r > 100);
 }
 
+// ---- timezones ----------------------------------------------------------------
+
+static void test_timezones_are_complete_and_unique() {
+  TEST_ASSERT_TRUE(timezones::count() >= 40);
+  TEST_ASSERT_TRUE(timezones::defaultIndex() >= 0);
+  TEST_ASSERT_EQUAL_STRING("CST6CDT,M3.2.0,M11.1.0", timezones::at(timezones::defaultIndex()).posix);
+  for (size_t i = 0; i < timezones::count(); i++) {
+    const timezones::Zone &z = timezones::at(i);
+    TEST_ASSERT_TRUE(strlen(z.name) > 2 && strlen(z.label) > 2 && strlen(z.posix) > 2);
+    TEST_ASSERT_EQUAL((int)i, timezones::find(z.name)); // names are unique
+    for (size_t j = i + 1; j < timezones::count(); j++) {
+      TEST_ASSERT_TRUE(strcmp(z.label, timezones::at(j).label) != 0); // so are labels
+    }
+  }
+  TEST_ASSERT_EQUAL(-1, timezones::find("Mars/Olympus_Mons"));
+  TEST_ASSERT_EQUAL(-1, timezones::find(nullptr));
+  TEST_ASSERT_EQUAL_STRING("Europe/London", timezones::at(timezones::find("Europe/London")).name);
+}
+
 // ---- weather_rules ------------------------------------------------------------
 
 // Every one of WeatherAPI.com's 60 codes (weather_conditions.json, 2026-10-22).
@@ -1902,6 +1922,7 @@ static int runTests() {
   RUN_TEST(test_clock_formats);
   RUN_TEST(test_clock_settings_round_trip);
   RUN_TEST(test_clock_time_of_day_colors);
+  RUN_TEST(test_timezones_are_complete_and_unique);
   RUN_TEST(test_weather_every_code_has_a_picture);
   RUN_TEST(test_weather_fetch_timing);
   RUN_TEST(test_weather_freshness_and_settings);

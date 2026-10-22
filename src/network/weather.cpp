@@ -157,6 +157,7 @@ static void fetch() {
   filter["current"]["is_day"] = true;
   filter["current"]["condition"]["code"] = true;
   filter["current"]["condition"]["text"] = true;
+  filter["location"]["tz_id"] = true;
   JsonDocument doc;
   if (status == 200 && !deserializeJson(doc, body, DeserializationOption::Filter(filter)) &&
       doc["current"]["condition"]["code"].is<int>()) {
@@ -167,6 +168,7 @@ static void fetch() {
     fresh.isDay = (doc["current"]["is_day"] | 1) == 1;
     fresh.code = doc["current"]["condition"]["code"];
     fresh.text = doc["current"]["condition"]["text"] | "";
+    fresh.tzId = doc["location"]["tz_id"] | "";
     fresh.fetchedAt = millis();
     if (fresh.fetchedAt == 0) {
       fresh.fetchedAt = 1; // 0 means "none"
@@ -415,6 +417,7 @@ void weatherReport(JsonObject out) {
     r["icon"] = weather::iconName(weather::iconFor(now.code));
     r["isDay"] = now.isDay;
     r["ageSeconds"] = (millis() - now.fetchedAt) / 1000;
+    r["timezone"] = now.tzId; // the town's, to suggest it for the clock
   } else {
     out["reading"] = nullptr;
   }

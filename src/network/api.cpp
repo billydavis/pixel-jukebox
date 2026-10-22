@@ -18,6 +18,8 @@
 #include "app/mode.h"
 #include "app/night.h"
 #include "app/rotation.h"
+#include "app/timezone.h"
+#include "timezones.h"
 #include "channels.h"
 #include "test_patterns.h"
 #include "app/status.h"
@@ -1258,6 +1260,15 @@ static void sendClock() {
   doc["seconds"] = s.seconds;
   doc["date"] = clockface::dateName(s.date);
   doc["color"] = clockface::colorName(s.color);
+  doc["timezone"] = timezones::at(timezoneIndex()).name;
+  struct tm now;
+  if (getLocalTime(&now, 0)) {
+    char local[20];
+    strftime(local, sizeof(local), "%Y-%m-%d %H:%M", &now);
+    doc["localTime"] = local; // as the clock shows it, to check the zone
+  } else {
+    doc["localTime"] = nullptr;
+  }
   char hex[8];
   clockface::formatHex(s.custom, hex);
   doc["customColor"] = hex;
@@ -1274,12 +1285,19 @@ static void sendClock() {
   for (int i = 0; i < (int)clockface::Color::COUNT; i++) {
     colors.add(clockface::colorName((clockface::Color)i));
   }
+  JsonArray zones = choices["timezone"].to<JsonArray>();
+  for (size_t i = 0; i < timezones::count(); i++) {
+    JsonObject zone = zones.add<JsonObject>();
+    zone["name"] = timezones::at(i).name;
+    zone["label"] = timezones::at(i).label;
+  }
   sendJson(200, doc);
 }
 
 static void handleGetClock() { sendClock(); }
 
-// Any of {"style", "hours": 12 or 24, "seconds", "date", "color", "customColor"}; the rest
+// Any of {"style", "hours": 12 or 24, "seconds", "date", "color", "customColor",
+// "timezone"}; the rest
 // stay as they are. A clock on screen shows the change at once.
 static void handlePutClock() {
   JsonDocument body;
@@ -1320,6 +1338,21 @@ static void handlePutClock() {
         clockface::parseHex(body["customColor"].as<const char *>(), s.custom))) {
     sendError(400, "customColor must be like \"#ff8800\"");
     return;
+  }
+  int zone = -1;
+  if (!body["timezone"].isNull()) {
+    zone = body["timezone"].is<const char *>() ? timezones::find(body["timezone"].as<const char *>()) : -1;
+    if (zone < 0) {
+      sendError(400, "timezone must be one of choices.timezone, such as \"America/Chicago\"");
+      return;
+    }
+  }
+  if (zone >= 0 && zone != timezoneIndex()) {
+    if (!commandSend(CommandType::ApplyTimezone)) {
+      sendError(503, "Command queue is full, try again");
+      return;
+    }
+    timezoneSave(zone); // saved now; the display loop puts it in force
   }
   clockSetSettings(s);
   sendClock();

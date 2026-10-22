@@ -29,6 +29,7 @@ struct WeatherReading {
   int code = 0;   // WeatherAPI.com condition code
   bool isDay = true;
   String text;    // "Partly cloudy"
+  String tzId;    // the town's time zone, "America/Chicago"
   uint32_t fetchedAt = 0; // millis() when it arrived
 };
 
