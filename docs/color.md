@@ -1,12 +1,12 @@
-# Colour on the panel
+# Color on the panel
 
-Why colours looked washed out, especially in photo mode, and what fixed it
+Why colors looked washed out, especially in photo mode, and what fixed it
 (firmware 0.32.0, 2026-10-19).
 
 ## How the panel makes a shade
 
 A HUB75 panel's LEDs are only ever on or off. Shades come from how long each
-LED is on (binary code modulation): each colour channel's 8 bits are shown one
+LED is on (binary code modulation): each color channel's 8 bits are shown one
 after another, bit 0 for 1 unit of time, bit 1 for 2, bit 2 for 4 ... bit 7 for
 128, so a value of 200 is on for 200 units out of 255. Before that, the
 display library maps the artwork's 8-bit value through a CIE 1931 lightness
@@ -29,7 +29,7 @@ gives every bit the same window. So bits 0 to `t` all weigh the same.
 | Normal mode, about 100 Hz | 2 | 1, 1, 1, 2, 4, 8, 16, 32 |
 | Photo mode, about 520 Hz | 4 | 1, 1, 1, 1, 1, 2, 4, 8 |
 
-The faint parts of every colour came out far too bright, and the brightness
+The faint parts of every color came out far too bright, and the brightness
 scale even ran backwards in places (31 brighter than 32). A deep red with a
 little green in it had that green blown up, so it looked chalky and pale.
 

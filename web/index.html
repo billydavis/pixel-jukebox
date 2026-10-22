@@ -116,6 +116,10 @@ select,input[type=text],input[type=time],input[type=password]{width:100%;min-hei
 input::placeholder{color:var(--dim)}
 .field{display:grid;gap:var(--s2)}
 .wxfind{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--s2)}
+label.custom{display:flex;align-items:center;gap:var(--s3);cursor:pointer}
+label.custom input{width:56px;height:44px;padding:0;border:0;background:none;cursor:pointer}
+label.custom[hidden]{display:none}
+select.secs{width:auto;min-height:32px;padding:0 var(--s2);margin-left:var(--s1);font-size:14px;vertical-align:middle}
 .note a{color:var(--accent);text-underline-offset:3px}
 .field>label{font:12px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
 .row{display:flex;align-items:center;justify-content:space-between;gap:var(--s4);min-height:48px}
@@ -477,6 +481,41 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
       <p class="note" id="viewsnote" role="status"></p>
     </div>
     <div class="section">
+      <h2>Clock</h2>
+      <div class="field">
+        <span class="cap" id="ckstylelabel">Style</span>
+        <div class="chips" id="ckstyle" role="group" aria-labelledby="ckstylelabel">
+          <button data-v="digital" aria-pressed="false">Digital</button><button data-v="big" aria-pressed="false">Big</button><button data-v="analog" aria-pressed="false">Analog</button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="cap" id="ckhourslabel">Hours</span>
+        <div class="chips" id="ckhours" role="group" aria-labelledby="ckhourslabel">
+          <button data-v="12" aria-pressed="false">12-hour</button><button data-v="24" aria-pressed="false">24-hour</button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="cap" id="ckdatelabel">Date</span>
+        <div class="chips" id="ckdate" role="group" aria-labelledby="ckdatelabel">
+          <button data-v="off" aria-pressed="false">None</button><button data-v="weekday" aria-pressed="false">Thu Oct 22</button><button data-v="daymonth" aria-pressed="false">22 Oct</button><button data-v="numeric" aria-pressed="false">10/22</button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="cap" id="ckcolorlabel">Color</span>
+        <div class="chips" id="ckcolor" role="group" aria-labelledby="ckcolorlabel">
+          <button data-v="white" aria-pressed="false">White</button><button data-v="amber" aria-pressed="false">Amber</button><button data-v="mint" aria-pressed="false">Mint</button><button data-v="timeofday" aria-pressed="false">Time of day</button><button data-v="custom" aria-pressed="false">Custom</button>
+        </div>
+        <label class="custom" id="ckcustombox" hidden><input id="ckcustom" type="color" value="#ff8000"> <span>Pick the custom color</span></label>
+        <p class="note">Time of day: dim red at night, orange at dawn, white at midday, amber in the evening.</p>
+      </div>
+      <div class="row">
+        <span class="what" id="cksecondslabel"><b>Seconds</b><small>Shows the seconds ticking</small></span>
+        <button class="switch" id="ckseconds" role="switch" aria-checked="false" aria-labelledby="cksecondslabel"></button>
+      </div>
+      <div><button class="key small" id="ckshow">Show on panel</button></div>
+      <p class="note" id="cknote" role="status"></p>
+    </div>
+    <div class="section">
       <h2>Weather</h2>
       <p class="lead" id="wxlead" role="status">&nbsp;</p>
       <div class="field">
@@ -584,7 +623,7 @@ function twoTap(button,armedText,onArm,act){
 const TABS=['now','rot','art','night','set'];
 const wide=matchMedia('(min-width:900px)');
 let tab='now';
-const loaders={rot:()=>{loadRot();loadTrans();},art:()=>loadArtTab(),night:()=>loadNight(),set:()=>{loadMk();loadWeather();loadPin();loadFw();loadCard();loadTests();showDevice();}};
+const loaders={rot:()=>{loadRot();loadTrans();},art:()=>loadArtTab(),night:()=>loadNight(),set:()=>{loadMk();loadClock();loadWeather();loadPin();loadFw();loadCard();loadTests();showDevice();}};
 function showTab(name,focus){
   if(!TABS.includes(name))name='now';
   if(wide.matches&&name=='now')name=store.get('jukebox.tab')||'rot';
@@ -651,7 +690,7 @@ function render(){
     text=w.temperature==null?'No data':Math.round(w.temperature)+'°'+(w.units=='c'?'C':'F');
     sub=(w.condition?w.condition+' · ':'')+(w.place||'');}
   else if(slot=='test'){text='Test pattern';who='Test pattern';sub='Back to art in Settings, or Next';}
-  else if(slot=='clock'){text=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}).replace(/\s?[AP]M/i,'');who='Clock';sub=night.panel=='clock'?'Clock only, for the night':'Back to the art in a moment';}
+  else if(slot=='clock'){text=new Date().toLocaleTimeString([],{hour:ck&&ck.hours==24?'2-digit':'numeric',minute:'2-digit',hour12:!(ck&&ck.hours==24)}).replace(/\s?[AP]M/i,'');who='Clock';sub=night.panel=='clock'?'Clock only, for the night':'Back to the art in a moment';}
   else if(slot=='makapix'){text='Code on the panel';who='Waiting to be linked';sub='Enter the code at makapix.club';}
   else{text='Between pieces';}
   setImg($('art'),art?artSrc(art):'');setImg($('mart'),art?artSrc(art):'');
@@ -792,6 +831,7 @@ let rot=null;
 const copy=()=>rot.rotation.map(r=>{
   const e={slot:r.slot,turns:r.turns,enabled:r.enabled!==false};
   if(r.slot=='makapix')e.channel=r.channel;
+  if(r.seconds)e.seconds=r.seconds;
   return e;
 });
 async function loadRot(){
@@ -816,6 +856,17 @@ function drawRot(){
     const nm=document.createElement('span');nm.className='nm';
     const b=document.createElement('b');b.textContent=name;
     const sm=document.createElement('small');sm.textContent=(on?'':'Paused · ')+r.turns+' × '+a.turn;
+    if(a.seconds){
+      // A timed slot: the length of a turn, chosen here.
+      sm.textContent=(on?'':'Paused · ')+r.turns+' × ';
+      const sel=document.createElement('select');sel.className='secs';sel.dataset.k=i+':s';
+      sel.setAttribute('aria-label','Seconds per turn for '+name);
+      [5,10,15,20,30,45,60].filter(v=>v>=a.seconds.min&&v<=a.seconds.max).forEach(v=>sel.add(new Option(v+' s',v)));
+      if(![...sel.options].some(o=>+o.value==r.seconds))sel.add(new Option(r.seconds+' s',r.seconds));
+      sel.value=r.seconds||a.seconds.default;
+      sel.onchange=()=>{const l=copy();l[i].seconds=+sel.value;saveRot(l);};
+      sm.appendChild(sel);
+    }
     nm.append(b,sm);
     if(r.problem&&on){const bad=document.createElement('small');bad.className='bad';bad.textContent='Skipped: '+r.problem;nm.appendChild(bad);}
     const tools=document.createElement('span');tools.className='tools';
@@ -863,7 +914,7 @@ function showChannelBox(){
 }
 $('add').onclick=()=>{
   const o=picked(),l=copy();
-  if(o.value!='makapix'){l.push({slot:o.value,turns:1});saveRot(l);return;}
+  if(o.value!='makapix'){l.push({slot:o.value,turns:1});saveRot(l);return;} // timed slots get the default seconds
   let channel=o.dataset.type;
   if(o.dataset.needs){
     const v=$('chval').value.trim().replace(/^[@#]/,'');
@@ -1298,6 +1349,37 @@ async function loadTests(){
   }catch(e){}
 }
 $('testoff').onclick=async()=>{shownTest='';try{await call('DELETE','/test');}catch(e){}clearTimeout(timer);timer=setTimeout(poll,400);};
+
+/* ---- the clock --------------------------------------------------------------------- */
+let ck=null;
+function showClock(){
+  if(!ck)return;
+  const pick=(id,v)=>$(id).querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v==String(v)));
+  pick('ckstyle',ck.style);pick('ckhours',ck.hours);pick('ckdate',ck.date);pick('ckcolor',ck.color);
+  $('ckcustombox').hidden=ck.color!='custom';
+  if(ck.customColor&&document.activeElement!=$('ckcustom'))$('ckcustom').value=ck.customColor;
+  $('ckseconds').setAttribute('aria-checked',ck.seconds);
+  // An analog dial has no 12 or 24 hours.
+  $('ckhours').querySelectorAll('button').forEach(b=>b.disabled=ck.style=='analog');
+}
+async function loadClock(){
+  try{ck=await call('GET','/clock');showClock();}catch(e){$('cknote').textContent='Could not read the clock settings.';}
+}
+async function putClock(change){
+  Object.assign(ck||{},change);showClock();$('cknote').textContent='';
+  try{ck=await call('PUT','/clock',change);showClock();}
+  catch(e){$('cknote').textContent=e.reason?'Not saved: '+e.reason+'.':'Could not save. Try again.';loadClock();}
+}
+[['ckstyle','style',v=>v],['ckhours','hours',v=>+v],['ckdate','date',v=>v],['ckcolor','color',v=>v]].forEach(([id,key,conv])=>
+  $(id).querySelectorAll('button').forEach(b=>b.onclick=()=>putClock({[key]:conv(b.dataset.v)})));
+// The picker sends on every change; the panel redraws on its next tick, so this stays light.
+let customTimer=0;
+$('ckcustom').oninput=()=>{clearTimeout(customTimer);customTimer=setTimeout(()=>putClock({color:'custom',customColor:$('ckcustom').value}),250);};
+$('ckseconds').onclick=()=>putClock({seconds:$('ckseconds').getAttribute('aria-checked')!='true'});
+$('ckshow').onclick=async()=>{
+  try{await call('POST','/clock/show');$('cknote').textContent='On the panel now, for one turn.';clearTimeout(timer);timer=setTimeout(poll,1500);}
+  catch(e){$('cknote').textContent='Could not reach the panel. Try again.';}
+};
 
 /* ---- the weather ------------------------------------------------------------------- */
 let wx=null;

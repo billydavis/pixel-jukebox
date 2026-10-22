@@ -1,6 +1,6 @@
 """Light out of one LED channel for each 8-bit colour value, as the HUB75
 library drives it, with and without the fixes in lib/ESP32-HUB75-MatrixPanel-DMA
-(PATCHES.md). The reasoning is in docs/colour.md.
+(PATCHES.md). The reasoning is in docs/color.md.
 
     python tools/colour_model.py
 

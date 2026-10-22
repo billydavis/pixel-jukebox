@@ -51,7 +51,7 @@ backgrounds. The pieces credited to Pixel Jukebox are drawn by code in
 | 19 | Tiny dungeon room | Kenney, Tiny Dungeon | CC0 1.0 |
 | 20 | Plasma | Pixel Jukebox | Apache 2.0 |
 | 21 | Sunset | Pixel Jukebox | Apache 2.0 |
-| 22 | Colour wheel | Pixel Jukebox | Apache 2.0 |
+| 22 | Color wheel | Pixel Jukebox | Apache 2.0 |
 | 23 | Spinning cube | Pixel Jukebox | Apache 2.0 |
 | 24 | Ripples | Pixel Jukebox | Apache 2.0 |
 | 25 | Game of Life | Pixel Jukebox | Apache 2.0 |

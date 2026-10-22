@@ -14,7 +14,10 @@ static MakapixSlot makapixSlot;
 MakapixSlot *rotationArtworkSlot() { return &makapixSlot; }
 static ClockSlot clockSlot;
 
-Slot *rotationClockSlot() { return &clockSlot; }
+Slot *rotationClockSlot() {
+  clockSlot.useSeconds(ROTATION_SECONDS_DEFAULT);
+  return &clockSlot;
+}
 static WeatherSlot weatherSlot;
 
 struct SlotType {
@@ -22,9 +25,9 @@ struct SlotType {
   Slot *slot;
 };
 static const SlotType SLOT_TYPES[] = {
-    {{"makapix", "Makapix artwork", "one artwork"}, &makapixSlot},
-    {{"clock", "Clock", "10 seconds"}, &clockSlot},
-    {{"weather", "Weather", "10 seconds"}, &weatherSlot},
+    {{"makapix", "Makapix artwork", "one artwork", false}, &makapixSlot},
+    {{"clock", "Clock", "a set time", true}, &clockSlot},
+    {{"weather", "Weather", "a set time", true}, &weatherSlot},
 };
 
 static const char *PREFS_KEY = "rotation";
@@ -43,6 +46,37 @@ struct Guard {
   ~Guard() { xSemaphoreGive(lock); }
 };
 } // namespace
+
+static const SlotType *findType(const String &name) {
+  for (const SlotType &type : SLOT_TYPES) {
+    if (name == type.info.name) {
+      return &type;
+    }
+  }
+  return nullptr;
+}
+
+// A timed slot's seconds: missing (0) becomes the default; others have none.
+static bool tidySeconds(std::vector<RotationEntry> &entries, String &error) {
+  for (RotationEntry &entry : entries) {
+    const SlotType *type = findType(entry.slot);
+    if (!type || !type->info.timed) {
+      if (entry.seconds) {
+        error = "only the clock and the weather have seconds";
+        return false;
+      }
+      continue;
+    }
+    if (entry.seconds == 0) {
+      entry.seconds = ROTATION_SECONDS_DEFAULT;
+    }
+    if (entry.seconds < ROTATION_SECONDS_MIN || entry.seconds > ROTATION_SECONDS_MAX) {
+      error = "seconds must be " + String(ROTATION_SECONDS_MIN) + " to " + String(ROTATION_SECONDS_MAX);
+      return false;
+    }
+  }
+  return true;
+}
 
 static Slot *findSlot(const String &name) {
   for (const SlotType &type : SLOT_TYPES) {
@@ -93,7 +127,7 @@ static bool validate(const std::vector<RotationEntry> &entries, String &error) {
 }
 
 static std::vector<RotationEntry> defaultRotation() {
-  return {{"makapix", 3, "all", true}, {"clock", 1, "", true}};
+  return {{"makapix", 3, "all", true, 0}, {"clock", 1, "", true, ROTATION_SECONDS_DEFAULT}};
 }
 
 // Stored as JSON: [{"slot":"makapix","turns":3,"channel":"promoted"}, ...],
@@ -111,6 +145,9 @@ static void save(const std::vector<RotationEntry> &entries) {
     if (!entry.enabled) {
       item["enabled"] = false;
     }
+    if (entry.seconds) {
+      item["seconds"] = entry.seconds;
+    }
   }
   String json;
   serializeJson(doc, json);
@@ -125,10 +162,12 @@ static std::vector<RotationEntry> load() {
   }
   std::vector<RotationEntry> entries;
   for (JsonObject item : doc.as<JsonArray>()) {
-    entries.push_back({item["slot"] | "", (uint8_t)(item["turns"] | 0), item["channel"] | "", item["enabled"] | true});
+    entries.push_back({item["slot"] | "", (uint8_t)(item["turns"] | 0), item["channel"] | "", item["enabled"] | true,
+                       (uint8_t)(item["seconds"] | 0)});
   }
   String error;
-  return tidyChannels(entries, error) && validate(entries, error) ? entries : defaultRotation();
+  return tidyChannels(entries, error) && validate(entries, error) && tidySeconds(entries, error) ? entries
+                                                                                                : defaultRotation();
 }
 
 void rotationBegin() {
@@ -156,7 +195,7 @@ std::vector<RotationEntry> rotationGet() {
 
 bool rotationSet(const std::vector<RotationEntry> &requested, String &error) {
   std::vector<RotationEntry> entries = requested;
-  if (!validate(entries, error) || !tidyChannels(entries, error)) {
+  if (!validate(entries, error) || !tidyChannels(entries, error) || !tidySeconds(entries, error)) {
     return false;
   }
   Guard guard;
@@ -183,6 +222,7 @@ Slot *rotationCurrent() {
   Guard guard;
   skipPaused();
   Slot *slot = findSlot(rotation[position].slot);
+  slot->useSeconds(rotation[position].seconds);
   if (slot == &makapixSlot) {
     makapixSlot.useChannel(channelOverride.isEmpty() ? rotation[position].channel : channelOverride);
   }

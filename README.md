@@ -37,6 +37,7 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 | **Photo mode** | A switch on the control page redraws the panel about five times as often (about 500 Hz), so phones and cameras film it without dark bands rolling through. Dark shades are less smooth, so it is off by default. The panel restarts to switch |
 | **Orientation** | Turn the picture 90, 180 or 270 degrees for however the panel sits in its case, or mirror it for a live stream or a mirror, from Settings. Changes at once and is remembered |
 | **Weather** | A weather slot for the rotation: a pixel-art picture of the current conditions and the temperature where you are, from [WeatherAPI.com](https://www.weatherapi.com/) with a free key of your own. Choose the town, F or C and how often to check in Settings |
+| **Clock** | Digital, Big or Analog, in 12 or 24 hours, with seconds and the date if wanted, in white, amber, mint, or a color that follows the time of day (a dim red at night). Each clock or weather slot in the rotation stays on screen as long as you choose, 5 to 60 seconds |
 | **Clock chip** | The board's clock chip keeps the time through restarts, so the clock and view reports have it before Wi-Fi is up. It is set from internet time whenever that answers. A backup battery keeps the time through power cuts too: a non-rechargeable 3 V coin cell (CR2032 or CR1220) on the 2-pin JST-SH 1.0 mm connector J4, pin 1 positive. The board does not charge it |
 | **Pausing slots** | An eye on each rotation row pauses a slot without removing it, like hiding a layer in an image editor: it keeps its place, turns and channel and is skipped until shown again. Up to 12 slots |
 | **Channels** | Each artwork slot in the rotation can play its own Makapix channel: everything, featured art, your own art, one artist, a hashtag, or the art you have liked. For example two featured pieces, one tagged #cat, one you liked, then the clock |
@@ -60,7 +61,7 @@ There is no app and no server of your own to run. The board talks to Makapix dir
 | **Updates over Wi-Fi** | Send new firmware from the PC with `python tools/ota_upload.py`, or the Update button in Settings. It is written alongside the running firmware and only used once it checks out; if it then fails to start properly, the panel goes back to the previous firmware by itself. USB still works |
 | **PIN** | An optional 4 to 8 digit PIN for the control page and the API, set in Settings. Each browser signs in once and stays signed in, through restarts. Five wrong guesses lock sign-in for 30 seconds. Forgot it? Hold the button for 5 seconds and tick "Also remove the control-page PIN" on the Wi-Fi setup page |
 | **Security** | Verifies the makapix.club TLS certificate before sending the device token |
-| **Diagnostics** | Separate builds for a colour and power check and a speaker test |
+| **Diagnostics** | Separate builds for a color and power check and a speaker test |
 
 ## Hardware
 
@@ -123,7 +124,7 @@ The clock's time zone is `TIMEZONE` in [`include/config.h`](include/config.h) (U
 
 ### Brightness
 
-Brightness (0-255) is set through the API and remembered across restarts; the starting value is `DEFAULT_BRIGHTNESS` in [`src/display/display.cpp`](src/display/display.cpp). Raise it only as far as white stays white; see the colour check below.
+Brightness (0-255) is set through the API and remembered across restarts; the starting value is `DEFAULT_BRIGHTNESS` in [`src/display/display.cpp`](src/display/display.cpp). Raise it only as far as white stays white; see the color check below.
 
 ## Control page
 
@@ -147,10 +148,10 @@ It is open to anyone on the same network until a PIN is set (Settings on the con
 Four extra PlatformIO environments run a check at boot and then carry on as normal. Upload the regular firmware again afterwards.
 
 ```sh
-pio run -e colour-check -t upload
+pio run -e color-check -t upload
 ```
 
-Shows white at brightness 32, 64 and 128, then colour bars. If white turns yellow or red as the brightness rises, the 5V supply is sagging: check the power wiring first, then the supply's rating.
+Shows white at brightness 32, 64 and 128, then color bars. If white turns yellow or red as the brightness rises, the 5V supply is sagging: check the power wiring first, then the supply's rating.
 
 ```sh
 pio run -e speaker-test -t upload
@@ -242,7 +243,7 @@ Compares the routes in `src/network/api.cpp` with the API document and the Postm
 python tools/check_web.py
 ```
 
-Checks the pages in `web/` for duplicate element IDs, script references to IDs that do not exist, anything loaded from outside the board, placeholders the firmware never fills in, and colour tokens that differ between the control page and the setup pages. Needs no board.
+Checks the pages in `web/` for duplicate element IDs, script references to IDs that do not exist, anything loaded from outside the board, placeholders the firmware never fills in, and color tokens that differ between the control page and the setup pages. Needs no board.
 
 ```sh
 powershell -File tools/run_unit_tests.ps1

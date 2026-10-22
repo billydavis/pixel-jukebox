@@ -113,6 +113,9 @@ effect before the reply, which is `200` with the new state.
 | `GET` | `/uploads/{id}.gif` | One upload's GIF |
 | `POST` | `/uploads/{id}/show` | Show an upload now |
 | `DELETE` | `/uploads/{id}` | Delete an upload |
+| `GET` | `/clock` | How the clock looks |
+| `PUT` | `/clock` | Change how the clock looks |
+| `POST` | `/clock/show` | Show the clock now, to see how it looks |
 | `GET` | `/weather` | The weather settings and the latest reading |
 | `PUT` | `/weather` | Set the key, town, units or refresh |
 | `GET` | `/weather/search` | Towns matching a name, to choose from |
@@ -401,14 +404,14 @@ swapped, done before turning) say which way up the picture goes, for however
 the panel sits in its case, or for a live stream or a mirror. Everything is
 drawn upright and turned on its way to the panel.
 
-The panel draws each colour as a sequence of on and off times, many times a
+The panel draws each color as a sequence of on and off times, many times a
 second. Eyes see a steady picture, but a camera's short exposure catches part
 of a cycle and shows dark bands rolling through the picture.
 
 | `photo` | Refresh | Use |
 |---|---|---|
-| `false` | about 100 Hz | The most accurate colours |
-| `true` | about 500 Hz | Filming and photographing: cameras see a steady picture. The five dimmest steps of each colour get equal time, so dark shades are less smooth |
+| `false` | about 100 Hz | The most accurate colors |
+| `true` | about 500 Hz | Filming and photographing: cameras see a steady picture. The five dimmest steps of each color get equal time, so dark shades are less smooth |
 
 `refreshHz` is the rate the display driver worked out at start-up.
 
@@ -583,14 +586,15 @@ It is a `400`, and nothing changes, if `mode` is not one of the two values or
 {
   "available": [
     { "name": "makapix", "label": "Makapix artwork", "turn": "one artwork" },
-    { "name": "clock", "label": "Clock", "turn": "10 seconds" }
+    { "name": "clock", "label": "Clock", "turn": "a set time", "seconds": { "min": 5, "max": 60, "default": 10 } },
+    { "name": "weather", "label": "Weather", "turn": "a set time", "seconds": { "min": 5, "max": 60, "default": 10 } }
   ],
   "rotation": [
     { "slot": "makapix", "turns": 2, "channel": "promoted", "channelLabel": "Promoted" },
     { "slot": "makapix", "turns": 1, "channel": "likedby:billy", "channelLabel": "Liked by @billy" },
     { "slot": "makapix", "turns": 1, "channel": "artist:nobody", "channelLabel": "@nobody",
       "problem": "User 'nobody' not found" },
-    { "slot": "clock", "turns": 1, "enabled": false }
+    { "slot": "clock", "turns": 1, "enabled": false, "seconds": 10 }
   ],
   "channels": [
     { "type": "all", "label": "Everything" },
@@ -607,7 +611,8 @@ It is a `400`, and nothing changes, if `mode` is not one of the two values or
 
 | Field | Meaning |
 |---|---|
-| `available` | Slot types this firmware has. `turn` says what one turn of that slot is, for showing to people |
+| `available` | Slot types this firmware has. `turn` says what one turn of that slot is, for showing to people. Timed slots (the clock and the weather) have `seconds`: the range a row's turn may last |
+| `rotation[].seconds` | For timed slots: how long one turn lasts, 5 to 60 seconds; 10 when not given. Other slots have none (an artwork's turn is as long as its artist asked) |
 | `rotation` | The order slots are shown in. Each entry is shown `turns` times in a row, then the next entry, looping |
 | `rotation[].enabled` | `false` while a slot is paused: it keeps its place, turns and channel but is skipped, and nothing is downloaded for it. At least one slot is always on |
 | `rotation[].channel` | For `makapix` slots: which Makapix art it plays; see Channels below. `channelLabel` is the same for people |
@@ -766,6 +771,51 @@ Shows it for one turn, like `POST /show/{postId}`. Reply: `202 {"queued":"showUp
 ### `DELETE /uploads/{id}`
 
 Reply: `200 {"removed": 3}`. `404` for no such upload.
+
+## Clock
+
+The clock slot shows the time in one of three styles, with the date if
+wanted. Its look is one setting for the whole panel, used by every clock row
+in the rotation and by the night schedule's clock-only nights; how long each
+clock row stays on screen is that row's `seconds`.
+
+### `GET /clock`
+
+```json
+{
+  "style": "digital",
+  "hours": 12,
+  "seconds": false,
+  "date": "weekday",
+  "color": "timeofday",
+  "customColor": "#ff8000",
+  "choices": {
+    "style": ["digital", "big", "analog"],
+    "date": ["off", "weekday", "daymonth", "numeric"],
+    "color": ["white", "amber", "mint", "timeofday", "custom"]
+  }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `style` | `digital`: the time at twice the text size, the date above and AM/PM below. `big`: chunky digits across the panel, readable across a room. `analog`: a dial with hands, and the day of the month in a window at three o'clock |
+| `hours` | 12 or 24. A 24-hour clock has no AM/PM. The analog dial ignores it |
+| `seconds` | Show the seconds: under the time, or as a second hand |
+| `date` | `off`, `weekday` ("Thu Oct 22"), `daymonth` ("22 Oct") or `numeric` ("10/22"). The analog dial shows only the day |
+| `customColor` | The color used when `color` is `custom`, as `"#rrggbb"`. Very dark colors show coarser on the panel, which has fewer steps near black |
+| `color` | `white`, `amber`, `mint`, `custom` (`customColor`), or `timeofday`: a dim red at night that does not light the room, orange at dawn, white at midday, amber in the evening, changing smoothly |
+
+### `PUT /clock`
+
+Any of the fields above; the rest stay as they are. A clock on screen shows
+the change at once. Reply: the `GET /clock` document. `400` for a value not
+listed.
+
+### `POST /clock/show`
+
+Shows the clock for one turn, as a request (like `POST /show/{postId}`).
+Reply: `202 {"queued":"showClock"}`.
 
 ## Weather
 
@@ -954,8 +1004,8 @@ Back to the rotation's own channels. Reply: as `GET /channel`.
 ## Test patterns
 
 For judging the picture: comparing normal and photo mode, checking white
-balance, and spotting brightness steps out of order (`docs/colour.md`). Every
-colour is exact in RGB565, the form artwork reaches the display driver in.
+balance, and spotting brightness steps out of order (`docs/color.md`). Every
+color is exact in RGB565, the form artwork reaches the display driver in.
 
 | Pattern | Shows |
 |---|---|

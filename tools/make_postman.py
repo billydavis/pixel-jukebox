@@ -92,7 +92,7 @@ FOLDERS = [
          "Redraws about five times as often, so cameras film the panel without dark bands. "
          "Saved; the board restarts to switch.", {"photo": True}, 202),
         ("Photo Mode Off", "PUT", "panel",
-         "Back to the most accurate colours. Saved; the board restarts to switch.", {"photo": False}, 202),
+         "Back to the most accurate colors. Saved; the board restarts to switch.", {"photo": False}, 202),
     ]),
     ("Rotation", [
         ("Get Slots", "GET", "slots", "The rotation and the slot types available.", None, 200),
@@ -184,6 +184,16 @@ FOLDERS = [
         ("Remove An Upload", "DELETE", "uploads/{{upload_id}}", "Deletes an upload from the card.", None, 200),
         ("Play My Uploads", "PUT", "channel", "Every artwork slot plays your uploads, for now.",
          {"channel": "uploads"}, 200),
+    ]),
+    ("Clock", [
+        ("Get Clock Settings", "GET", "clock", "How the clock looks, and the choices.", None, 200),
+        ("Big Clock, Time Of Day Color", "PUT", "clock", "Chunky digits that change color through the day.",
+         {"style": "big", "color": "timeofday"}, 200),
+        ("Clock In A Custom Color", "PUT", "clock", "Any color, as #rrggbb.",
+         {"color": "custom", "customColor": "#ff8000"}, 200),
+        ("24-Hour Clock With Seconds", "PUT", "clock", "24-hour time with the seconds.",
+         {"hours": 24, "seconds": True}, 200),
+        ("Show The Clock", "POST", "clock/show", "Shows the clock for one turn, to see how it looks.", None, 202),
     ]),
     ("Weather", [
         ("Get Weather", "GET", "weather",

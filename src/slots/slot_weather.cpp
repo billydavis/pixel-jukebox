@@ -6,7 +6,6 @@
 #include "pins.h"
 #include "weather_rules.h"
 
-static const uint32_t SHOW_MS = 10000;
 static const uint32_t UPDATE_MS = 1000;
 static const int ICON_X = (PANEL_RES_X - WEATHER_ICON_SIZE) / 2;
 static const int ICON_Y = 3;
@@ -31,7 +30,7 @@ uint32_t WeatherSlot::update() {
   return UPDATE_MS;
 }
 
-bool WeatherSlot::finished() const { return millis() - startedAt >= SHOW_MS; }
+bool WeatherSlot::finished() const { return millis() - startedAt >= showMs; }
 
 void WeatherSlot::redraw() { drawnAgeMinutes = -2; }
 

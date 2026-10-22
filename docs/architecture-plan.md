@@ -80,7 +80,7 @@ four environments, and the regular one once more with `include/secrets.h`
 moved aside.
 
 ```sh
-pio run -e waveshare-s3-rgb-matrix -e colour-check -e speaker-test -e mic-test
+pio run -e waveshare-s3-rgb-matrix -e color-check -e speaker-test -e mic-test
 ```
 
 Reasons to revisit: a second contributor, a library update that breaks a
@@ -189,7 +189,7 @@ Two things changed beyond a straight move:
   out would mean three requests to a small single-threaded server for no gain
   in maintainability at its current size.
 
-The colour tokens exist twice, in `index.html` and `setup.css`. Removing that
+The color tokens exist twice, in `index.html` and `setup.css`. Removing that
 would mean the control page loading a second file, so `check_web.py` compares
 the two and fails if they differ.
 
@@ -205,7 +205,7 @@ loop that picks and runs a slot, and command handling, and nothing else.
 |---|---|---|
 | `src/network/connection.cpp` | Joining Wi-Fi at boot, announcing the connection, rejoining after a drop, entering setup | 67 |
 | `src/app/diagnostics.cpp` | The speaker and microphone checks, behind one `runDiagnostics()` call | 99 |
-| `src/display/display.cpp` | The three status colours, which each file had been defining for itself | 3 |
+| `src/display/display.cpp` | The three status colors, which each file had been defining for itself | 3 |
 
 The code was moved, not rewritten; the only edits are names. Verified after
 the move: all four environments build, as does the regular one without

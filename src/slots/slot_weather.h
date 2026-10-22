@@ -13,11 +13,13 @@ class WeatherSlot : public Slot {
   uint32_t update() override;
   bool finished() const override;
   void redraw() override;
+  void useSeconds(uint8_t seconds) override { showMs = seconds * 1000UL; }
 
  private:
   void draw();
 
   uint32_t startedAt = 0;
+  uint32_t showMs = 10000;
   uint32_t drawnFetchedAt = 0; // the reading on screen, to redraw when a new one arrives
   int drawnAgeMinutes = -1;
 };

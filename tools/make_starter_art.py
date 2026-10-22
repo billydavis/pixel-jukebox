@@ -537,7 +537,7 @@ def ramps(i, n, px, im):
 
 code("code-plasma", "Plasma", "Full-panel colour motion", plasma, 48, 60)
 code("code-sunset", "Sunset", "Smooth gradient and shimmer, shows the colour fix", sunset, 32, 90)
-code("code-wheel", "Colour wheel", "Every hue and saturation, turning", wheel, 36, 60)
+code("code-wheel", "Color wheel", "Every hue and saturation, turning", wheel, 36, 60)
 code("code-cube", "Spinning cube", "3D wireframe, rainbow edges", cube, 60, 50)
 code("code-ripples", "Ripples", "Two interfering water ripples", ripples, 30, 60)
 code("code-life", "Game of Life", "Conway's cellular automaton, coloured by age", life, 120, 80)

@@ -67,8 +67,8 @@ from the packs above (its header says where to put them), and listed in
 - Sunny Land (4): the fox with three-layer parallax, the eagle over the sea,
   frog and opossum, gem and cherry scaled x2
 - Kenney (2): a meadow platformer scene, a tiny dungeon room
-- Drawn by code (9): plasma, sunset, colour wheel, spinning cube, ripples,
-  Game of Life, a Pixel Jukebox logo, a starfield, glowing colour bands
+- Drawn by code (9): plasma, sunset, color wheel, spinning cube, ripples,
+  Game of Life, a Pixel Jukebox logo, a starfield, glowing color bands
 
 ## In the firmware
 

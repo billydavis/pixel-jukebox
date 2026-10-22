@@ -322,6 +322,22 @@ try:
     check("pausing every slot is refused", code == 400, body)
     code, body = call("PUT", "/slots", {"rotation": [{"slot": "clock", "turns": 1, "enabled": "no"}]})
     check("enabled must be true or false", code == 400, body)
+    code, body = call("PUT", "/slots", {"rotation": [{"slot": "clock", "turns": 1, "seconds": 25},
+                                                     {"slot": "makapix", "turns": 1}]})
+    rows = body.get("rotation") or [{}, {}]
+    check("a clock row keeps its seconds; an art row has none",
+          code == 200 and rows[0].get("seconds") == 25 and "seconds" not in rows[1], body)
+    code, body = call("PUT", "/slots", {"rotation": [{"slot": "clock", "turns": 1}]})
+    check("a clock row without seconds gets 10", code == 200 and body["rotation"][0].get("seconds") == 10, body)
+    for label, bad in (("4 seconds", [{"slot": "clock", "turns": 1, "seconds": 4}]),
+                       ("61 seconds", [{"slot": "clock", "turns": 1, "seconds": 61}]),
+                       ("seconds on an art row", [{"slot": "makapix", "turns": 1, "seconds": 10}])):
+        code, body = call("PUT", "/slots", {"rotation": bad})
+        check(f"rotation rejects {label}", code == 400, body)
+    available = {a["name"]: a for a in call("GET", "/slots")[1].get("available", [])}
+    check("timed slots say their seconds range",
+          available.get("clock", {}).get("seconds") == {"min": 5, "max": 60, "default": 10}
+          and "seconds" not in available.get("makapix", {}), available)
 
     section("Transitions")
     code, body = call("GET", "/transition")
@@ -418,6 +434,29 @@ try:
         check("a removed upload is gone", call("GET", f"/uploads/{upload_id}.gif")[0] == 404)
     else:
         print("  (no card: upload checks skipped)")
+
+    section("Clock")
+    code, ck = call("GET", "/clock")
+    check("the clock says its look and the choices",
+          code == 200 and ck.get("style") in ("digital", "big", "analog") and ck.get("hours") in (12, 24)
+          and ck.get("choices", {}).get("color") == ["white", "amber", "mint", "timeofday", "custom"]
+          and "colour" not in ck, ck)
+    for bad in ({"style": "fancy"}, {"hours": 13}, {"hours": "24"}, {"seconds": "yes"}, {"date": "long"},
+                {"color": "pink"}, {"customColor": "ff8000"}, {"customColor": "#ff80"}, {"customColor": "#zz8000"}):
+        code, body = call("PUT", "/clock", bad)
+        check(f"the clock rejects {json.dumps(bad)}", code == 400, body)
+    trial = {"style": "analog", "hours": 24, "seconds": True, "date": "numeric", "color": "custom",
+             "customColor": "#12c8ff"}
+    code, body = call("PUT", "/clock", trial)
+    check("every clock setting can change at once", code == 200 and all(body.get(k) == v for k, v in trial.items()), body)
+    code, body = call("PUT", "/clock", {"style": "big"})
+    check("changing one keeps the rest", body.get("style") == "big" and body.get("hours") == 24, body)
+    code, body = call("POST", "/clock/show")
+    check("the clock can be shown on request",
+          code == 202 and wait_for(lambda s: s.get("slot", {}).get("name") == "clock", 10), body)
+    restore = {k: ck.get(k) for k in ("style", "hours", "seconds", "date", "color", "customColor")}
+    code, body = call("PUT", "/clock", restore)
+    check("and the clock goes back as it was", all(body.get(k) == v for k, v in restore.items()), body)
 
     section("Weather")
     code, wx = call("GET", "/weather")

@@ -28,4 +28,8 @@ class Slot {
   virtual void redraw() = 0;
 
   virtual void stop() {}
+
+  // How long one turn lasts, for slots shown for a set time (the clock, the
+  // weather), from the rotation row. Others ignore it.
+  virtual void useSeconds(uint8_t seconds) {}
 };

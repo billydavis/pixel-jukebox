@@ -11,6 +11,7 @@
 #include "beat_follower.h"
 #include "cache_index.h"
 #include "channels.h"
+#include "clock_rules.h"
 #include "crash_cause.h"
 #include "gif_pad.h"
 #include "html_escape.h"
@@ -1575,6 +1576,94 @@ static void test_orientation_degrees_and_packing() {
   }
 }
 
+// ---- clock_rules --------------------------------------------------------------
+
+static void test_clock_formats() {
+  char text[16];
+  clockface::formatTime(0, 5, false, text);
+  TEST_ASSERT_EQUAL_STRING("12:05", text); // midnight
+  clockface::formatTime(13, 42, false, text);
+  TEST_ASSERT_EQUAL_STRING("1:42", text);
+  clockface::formatTime(12, 0, false, text);
+  TEST_ASSERT_EQUAL_STRING("12:00", text);
+  clockface::formatTime(6, 7, true, text);
+  TEST_ASSERT_EQUAL_STRING("06:07", text);
+  clockface::formatTime(23, 59, true, text);
+  TEST_ASSERT_EQUAL_STRING("23:59", text);
+  TEST_ASSERT_EQUAL_STRING("AM", clockface::meridiem(11));
+  TEST_ASSERT_EQUAL_STRING("PM", clockface::meridiem(12));
+  clockface::formatDate(clockface::DateFormat::Weekday, 4, 10, 22, text);
+  TEST_ASSERT_EQUAL_STRING("Thu Oct 22", text);
+  clockface::formatDate(clockface::DateFormat::DayMonth, 4, 10, 22, text);
+  TEST_ASSERT_EQUAL_STRING("22 Oct", text);
+  clockface::formatDate(clockface::DateFormat::Numeric, 4, 1, 5, text);
+  TEST_ASSERT_EQUAL_STRING("1/5", text);
+  clockface::formatDate(clockface::DateFormat::Off, 4, 10, 22, text);
+  TEST_ASSERT_EQUAL_STRING("", text);
+}
+
+static void test_clock_settings_round_trip() {
+  clockface::Settings s;
+  s.style = clockface::Style::Analog;
+  s.hours24 = true;
+  s.seconds = true;
+  s.date = clockface::DateFormat::Numeric;
+  s.color = clockface::Color::Custom;
+  s.custom = {12, 200, 255};
+  clockface::Settings back = clockface::unpack(clockface::pack(s), clockface::packColor(s.custom));
+  TEST_ASSERT_TRUE(back.style == s.style && back.hours24 && back.seconds && back.date == s.date &&
+                   back.color == s.color);
+  TEST_ASSERT_TRUE(back.custom.r == 12 && back.custom.g == 200 && back.custom.b == 255);
+  clockface::Settings defaults = clockface::unpack(0); // nothing stored yet
+  TEST_ASSERT_TRUE(defaults.style == clockface::Style::Digital && !defaults.hours24 &&
+                   defaults.date == clockface::DateFormat::Weekday && defaults.color == clockface::Color::White);
+  TEST_ASSERT_TRUE(clockface::unpack(0x8000000Fu).style == clockface::Style::Digital); // damaged: defaults
+  clockface::Style style;
+  TEST_ASSERT_TRUE(clockface::styleFrom("big", style) && style == clockface::Style::Big);
+  TEST_ASSERT_FALSE(clockface::styleFrom("fancy", style));
+  clockface::Color color;
+  TEST_ASSERT_TRUE(clockface::colorFrom("timeofday", color) && color == clockface::Color::TimeOfDay);
+  TEST_ASSERT_TRUE(clockface::colorFrom("custom", color) && color == clockface::Color::Custom);
+  TEST_ASSERT_FALSE(clockface::colorFrom("colour", color));
+  clockface::Rgb rgb;
+  TEST_ASSERT_TRUE(clockface::parseHex("#FF8800", rgb) && rgb.r == 255 && rgb.g == 136 && rgb.b == 0);
+  char hex[8];
+  clockface::formatHex(rgb, hex);
+  TEST_ASSERT_EQUAL_STRING("#ff8800", hex);
+  TEST_ASSERT_FALSE(clockface::parseHex("ff8800", rgb));  // the # is needed
+  TEST_ASSERT_FALSE(clockface::parseHex("#ff880", rgb));  // too short
+  TEST_ASSERT_FALSE(clockface::parseHex("#gg8800", rgb)); // not hex
+  clockface::DateFormat date;
+  TEST_ASSERT_TRUE(clockface::dateFrom("daymonth", date) && date == clockface::DateFormat::DayMonth);
+  TEST_ASSERT_EQUAL_STRING("numeric", clockface::dateName(clockface::DateFormat::Numeric));
+}
+
+static void test_clock_time_of_day_colors() {
+  using clockface::Color;
+  const clockface::Rgb none = {0, 0, 0};
+  clockface::Rgb night = clockface::colorAt(Color::TimeOfDay, none, 2, 0);
+  clockface::Rgb noon = clockface::colorAt(Color::TimeOfDay, none, 12, 0);
+  clockface::Rgb dawn = clockface::colorAt(Color::TimeOfDay, none, 6, 30);
+  TEST_ASSERT_TRUE(night.r > night.g && night.r < 160);          // dim red at night
+  TEST_ASSERT_TRUE(noon.r == 255 && noon.g == 255 && noon.b == 255);
+  TEST_ASSERT_TRUE(dawn.r == 255 && dawn.g < 200 && dawn.b < 100); // orange at dawn
+  // Smooth: no big jump from one minute to the next, all day.
+  clockface::Rgb last = clockface::colorAt(Color::TimeOfDay, none, 0, 0);
+  for (int m = 1; m < 24 * 60; m++) {
+    clockface::Rgb c = clockface::colorAt(Color::TimeOfDay, none, m / 60, m % 60);
+    TEST_ASSERT_TRUE(abs(c.r - last.r) <= 3 && abs(c.g - last.g) <= 3 && abs(c.b - last.b) <= 3);
+    last = c;
+  }
+  clockface::Rgb end = clockface::colorAt(Color::TimeOfDay, none, 23, 59);
+  TEST_ASSERT_TRUE(abs(end.r - night.r) <= 3); // and it joins up at midnight
+  clockface::Rgb amber = clockface::colorAt(Color::Amber, none, 3, 0);
+  TEST_ASSERT_TRUE(amber.r == 255 && amber.b < 64);
+  clockface::Rgb mine = clockface::colorAt(Color::Custom, {1, 2, 3}, 3, 0);
+  TEST_ASSERT_TRUE(mine.r == 1 && mine.g == 2 && mine.b == 3);
+  clockface::Rgb dim = clockface::dimmed(noon);
+  TEST_ASSERT_TRUE(dim.r < 128 && dim.r > 100);
+}
+
 // ---- weather_rules ------------------------------------------------------------
 
 // Every one of WeatherAPI.com's 60 codes (weather_conditions.json, 2026-10-22).
@@ -1810,6 +1899,9 @@ static int runTests() {
   RUN_TEST(test_upload_decodes_percent_names);
   RUN_TEST(test_channels_uploads);
   RUN_TEST(test_channels_starter);
+  RUN_TEST(test_clock_formats);
+  RUN_TEST(test_clock_settings_round_trip);
+  RUN_TEST(test_clock_time_of_day_colors);
   RUN_TEST(test_weather_every_code_has_a_picture);
   RUN_TEST(test_weather_fetch_timing);
   RUN_TEST(test_weather_freshness_and_settings);

@@ -35,6 +35,7 @@
 #include "screen_rules.h"
 #include "audio/audio.h"
 #include "slots/slot_makapix.h"
+#include "slots/slot_clock.h"
 #include "slots/slot_test.h"
 
 static const uint32_t MESSAGE_MS = 1500;
@@ -47,6 +48,7 @@ static uint32_t requestedPost = 0;   // an artwork asked for (gallery, Back, mak
 static uint32_t requestedUpload = 0; // an upload asked for from the Art tab
 static uint16_t requestedStarter = 0; // a piece of starter art asked for from the Art tab
 static int requestedTest = -1;       // a test pattern asked for from Settings
+static bool requestedClock = false;  // the clock asked for from Settings, to see its look
 static TestPatternSlot testSlot;
 static bool requestFromBack = false; // that request came from Back: not a new step in the history
 static screen::Source lastSource = screen::Source::Rotation;
@@ -184,6 +186,12 @@ static void runSlot(Slot *slot, screen::Source source) {
             statusSetHeld(false);
             slot->stop();
             return;
+          case CommandType::ShowClock:
+            Serial.println("Command: show the clock");
+            requestedClock = true;
+            statusSetHeld(false);
+            slot->stop();
+            return;
           case CommandType::SetBrightness:
             Serial.printf("Command: brightness %u\n", command.value);
             nightSetBrightness(command.value);
@@ -276,6 +284,8 @@ static void handleCommandsWhileIdle() {
       requestedStarter = command.value;
     } else if (command.type == CommandType::ShowTestPattern) {
       requestedTest = command.value;
+    } else if (command.type == CommandType::ShowClock) {
+      requestedClock = true;
     } else if (command.type == CommandType::Back) {
       requestPrevious();
     }
@@ -307,6 +317,10 @@ static void nightDark() {
           return;
         case CommandType::ShowTestPattern:
           requestedTest = command.value;
+          nightWake();
+          return;
+        case CommandType::ShowClock:
+          requestedClock = true;
           nightWake();
           return;
         case CommandType::Next:
@@ -389,6 +403,7 @@ void setup() {
 
   statusBegin();
   commandsBegin();
+  clockBegin();
   rotationBegin();
   MEMORY_AT("rotation");
   telemetryBootMark("rotation");
@@ -427,7 +442,8 @@ void loop() {
   // schedule, sound mode, a request and the rotation.
   bool nightOff = nightNow().off;
   screen::Source source =
-      screen::choose(screenInputs(requestedPost != 0 || requestedUpload != 0 || requestedStarter != 0 || requestedTest >= 0));
+      screen::choose(screenInputs(requestedPost != 0 || requestedUpload != 0 || requestedStarter != 0 || requestedTest >= 0 ||
+                     requestedClock));
   statusSetScreen(screen::name(source));
   if (source == screen::Source::Dark) {
     lastSource = source;
@@ -448,8 +464,11 @@ void loop() {
   // where it was.
   bool fromBack = false;
   bool testing = false;
+  bool clockShown = false;
   if (source == screen::Source::Request) {
-    if (requestedTest >= 0) {
+    if (requestedClock) {
+      clockShown = true;
+    } else if (requestedTest >= 0) {
       testSlot.use((testpattern::Pattern)requestedTest);
       testing = true;
     } else if (requestedUpload) {
@@ -459,6 +478,7 @@ void loop() {
     } else {
       rotationArtworkSlot()->request(requestedPost);
     }
+    requestedClock = false;
     requestedTest = -1;
     requestedUpload = 0;
     requestedStarter = 0;
@@ -467,6 +487,7 @@ void loop() {
     requestFromBack = false;
   }
   Slot *slot = testing                                ? &testSlot
+               : clockShown                           ? rotationClockSlot()
                : source == screen::Source::Sound        ? modeSoundSlot()
                : source == screen::Source::Request    ? rotationArtworkSlot()
                : source == screen::Source::NightClock ? rotationClockSlot()

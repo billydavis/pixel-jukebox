@@ -17,6 +17,7 @@ enum class CommandType : uint8_t {
   ShowUpload,    // value: an upload's id (storage/uploads.h), to show for one turn
   ShowStarter,   // value: a starter art id (storage/starter_art.h), to show for one turn
   SetOrientation, // value: orientation::pack(), applied at once and saved
+  ShowClock,      // show the clock for one turn, as a preview from Settings
   ShowTestPattern, // value: a testpattern::Pattern, shown until Next or ten minutes
 };
 

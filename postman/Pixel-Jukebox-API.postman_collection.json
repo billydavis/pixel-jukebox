@@ -1665,7 +1665,7 @@
                 "panel"
               ]
             },
-            "description": "Back to the most accurate colours. Saved; the board restarts to switch.",
+            "description": "Back to the most accurate colors. Saved; the board restarts to switch.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"photo\": false\n}",
@@ -3265,6 +3265,246 @@
                 }
               }
             }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Clock",
+      "item": [
+        {
+          "name": "Get Clock Settings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/clock",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clock"
+              ]
+            },
+            "description": "How the clock looks, and the choices."
+          },
+          "response": []
+        },
+        {
+          "name": "Big Clock, Time Of Day Color",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/clock",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clock"
+              ]
+            },
+            "description": "Chunky digits that change color through the day.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"style\": \"big\",\n  \"color\": \"timeofday\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Clock In A Custom Color",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/clock",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clock"
+              ]
+            },
+            "description": "Any color, as #rrggbb.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"color\": \"custom\",\n  \"customColor\": \"#ff8000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "24-Hour Clock With Seconds",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/clock",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clock"
+              ]
+            },
+            "description": "24-hour time with the seconds.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hours\": 24,\n  \"seconds\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Show The Clock",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 202', function () {",
+                  "  pm.response.to.have.status(202);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/clock/show",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clock",
+                "show"
+              ]
+            },
+            "description": "Shows the clock for one turn, to see how it looks."
           },
           "response": []
         }

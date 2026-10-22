@@ -32,6 +32,7 @@
 #include "storage/art_cache.h"
 #include "storage/card.h"
 #include "network/weather.h"
+#include "slots/slot_clock.h"
 #include "storage/starter_art.h"
 #include "storage/uploads.h"
 #include "upload_rules.h"
@@ -924,6 +925,13 @@ static void sendSlots() {
     item["name"] = info.name;
     item["label"] = info.label;
     item["turn"] = info.turnMeaning;
+    if (info.timed) {
+      // A turn lasts the row's `seconds`.
+      JsonObject seconds = item["seconds"].to<JsonObject>();
+      seconds["min"] = ROTATION_SECONDS_MIN;
+      seconds["max"] = ROTATION_SECONDS_MAX;
+      seconds["default"] = ROTATION_SECONDS_DEFAULT;
+    }
   }
   JsonArray rotation = doc["rotation"].to<JsonArray>();
   for (const RotationEntry &entry : rotationGet()) {
@@ -931,6 +939,9 @@ static void sendSlots() {
     item["slot"] = entry.slot;
     item["turns"] = entry.turns;
     item["enabled"] = entry.enabled;
+    if (entry.seconds) {
+      item["seconds"] = entry.seconds;
+    }
     if (entry.slot == "makapix") {
       item["channel"] = entry.channel;
       channels::Channel channel;
@@ -986,6 +997,11 @@ static void handlePutSlots() {
       sendError(400, "enabled must be true or false");
       return;
     }
+    if (!item["seconds"].isNull() && (!item["seconds"].is<int>() || item["seconds"].as<int>() < 1 ||
+                                      item["seconds"].as<int>() > 255)) {
+      sendError(400, "seconds must be a whole number of seconds, 5 to 60");
+      return;
+    }
     if (!item["channel"].isNull() && !item["channel"].is<const char *>()) {
       sendError(400, "channel must be a string, such as \"promoted\" or \"artist:Fab\"");
       return;
@@ -999,7 +1015,8 @@ static void handlePutSlots() {
     if (channel.isEmpty() && item["slot"].as<String>() == "makapix") {
       channel = "all";
     }
-    entries.push_back({item["slot"].as<String>(), (uint8_t)turns, channel, item["enabled"] | true});
+    entries.push_back(
+        {item["slot"].as<String>(), (uint8_t)turns, channel, item["enabled"] | true, (uint8_t)(item["seconds"] | 0)});
   }
 
   String error;
@@ -1230,6 +1247,86 @@ static void handleUploadImage() {
   server.send_P(200, "image/gif", (const char *)data, size);
   free(data);
 }
+
+// --- the clock -------------------------------------------------------------------------
+
+static void sendClock() {
+  clockface::Settings s = clockSettings();
+  JsonDocument doc;
+  doc["style"] = clockface::styleName(s.style);
+  doc["hours"] = s.hours24 ? 24 : 12;
+  doc["seconds"] = s.seconds;
+  doc["date"] = clockface::dateName(s.date);
+  doc["color"] = clockface::colorName(s.color);
+  char hex[8];
+  clockface::formatHex(s.custom, hex);
+  doc["customColor"] = hex;
+  JsonObject choices = doc["choices"].to<JsonObject>();
+  JsonArray styles = choices["style"].to<JsonArray>();
+  for (int i = 0; i < (int)clockface::Style::COUNT; i++) {
+    styles.add(clockface::styleName((clockface::Style)i));
+  }
+  JsonArray dates = choices["date"].to<JsonArray>();
+  for (int i = 0; i < (int)clockface::DateFormat::COUNT; i++) {
+    dates.add(clockface::dateName((clockface::DateFormat)i));
+  }
+  JsonArray colors = choices["color"].to<JsonArray>();
+  for (int i = 0; i < (int)clockface::Color::COUNT; i++) {
+    colors.add(clockface::colorName((clockface::Color)i));
+  }
+  sendJson(200, doc);
+}
+
+static void handleGetClock() { sendClock(); }
+
+// Any of {"style", "hours": 12 or 24, "seconds", "date", "color", "customColor"}; the rest
+// stay as they are. A clock on screen shows the change at once.
+static void handlePutClock() {
+  JsonDocument body;
+  if (!readBody(body)) {
+    return;
+  }
+  clockface::Settings s = clockSettings();
+  if (!body["style"].isNull() && !(body["style"].is<const char *>() && clockface::styleFrom(body["style"].as<const char *>(), s.style))) {
+    sendError(400, "style must be digital, big or analog");
+    return;
+  }
+  if (!body["hours"].isNull()) {
+    int hours = body["hours"].is<int>() ? body["hours"].as<int>() : 0;
+    if (hours != 12 && hours != 24) {
+      sendError(400, "hours must be 12 or 24");
+      return;
+    }
+    s.hours24 = hours == 24;
+  }
+  if (!body["seconds"].isNull()) {
+    if (!body["seconds"].is<bool>()) {
+      sendError(400, "seconds must be true or false");
+      return;
+    }
+    s.seconds = body["seconds"];
+  }
+  if (!body["date"].isNull() && !(body["date"].is<const char *>() && clockface::dateFrom(body["date"].as<const char *>(), s.date))) {
+    sendError(400, "date must be off, weekday, daymonth or numeric");
+    return;
+  }
+  if (!body["color"].isNull() &&
+      !(body["color"].is<const char *>() && clockface::colorFrom(body["color"].as<const char *>(), s.color))) {
+    sendError(400, "color must be white, amber, mint, timeofday or custom");
+    return;
+  }
+  if (!body["customColor"].isNull() &&
+      !(body["customColor"].is<const char *>() &&
+        clockface::parseHex(body["customColor"].as<const char *>(), s.custom))) {
+    sendError(400, "customColor must be like \"#ff8800\"");
+    return;
+  }
+  clockSetSettings(s);
+  sendClock();
+}
+
+// Shows the clock for one turn, to see how it looks.
+static void handleShowClock() { sendQueued(commandSend(CommandType::ShowClock), "showClock"); }
 
 // --- the weather -------------------------------------------------------------------
 
@@ -1488,6 +1585,9 @@ void apiBegin() {
   server.on(API_BASE "/auth/pin", HTTP_PUT, guarded(handlePutPin));
   server.on(API_BASE "/update", HTTP_POST, handleUpdate, handleUpdateBody); // checks the PIN itself
   server.on(API_BASE "/uploads", HTTP_GET, guarded(handleListUploads));
+  server.on(API_BASE "/clock", HTTP_GET, guarded(handleGetClock));
+  server.on(API_BASE "/clock", HTTP_PUT, guarded(handlePutClock));
+  server.on(API_BASE "/clock/show", HTTP_POST, guarded(handleShowClock));
   server.on(API_BASE "/weather", HTTP_GET, guarded(handleGetWeather));
   server.on(API_BASE "/weather", HTTP_PUT, guarded(handlePutWeather));
   server.on(API_BASE "/weather/search", HTTP_GET, guarded(handleWeatherSearch));

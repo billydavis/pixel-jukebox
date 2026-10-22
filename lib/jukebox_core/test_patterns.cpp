@@ -24,7 +24,7 @@ const char *label(Pattern pattern) {
     case Pattern::Darks:
       return "Dark steps";
     case Pattern::Bars:
-      return "Colour bars";
+      return "Color bars";
     case Pattern::White:
       return "White";
     default:
