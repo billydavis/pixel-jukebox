@@ -115,6 +115,8 @@ input[type=range]:disabled{opacity:.4}
 select,input[type=text],input[type=time],input[type=password]{width:100%;min-height:48px;padding:0 var(--s3);border:0;border-radius:0;background:var(--sunk);font-size:16px;color-scheme:dark}
 input::placeholder{color:var(--dim)}
 .field{display:grid;gap:var(--s2)}
+.wxfind{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--s2)}
+.note a{color:var(--accent);text-underline-offset:3px}
 .field>label{font:12px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
 .row{display:flex;align-items:center;justify-content:space-between;gap:var(--s4);min-height:48px}
 .what{display:grid;gap:2px;min-width:0}
@@ -475,6 +477,31 @@ input.pin{font:700 22px/1 var(--mono);letter-spacing:.3em}
       <p class="note" id="viewsnote" role="status"></p>
     </div>
     <div class="section">
+      <h2>Weather</h2>
+      <p class="lead" id="wxlead" role="status">&nbsp;</p>
+      <div class="field">
+        <label for="wxq">Town</label>
+        <div class="wxfind"><input id="wxq" type="text" autocomplete="off" placeholder="Search for your town" maxlength="60"><button class="key small" id="wxfind">Find</button></div>
+        <div class="chips" id="wxplaces" role="group" aria-label="Matching towns"></div>
+      </div>
+      <div class="field">
+        <span class="cap" id="wxunitslabel">Units</span>
+        <div class="chips" id="wxunits" role="group" aria-labelledby="wxunitslabel">
+          <button data-units="f" aria-pressed="false">°F</button><button data-units="c" aria-pressed="false">°C</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="wxrefresh">Check every</label>
+        <select id="wxrefresh"></select>
+      </div>
+      <div class="field">
+        <label for="wxkey">WeatherAPI.com key</label>
+        <div class="wxfind"><input id="wxkey" type="password" autocomplete="off" spellcheck="false" maxlength="64"><button class="key small" id="wxkeysave">Save key</button></div>
+      </div>
+      <p class="note" id="wxnote" role="status"></p>
+      <p class="note"><a href="https://www.weatherapi.com/" target="_blank" rel="noopener" title="Free Weather API">Weather by WeatherAPI.com</a></p>
+    </div>
+    <div class="section">
       <h2>PIN</h2>
       <p class="lead" id="pinlead">&nbsp;</p>
       <div class="pins">
@@ -557,7 +584,7 @@ function twoTap(button,armedText,onArm,act){
 const TABS=['now','rot','art','night','set'];
 const wide=matchMedia('(min-width:900px)');
 let tab='now';
-const loaders={rot:()=>{loadRot();loadTrans();},art:()=>loadArtTab(),night:()=>loadNight(),set:()=>{loadMk();loadPin();loadFw();loadCard();loadTests();showDevice();}};
+const loaders={rot:()=>{loadRot();loadTrans();},art:()=>loadArtTab(),night:()=>loadNight(),set:()=>{loadMk();loadWeather();loadPin();loadFw();loadCard();loadTests();showDevice();}};
 function showTab(name,focus){
   if(!TABS.includes(name))name='now';
   if(wide.matches&&name=='now')name=store.get('jukebox.tab')||'rot';
@@ -620,6 +647,9 @@ function render(){
     sub='Makapix post '+art.postId+(art.source=='card'?', from the card':art.channel&&art.channel!='Everything'?' · '+art.channel:'');
   }else if(night.panel=='off'){text='Off for the night';who='Night';sub='Next wakes it for a while';}
   else if(st.mode=='sound'){const v=(vizList.find(x=>x.name==st.visualizer)||{label:'Sound'}).label;text=v;who=v;sub='Listening to the room';}
+  else if(slot=='weather'){const w=st.weather||{};who='Weather';
+    text=w.temperature==null?'No data':Math.round(w.temperature)+'°'+(w.units=='c'?'C':'F');
+    sub=(w.condition?w.condition+' · ':'')+(w.place||'');}
   else if(slot=='test'){text='Test pattern';who='Test pattern';sub='Back to art in Settings, or Next';}
   else if(slot=='clock'){text=new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}).replace(/\s?[AP]M/i,'');who='Clock';sub=night.panel=='clock'?'Clock only, for the night':'Back to the art in a moment';}
   else if(slot=='makapix'){text='Code on the panel';who='Waiting to be linked';sub='Enter the code at makapix.club';}
@@ -1268,6 +1298,66 @@ async function loadTests(){
   }catch(e){}
 }
 $('testoff').onclick=async()=>{shownTest='';try{await call('DELETE','/test');}catch(e){}clearTimeout(timer);timer=setTimeout(poll,400);};
+
+/* ---- the weather ------------------------------------------------------------------- */
+let wx=null;
+function placeName(p){return p.name+(p.region?', '+p.region:p.country?', '+p.country:'');}
+function showWeather(){
+  if(!wx)return;
+  const r=wx.reading;
+  let lead;
+  if(!wx.keySet)lead='Add a free WeatherAPI.com key below to show the weather.';
+  else if(!wx.place)lead='Search for your town below.';
+  else if(r){
+    const t=Math.round(wx.units=='c'?r.tempC:r.tempF);
+    const age=r.ageSeconds<90?'just now':Math.round(r.ageSeconds/60)+' min ago';
+    lead=placeName(wx.place)+': '+t+'°'+wx.units.toUpperCase()+', '+r.condition.toLowerCase()+', checked '+age+'.';
+  }else lead=placeName(wx.place)+': '+(wx.problem?'no reading, '+wx.problem+'.':wx.inRotation?'checking…':'no reading yet.');
+  if(wx.keySet&&wx.place&&!wx.inRotation)lead+=' Add a Weather slot in Rotation to show it on the panel.';
+  $('wxlead').textContent=lead;
+  $('wxunits').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.units==wx.units));
+  const sel=$('wxrefresh');
+  if(!sel.options.length){
+    [15,20,30,45,60].filter(m=>m>=wx.refreshMin&&m<=wx.refreshMax).forEach(m=>{
+      const o=document.createElement('option');o.value=m;o.textContent=m+' minutes';sel.appendChild(o);
+    });
+  }
+  sel.value=wx.refreshMinutes;
+  $('wxkey').placeholder=wx.keySource=='settings'?'Saved (hidden)':wx.keySource=='build'?'Using the key built into the firmware':'Paste your key';
+}
+async function loadWeather(){
+  try{wx=await call('GET','/weather');showWeather();}
+  catch(e){$('wxlead').textContent='Could not read the weather settings.';}
+}
+async function putWeather(change,done){
+  $('wxnote').textContent='';
+  try{wx=await call('PUT','/weather',change);showWeather();if(done)$('wxnote').textContent=done;
+    setTimeout(loadWeather,4000);} // a new town or key is checked at once
+  catch(e){$('wxnote').textContent=e.reason?'Not saved: '+e.reason+'.':'Could not save. Try again.';}
+}
+async function findTown(){
+  const q=$('wxq').value.trim(),list=$('wxplaces');
+  if(q.length<2){$('wxnote').textContent='Type at least two letters.';return;}
+  list.textContent='';$('wxnote').textContent='Searching…';$('wxfind').disabled=true;
+  try{
+    const r=await call('GET','/weather/search?q='+encodeURIComponent(q));
+    $('wxnote').textContent=r.places.length?'Tap your town.':'No towns found. Try another spelling.';
+    r.places.forEach(p=>{
+      const b=document.createElement('button');b.textContent=placeName(p);b.setAttribute('aria-pressed','false');
+      b.onclick=()=>{list.textContent='';$('wxq').value='';putWeather({place:p},'Saved. Checking the weather there now.');};
+      list.appendChild(b);
+    });
+  }catch(e){$('wxnote').textContent=e.reason?'Search failed: '+e.reason+'.':'Search failed. Try again.';}
+  $('wxfind').disabled=false;
+}
+$('wxfind').onclick=findTown;
+$('wxq').onkeydown=e=>{if(e.key=='Enter'){e.preventDefault();findTown();}};
+$('wxunits').querySelectorAll('button').forEach(b=>b.onclick=()=>putWeather({units:b.dataset.units}));
+$('wxrefresh').onchange=()=>putWeather({refreshMinutes:+$('wxrefresh').value},'Saved.');
+$('wxkeysave').onclick=()=>{
+  const k=$('wxkey').value.trim();
+  putWeather({key:k},k?'Key saved. Checking it now.':'Key removed.');$('wxkey').value='';
+};
 
 /* ---- the PIN ---------------------------------------------------------------------- */
 // The page itself is open; the API answers 401 until this browser signs in.

@@ -11,6 +11,7 @@
 #include "config.h"
 #include "app/memory_trace.h"
 #include "pins.h"
+#include "network/locked_tls.h"
 #include "storage/card.h"
 
 namespace makapix {
@@ -25,67 +26,9 @@ static String apiToken;
 
 // The connection to Makapix, kept open between requests (HTTP keep-alive), so
 // most requests skip the TLS handshake, the slowest and most CPU-hungry part.
-//
-// The card lock (storage/card.h) is taken for each TLS operation on its own,
-// as the live connection does, rather than for a whole request: a request
-// held it for up to 4.6 s, mostly waiting on the network, and every card read
-// behind it waited too, the control page's pictures included, which stalled
-// the one-at-a-time web server for seconds (2026-10-18).
-class LockedTls : public WiFiClientSecure {
- public:
-  int connect(IPAddress ip, uint16_t port) override {
-    CardLock card;
-    return WiFiClientSecure::connect(ip, port);
-  }
-  int connect(IPAddress ip, uint16_t port, int32_t timeout) override {
-    CardLock card;
-    return WiFiClientSecure::connect(ip, port, timeout);
-  }
-  int connect(const char *host, uint16_t port) override {
-    CardLock card;
-    return WiFiClientSecure::connect(host, port);
-  }
-  int connect(const char *host, uint16_t port, int32_t timeout) override {
-    CardLock card;
-    return WiFiClientSecure::connect(host, port, timeout);
-  }
-  size_t write(uint8_t byte) override {
-    CardLock card;
-    return WiFiClientSecure::write(byte);
-  }
-  size_t write(const uint8_t *buf, size_t size) override {
-    CardLock card;
-    return WiFiClientSecure::write(buf, size);
-  }
-  int available() override {
-    CardLock card;
-    return WiFiClientSecure::available();
-  }
-  int read() override {
-    CardLock card;
-    return WiFiClientSecure::read();
-  }
-  int read(uint8_t *buf, size_t size) override {
-    CardLock card;
-    return WiFiClientSecure::read(buf, size);
-  }
-  int peek() override {
-    CardLock card;
-    return WiFiClientSecure::peek();
-  }
-  void stop() override {
-    CardLock card;
-    WiFiClientSecure::stop();
-  }
-  uint8_t connected() override {
-    CardLock card;
-    return WiFiClientSecure::connected();
-  }
-};
-
+// It takes the card lock per TLS operation (network/locked_tls.h).
 static LockedTls tls;
 static HTTPClient http; // also kept: destroying it would close the connection
-
 
 // Retry-After in whole seconds (Makapix sends it with 429), clamped to a sane
 // range; 0 when absent or in a form we do not read (an HTTP date).

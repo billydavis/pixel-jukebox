@@ -30,6 +30,7 @@
 #include "transitions.h"
 #include "upload_rules.h"
 #include "view_queue.h"
+#include "weather_rules.h"
 
 #ifdef ARDUINO
 #include <Arduino.h>
@@ -1574,6 +1575,68 @@ static void test_orientation_degrees_and_packing() {
   }
 }
 
+// ---- weather_rules ------------------------------------------------------------
+
+// Every one of WeatherAPI.com's 60 codes (weather_conditions.json, 2026-10-22).
+static void test_weather_every_code_has_a_picture() {
+  const int codes[] = {1000, 1003, 1006, 1009, 1012, 1015, 1018, 1021, 1024, 1027, 1030, 1033, 1036, 1039, 1042,
+                       1045, 1048, 1063, 1066, 1069, 1072, 1087, 1114, 1117, 1135, 1147, 1150, 1153, 1168, 1171,
+                       1180, 1183, 1186, 1189, 1192, 1195, 1198, 1201, 1204, 1207, 1210, 1213, 1216, 1219, 1222,
+                       1225, 1237, 1240, 1243, 1246, 1249, 1252, 1255, 1258, 1261, 1264, 1273, 1276, 1279, 1282};
+  TEST_ASSERT_EQUAL(60, (int)(sizeof(codes) / sizeof(codes[0])));
+  int counts[(int)weather::Icon::COUNT] = {};
+  for (int code : codes) {
+    counts[(int)weather::iconFor(code)]++;
+  }
+  for (int i = 0; i < (int)weather::Icon::COUNT; i++) {
+    TEST_ASSERT_TRUE(counts[i] > 0); // every picture is used
+  }
+  TEST_ASSERT_TRUE(weather::iconFor(1000) == weather::Icon::Clear);
+  TEST_ASSERT_TRUE(weather::iconFor(1003) == weather::Icon::PartlyCloudy);
+  TEST_ASSERT_TRUE(weather::iconFor(1033) == weather::Icon::Haze);     // smoke
+  TEST_ASSERT_TRUE(weather::iconFor(1030) == weather::Icon::Fog);      // mist
+  TEST_ASSERT_TRUE(weather::iconFor(1153) == weather::Icon::Drizzle);
+  TEST_ASSERT_TRUE(weather::iconFor(1246) == weather::Icon::Rain);     // torrential shower
+  TEST_ASSERT_TRUE(weather::iconFor(1117) == weather::Icon::Snow);     // blizzard
+  TEST_ASSERT_TRUE(weather::iconFor(1198) == weather::Icon::Sleet);    // freezing rain
+  TEST_ASSERT_TRUE(weather::iconFor(1087) == weather::Icon::Storm);
+  TEST_ASSERT_TRUE(weather::iconFor(9999) == weather::Icon::Cloudy);   // unknown
+  TEST_ASSERT_EQUAL_STRING("partly-cloudy", weather::iconName(weather::Icon::PartlyCloudy));
+  TEST_ASSERT_TRUE(weather::hasNightPicture(weather::Icon::Clear));
+  TEST_ASSERT_FALSE(weather::hasNightPicture(weather::Icon::Rain));
+}
+
+static void test_weather_fetch_timing() {
+  const uint32_t MIN = 60000;
+  TEST_ASSERT_TRUE(weather::fetchDue(false, 1000, 0, 0, 30));                 // nothing yet
+  TEST_ASSERT_FALSE(weather::fetchDue(false, 29 * MIN, 1, 0, 30));            // still fresh
+  TEST_ASSERT_TRUE(weather::fetchDue(false, 30 * MIN + 1, 1, 0, 30));         // due
+  TEST_ASSERT_TRUE(weather::fetchDue(true, 2 * MIN, 1 * MIN, 0, 30));         // place changed
+  TEST_ASSERT_FALSE(weather::fetchDue(false, 10 * MIN, 0, 12 * MIN, 30));     // waiting after a failure
+  TEST_ASSERT_TRUE(weather::fetchDue(false, 12 * MIN, 0, 12 * MIN, 30));
+  TEST_ASSERT_TRUE(weather::fetchDue(true, 10 * MIN, 0, 12 * MIN, 30));       // a change does not wait
+  // Across the millisecond clock wrapping, about every 49.7 days.
+  TEST_ASSERT_FALSE(weather::fetchDue(false, 5 * MIN, 0xFFFFFFFFu - MIN, 0, 30));
+  TEST_ASSERT_TRUE(weather::fetchDue(false, 30 * MIN, 0xFFFFFFFFu - MIN, 0, 30));
+}
+
+static void test_weather_freshness_and_settings() {
+  const uint32_t MIN = 60000;
+  TEST_ASSERT_TRUE(weather::freshness(10 * MIN, 30) == weather::Freshness::Fresh);
+  TEST_ASSERT_TRUE(weather::freshness(34 * MIN, 30) == weather::Freshness::Fresh);
+  TEST_ASSERT_TRUE(weather::freshness(35 * MIN, 30) == weather::Freshness::Aged);
+  TEST_ASSERT_TRUE(weather::freshness(60 * MIN, 30) == weather::Freshness::Aged);
+  TEST_ASSERT_TRUE(weather::freshness(60 * MIN + 1, 30) == weather::Freshness::Expired);
+  TEST_ASSERT_TRUE(weather::freshness(59 * MIN, 60) == weather::Freshness::Fresh); // never aged before expiry
+  TEST_ASSERT_FALSE(weather::refreshValid(14));
+  TEST_ASSERT_TRUE(weather::refreshValid(15));
+  TEST_ASSERT_TRUE(weather::refreshValid(60));
+  TEST_ASSERT_FALSE(weather::refreshValid(61));
+  TEST_ASSERT_EQUAL(72, weather::roundTemperature(71.5f));
+  TEST_ASSERT_EQUAL(-3, weather::roundTemperature(-2.6f));
+  TEST_ASSERT_EQUAL(0, weather::roundTemperature(-0.4f));
+}
+
 // ---- test_patterns ------------------------------------------------------------
 
 static void test_pattern_names_round_trip() {
@@ -1747,6 +1810,9 @@ static int runTests() {
   RUN_TEST(test_upload_decodes_percent_names);
   RUN_TEST(test_channels_uploads);
   RUN_TEST(test_channels_starter);
+  RUN_TEST(test_weather_every_code_has_a_picture);
+  RUN_TEST(test_weather_fetch_timing);
+  RUN_TEST(test_weather_freshness_and_settings);
   RUN_TEST(test_cache_index_keeps_the_storage_key);
   RUN_TEST(test_orientation_corners);
   RUN_TEST(test_orientation_maps_every_pixel_once);

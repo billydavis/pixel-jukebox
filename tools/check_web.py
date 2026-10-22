@@ -90,6 +90,9 @@ for name in PAGES:
             problems.append(f"{name}: the script uses id \"{reference}\", which does not exist")
 
     for tag, attribute, value in page.links:
+        # A link the user follows loads nothing by itself (the weather credit).
+        if tag == "a" and attribute == "href":
+            continue
         if is_external(value):
             problems.append(f"{name}: <{tag} {attribute}> loads from outside the board: {value}")
     for value in re.findall(r"url\(\s*['\"]?([^'\")]+)", text) + re.findall(r"@import\s+['\"]([^'\"]+)", text):

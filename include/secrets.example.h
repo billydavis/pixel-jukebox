@@ -7,3 +7,7 @@
 
 #define WIFI_SSID "your-ssid"
 #define WIFI_PASSWORD "your-password"
+
+// WeatherAPI.com key for the weather slot (backlog #12): a free key from weatherapi.com,
+// one per app under their terms. Optional; it can be entered in Settings instead.
+#define WEATHERAPI_KEY ""

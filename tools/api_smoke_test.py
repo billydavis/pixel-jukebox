@@ -294,7 +294,7 @@ try:
     section("Rotation")
     code, body = call("GET", "/slots")
     available = [slot["name"] for slot in body.get("available", [])]
-    check("slots lists what can go in the rotation", code == 200 and available == ["makapix", "clock"], available)
+    check("slots lists what can go in the rotation", code == 200 and available == ["makapix", "clock", "weather"], available)
     trial = [{"slot": "clock", "turns": 2}, {"slot": "makapix", "turns": 1, "channel": "hashtag:#Cat"}]
     expected = [("clock", 2, None, True), ("makapix", 1, "hashtag:cat", True)]  # the channel is stored tidied
     code, body = call("PUT", "/slots", {"rotation": trial})
@@ -418,6 +418,32 @@ try:
         check("a removed upload is gone", call("GET", f"/uploads/{upload_id}.gif")[0] == 404)
     else:
         print("  (no card: upload checks skipped)")
+
+    section("Weather")
+    code, wx = call("GET", "/weather")
+    check("the weather settings are there, without the key",
+          code == 200 and isinstance(wx.get("keySet"), bool) and "key" not in wx
+          and wx.get("refreshMin") == 15 and wx.get("refreshMax") == 60
+          and wx.get("credit") == "Weather by WeatherAPI.com", wx)
+    for bad in ({"refreshMinutes": 14}, {"refreshMinutes": 61}, {"refreshMinutes": "30"}, {"units": "k"},
+                {"key": "not a key!"}, {"place": {"name": "Nowhere"}}, {"place": {"name": "X", "lat": 95, "lon": 0}}):
+        code, body = call("PUT", "/weather", bad)
+        check(f"the weather rejects {json.dumps(bad)}", code == 400, body)
+    other = "c" if wx.get("units") == "f" else "f"
+    code, body = call("PUT", "/weather", {"units": other, "refreshMinutes": 45})
+    check("units and refresh can be changed", code == 200 and body.get("units") == other
+          and body.get("refreshMinutes") == 45, body)
+    code, body = call("PUT", "/weather", {"units": wx.get("units"), "refreshMinutes": wx.get("refreshMinutes")})
+    check("and changed back", body.get("units") == wx.get("units")
+          and body.get("refreshMinutes") == wx.get("refreshMinutes"), body)
+    check("a one-letter search is refused", call("GET", "/weather/search?q=a")[0] == 400)
+    if wx.get("keySet"):
+        code, body = call_full("GET", "/weather/search?q=London")[:2]
+        check("a town search finds places with coordinates",
+              code == 200 and body.get("places") and all("lat" in p and "lon" in p for p in body["places"]), body)
+    if wx.get("reading"):
+        r = wx["reading"]
+        check("the reading has both units and a picture", "tempC" in r and "tempF" in r and r.get("icon"), r)
 
     section("Starter art")
     code, body = call("GET", "/starter")

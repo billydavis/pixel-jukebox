@@ -22,6 +22,7 @@
 #include "network/connection.h"
 #include "network/live.h"
 #include "network/reporter.h"
+#include "network/weather.h"
 #include "pins.h"
 #include "app/rotation.h"
 #include "app/status.h"
@@ -391,7 +392,8 @@ void setup() {
   rotationBegin();
   MEMORY_AT("rotation");
   telemetryBootMark("rotation");
-  reporterBegin(); // after rotationBegin(), which starts the Makapix client
+  weatherBegin();
+  reporterBegin(); // after rotationBegin(), which starts the Makapix client; fetches the weather too
   liveBegin();
   MEMORY_AT("reporter");
   telemetryBootMark("reporter");

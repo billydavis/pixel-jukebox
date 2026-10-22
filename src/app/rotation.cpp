@@ -7,6 +7,7 @@
 #include "rotation_rules.h"
 #include "slots/slot_clock.h"
 #include "slots/slot_makapix.h"
+#include "slots/slot_weather.h"
 
 static MakapixSlot makapixSlot;
 
@@ -14,6 +15,7 @@ MakapixSlot *rotationArtworkSlot() { return &makapixSlot; }
 static ClockSlot clockSlot;
 
 Slot *rotationClockSlot() { return &clockSlot; }
+static WeatherSlot weatherSlot;
 
 struct SlotType {
   SlotInfo info;
@@ -22,6 +24,7 @@ struct SlotType {
 static const SlotType SLOT_TYPES[] = {
     {{"makapix", "Makapix artwork", "one artwork"}, &makapixSlot},
     {{"clock", "Clock", "10 seconds"}, &clockSlot},
+    {{"weather", "Weather", "10 seconds"}, &weatherSlot},
 };
 
 static const char *PREFS_KEY = "rotation";

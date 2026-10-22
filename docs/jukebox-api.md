@@ -113,6 +113,9 @@ effect before the reply, which is `200` with the new state.
 | `GET` | `/uploads/{id}.gif` | One upload's GIF |
 | `POST` | `/uploads/{id}/show` | Show an upload now |
 | `DELETE` | `/uploads/{id}` | Delete an upload |
+| `GET` | `/weather` | The weather settings and the latest reading |
+| `PUT` | `/weather` | Set the key, town, units or refresh |
+| `GET` | `/weather/search` | Towns matching a name, to choose from |
 | `GET` | `/starter` | The starter art built into the firmware |
 | `GET` | `/starter/{id}.gif` | One piece of starter art |
 | `POST` | `/starter/{id}/show` | Show a piece of starter art now |
@@ -169,6 +172,7 @@ effect before the reply, which is `200` with the new state.
 | `artwork.source` | `makapix` when downloaded for this turn, `card` when played from the board's offline copy, because Makapix or the Wi-Fi could not be reached or because it was asked for from the gallery; `upload` and `starter` for art that is not from Makapix (see Uploads and Starter art) |
 | `artwork.liked` | Whether the artwork has been liked from this panel; see `PUT /likes/{postId}` |
 | `artwork.channel` | The channel it came from, as `channelLabel` in `GET /slots`; `null` when from the card |
+| `weather` | Only while the weather slot is on screen: `{"place": "Georgetown", "units": "f", "temperature": 59.2, "condition": "Sunny"}`, with `temperature` and `condition` `null` when there is no reading |
 | `screen` | What has the panel this turn: `rotation`, `request` (one artwork asked for), `sound`, `nightClock` or `dark`. See [What is on screen](#what-is-on-screen) |
 | `mode` | `rotation` or `sound` |
 | `channelOverride` | `null`, or `{"channel": "hashtag:cat", "from": "makapix.club"}` while one channel plays in place of the rotation's; see `PUT /channel` |
@@ -762,6 +766,70 @@ Shows it for one turn, like `POST /show/{postId}`. Reply: `202 {"queued":"showUp
 ### `DELETE /uploads/{id}`
 
 Reply: `200 {"removed": 3}`. `404` for no such upload.
+
+## Weather
+
+The weather slot shows the current conditions where you are: a pixel-art
+picture of the weather and the temperature. They come from
+[WeatherAPI.com](https://www.weatherapi.com/) over HTTPS, with a free key of your
+own (one per app, under their terms), every 15 to 60 minutes (30 by default),
+and only while a `weather` slot is in the rotation, switched on, and the panel
+is not off for the night. WeatherAPI.com's terms allow a reading to be kept for
+60 minutes: after that the slot shows "no data", and before that, once a check
+has been missed, the reading's age. Credit: "Weather by WeatherAPI.com" (their
+terms require it on the free plan).
+
+The key is entered in Settings or with `PUT /weather`, or built in from
+`WEATHERAPI_KEY` in `include/secrets.h`; Settings wins. It is never sent back.
+
+### `GET /weather`
+
+```json
+{
+  "keySet": true,
+  "keySource": "settings",
+  "place": { "name": "Georgetown", "region": "Texas", "country": "United States of America", "lat": 30.63, "lon": -97.68 },
+  "units": "f",
+  "refreshMinutes": 30,
+  "refreshMin": 15,
+  "refreshMax": 60,
+  "reading": { "tempC": 15.1, "tempF": 59.2, "condition": "Sunny", "code": 1000, "icon": "clear", "isDay": true, "ageSeconds": 42 },
+  "problem": null,
+  "inRotation": true,
+  "credit": "Weather by WeatherAPI.com"
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `keySource` | `settings`, `build` (from `secrets.h`) or `none` |
+| `place` | The town, as chosen from `GET /weather/search`; `null` until one is |
+| `reading` | The latest conditions, `null` when there are none under 60 minutes old. `code` is WeatherAPI.com's condition code; `icon` the picture the panel shows for it: `clear`, `partly-cloudy`, `cloudy`, `haze`, `fog`, `drizzle`, `rain`, `snow`, `sleet` or `storm` (clear and partly cloudy have night versions) |
+| `problem` | Why there is no reading: `no WeatherAPI.com key`, `no town chosen`, `the key was refused`, `this month's free calls are used up`..., or `null` |
+| `inRotation` | Whether a weather slot is in the rotation, switched on: without one nothing is fetched |
+
+### `PUT /weather`
+
+Any of `key`, `place`, `units` (`"f"` or `"c"`) and `refreshMinutes` (15 to
+60); the rest stay as they are. `place` is an entry from `GET /weather/search`.
+A new key or place is checked at once; units need no new check, since every
+reading has both. `"key": ""` removes the key set here, falling back to the
+built-in one. Reply: the `GET /weather` document. `400` for a key that is not
+letters and digits, a place without a name, `lat` and `lon`, or anything else
+out of range.
+
+### `GET /weather/search`
+
+`?q=Georgetown`: towns matching the name, up to 8, asked of WeatherAPI.com
+(a second or two). Choose from these rather than sending a name: an unknown
+name is not an error at WeatherAPI.com but quietly becomes some other place.
+
+```json
+{ "places": [ { "name": "Georgetown", "region": "Texas", "country": "United States of America", "lat": 30.63, "lon": -97.68 } ] }
+```
+
+`400` for fewer than 2 or more than 60 characters, or with no key; `502` when
+WeatherAPI.com refuses or cannot be reached, with its reason.
 
 ## Starter art
 

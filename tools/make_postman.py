@@ -185,6 +185,16 @@ FOLDERS = [
         ("Play My Uploads", "PUT", "channel", "Every artwork slot plays your uploads, for now.",
          {"channel": "uploads"}, 200),
     ]),
+    ("Weather", [
+        ("Get Weather", "GET", "weather",
+         "The weather settings and the latest reading. The key is never sent back, only whether one is set.",
+         None, 200),
+        ("Search For A Town", "GET", "weather/search?q=Georgetown",
+         "Towns matching a name, from WeatherAPI.com, to choose from.", None, 200),
+        ("Weather In Fahrenheit", "PUT", "weather", "Shows the temperature in Fahrenheit.", {"units": "f"}, 200),
+        ("Check Every 30 Minutes", "PUT", "weather", "How often to check: 15 to 60 minutes.",
+         {"refreshMinutes": 30}, 200),
+    ]),
     ("Starter art", [
         ("List Starter Art", "GET", "starter", "The starter art built into the firmware, with credits.", None, 200),
         ("Get A Starter Piece's GIF", "GET", "starter/{{starter_id}}.gif", "One piece of starter art.", None, 200),
@@ -240,19 +250,22 @@ FOLDERS = [
 
 
 def request(name, method, path, description, body, expected):
+    path, _, query = path.partition("?")
     segments = API.split("/") + (path.split("/") if path else [])
     # Ignored while no PIN is set; with one set, fill in the `pin` variable.
     item = {
         "method": method,
         "header": [{"key": "X-Jukebox-Pin", "value": "{{pin}}"}],
         "url": {
-            "raw": "http://{{device_ip}}/" + "/".join(segments),
+            "raw": "http://{{device_ip}}/" + "/".join(segments) + ("?" + query if query else ""),
             "protocol": "http",
             "host": ["{{device_ip}}"],
             "path": segments,
         },
         "description": description,
     }
+    if query:
+        item["url"]["query"] = [{"key": k, "value": v} for k, _, v in (pair.partition("=") for pair in query.split("&"))]
     if body is not None:
         item["header"].append({"key": "Content-Type", "value": "application/json"})
         item["body"] = {"mode": "raw", "raw": json.dumps(body, indent=2), "options": {"raw": {"language": "json"}}}

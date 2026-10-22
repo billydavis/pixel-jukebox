@@ -31,6 +31,7 @@
 #include "slots/slot_makapix.h"
 #include "storage/art_cache.h"
 #include "storage/card.h"
+#include "network/weather.h"
 #include "storage/starter_art.h"
 #include "storage/uploads.h"
 #include "upload_rules.h"
@@ -278,6 +279,19 @@ static void handleStatus() {
     doc["artwork"] = nullptr;
   }
 
+  if (status.slot == "weather") {
+    WeatherReading now = weatherReading();
+    JsonObject weather = doc["weather"].to<JsonObject>();
+    weather["place"] = weatherPlace().name;
+    weather["units"] = weatherFahrenheit() ? "f" : "c";
+    if (now.valid) {
+      weather["temperature"] = weatherFahrenheit() ? now.tempF : now.tempC;
+      weather["condition"] = now.text;
+    } else {
+      weather["temperature"] = nullptr;
+      weather["condition"] = nullptr;
+    }
+  }
   doc["screen"] = status.screen.isEmpty() ? "rotation" : status.screen;
   doc["mode"] = modeIsSound() ? "sound" : "rotation";
   doc["visualizer"] = modeVisualizer();
@@ -1217,6 +1231,102 @@ static void handleUploadImage() {
   free(data);
 }
 
+// --- the weather -------------------------------------------------------------------
+
+static void sendWeather() {
+  JsonDocument doc;
+  weatherReport(doc.to<JsonObject>());
+  sendJson(200, doc);
+}
+
+static void handleGetWeather() { sendWeather(); }
+
+// Any of {"key", "place": {"name", "region", "country", "lat", "lon"}, "units":
+// "f" or "c", "refreshMinutes"}; the rest stay as they are. The key is never
+// sent back, only whether one is set.
+static void handlePutWeather() {
+  JsonDocument body;
+  if (!readBody(body)) {
+    return;
+  }
+  if (!body["key"].isNull()) {
+    String key = body["key"] | "";
+    key.trim();
+    bool plain = body["key"].is<const char *>() && key.length() <= 64;
+    for (char c : key) {
+      plain = plain && isalnum((unsigned char)c);
+    }
+    if (!plain) {
+      sendError(400, "key must be letters and digits, as WeatherAPI.com gives it");
+      return;
+    }
+  }
+  WeatherPlace where;
+  bool setPlace = !body["place"].isNull();
+  if (setPlace) {
+    JsonObject p = body["place"];
+    if (!p["name"].is<const char *>() || !p["lat"].is<float>() || !p["lon"].is<float>()) {
+      sendError(400, "place needs a name, lat and lon, as GET /weather/search gives them");
+      return;
+    }
+    float lat = p["lat"], lon = p["lon"];
+    where.name = p["name"].as<String>().substring(0, 48);
+    where.region = String(p["region"] | "").substring(0, 48);
+    where.country = String(p["country"] | "").substring(0, 48);
+    where.lat = lat;
+    where.lon = lon;
+    if (where.name.isEmpty() || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      sendError(400, "place is not a place on Earth");
+      return;
+    }
+  }
+  if (!body["units"].isNull() && body["units"] != "f" && body["units"] != "c") {
+    sendError(400, "units must be \"f\" or \"c\"");
+    return;
+  }
+  if (!body["refreshMinutes"].isNull()) {
+    String error;
+    if (!body["refreshMinutes"].is<int>() || !weatherSetRefresh(body["refreshMinutes"].as<int>(), error)) {
+      sendError(400, error.isEmpty() ? String("refreshMinutes must be a whole number").c_str() : error.c_str());
+      return;
+    }
+  }
+  if (!body["key"].isNull()) {
+    String key = body["key"] | "";
+    key.trim();
+    weatherSetKey(key);
+  }
+  if (setPlace) {
+    weatherSetPlace(where);
+  }
+  if (!body["units"].isNull()) {
+    weatherSetFahrenheit(body["units"] == "f");
+  }
+  sendWeather();
+}
+
+// ?q=George: towns for Settings to choose from. Asks WeatherAPI.com, so it
+// takes a second or two.
+static void handleWeatherSearch() {
+  std::vector<WeatherPlace> places;
+  String error;
+  if (!weatherSearch(server.arg("q"), places, error)) {
+    sendError(error.startsWith("type ") || error.startsWith("enter ") ? 400 : 502, error.c_str());
+    return;
+  }
+  JsonDocument doc;
+  JsonArray list = doc["places"].to<JsonArray>();
+  for (const WeatherPlace &where : places) {
+    JsonObject item = list.add<JsonObject>();
+    item["name"] = where.name;
+    item["region"] = where.region;
+    item["country"] = where.country;
+    item["lat"] = where.lat;
+    item["lon"] = where.lon;
+  }
+  sendJson(200, doc);
+}
+
 // --- starter art ---------------------------------------------------------------------
 
 static void handleListStarter() {
@@ -1378,6 +1488,9 @@ void apiBegin() {
   server.on(API_BASE "/auth/pin", HTTP_PUT, guarded(handlePutPin));
   server.on(API_BASE "/update", HTTP_POST, handleUpdate, handleUpdateBody); // checks the PIN itself
   server.on(API_BASE "/uploads", HTTP_GET, guarded(handleListUploads));
+  server.on(API_BASE "/weather", HTTP_GET, guarded(handleGetWeather));
+  server.on(API_BASE "/weather", HTTP_PUT, guarded(handlePutWeather));
+  server.on(API_BASE "/weather/search", HTTP_GET, guarded(handleWeatherSearch));
   server.on(API_BASE "/starter", HTTP_GET, guarded(handleListStarter));
   // Before {}.gif, which would match "7/still" as the id.
   server.on(UriBraces(API_BASE "/starter/{}/still.gif"), HTTP_GET, guarded(handleStarterStill));

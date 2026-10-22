@@ -3271,6 +3271,200 @@
       ]
     },
     {
+      "name": "Weather",
+      "item": [
+        {
+          "name": "Get Weather",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/weather",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "weather"
+              ]
+            },
+            "description": "The weather settings and the latest reading. The key is never sent back, only whether one is set."
+          },
+          "response": []
+        },
+        {
+          "name": "Search For A Town",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/weather/search?q=Georgetown",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "weather",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "Georgetown"
+                }
+              ]
+            },
+            "description": "Towns matching a name, from WeatherAPI.com, to choose from."
+          },
+          "response": []
+        },
+        {
+          "name": "Weather In Fahrenheit",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/weather",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "weather"
+              ]
+            },
+            "description": "Shows the temperature in Fahrenheit.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"units\": \"f\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Check Every 30 Minutes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "X-Jukebox-Pin",
+                "value": "{{pin}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "http://{{device_ip}}/api/v1/weather",
+              "protocol": "http",
+              "host": [
+                "{{device_ip}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "weather"
+              ]
+            },
+            "description": "How often to check: 15 to 60 minutes.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshMinutes\": 30\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Starter art",
       "item": [
         {

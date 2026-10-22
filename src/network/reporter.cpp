@@ -10,6 +10,7 @@
 #include "network/makapix.h"
 #include "storage/card.h"
 #include "view_queue.h"
+#include "network/weather.h"
 
 static const uint32_t STACK_BYTES = 12288; // a TLS handshake and a small JSON body
 static const BaseType_t CORE = 0;          // away from the display loop on core 1
@@ -247,6 +248,7 @@ static void reporterTask(void *) {
   for (;;) {
     ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
     saveNewViews();
+    weatherMaintain(); // the weather needs no Makapix link, so before the checks below
     if (WiFi.status() != WL_CONNECTED || !makapix::isRegistered() || (int32_t)(millis() - retryAt) < 0) {
       continue;
     }

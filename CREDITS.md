@@ -1,5 +1,12 @@
 # Credits
 
+## Weather
+
+[Weather by WeatherAPI.com](https://www.weatherapi.com/). The weather slot's
+current conditions come from WeatherAPI.com's free plan, whose terms require
+this credit; it is also shown in the control page's Weather settings. The
+weather pictures are this project's own, drawn by `tools/make_weather_icons.py`.
+
 ## Starter art
 
 The starter art built into the firmware (`assets/starter/`, made by
